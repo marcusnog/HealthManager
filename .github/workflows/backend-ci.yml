@@ -2,7 +2,7 @@ name: backend-ci
 
 on:
   push:
-    branches: ["main", "develop"]
+    branches: ["master", "main", "develop"]
   pull_request:
 
 env:
@@ -35,6 +35,9 @@ jobs:
       - name: Test
         run: dotnet test HealthManager.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory ./TestResults
 
+      - name: Restore dotnet tools
+        run: dotnet tool restore
+
       - name: Generate coverage report
         run: dotnet tool run reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:"CoverageReport" -reporttypes:"Html;Cobertura;MarkdownSummaryGithub"
 
@@ -54,7 +57,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name == 'push'
 
     permissions:
       id-token: write
