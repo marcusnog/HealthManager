@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: healthmanager-postgres
+    environment:
+      POSTGRES_DB: healthmanager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d healthmanager"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: healthmanager-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DATABASE_URL: Host=postgres;Port=5432;Database=healthmanager;Username=postgres;Password=postgres
+      JWT_ISSUER: healthmanager
+      JWT_AUDIENCE: healthmanager-web
+      JWT_SECRET: dev-secret-change-me-with-32-bytes
+      JWT_ACCESS_TOKEN_MINUTES: 30
+      JWT_REFRESH_TOKEN_DAYS: 30
+      SUPABASE_BUCKET: patient-documents
+      WHATSAPP_VERIFY_TOKEN: local-whatsapp-verify
+    ports:
+      - "8080:8080"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: healthmanager-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DATABASE_URL: Host=postgres;Port=5432;Database=healthmanager;Username=postgres;Password=postgres
+      JWT_ISSUER: healthmanager
+      JWT_AUDIENCE: healthmanager-web
+      JWT_SECRET: dev-secret-change-me-with-32-bytes
+      JWT_ACCESS_TOKEN_MINUTES: 30
+      JWT_REFRESH_TOKEN_DAYS: 30
+      SUPABASE_BUCKET: patient-documents
+
+volumes:
+  postgres_data:

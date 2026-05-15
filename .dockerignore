@@ -1,0 +1,10 @@
+.git
+.github
+.vs
+.vscode
+**/bin
+**/obj
+**/.DS_Store
+**/node_modules
+README.md
+

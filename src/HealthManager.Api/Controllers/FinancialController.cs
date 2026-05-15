@@ -1,0 +1,22 @@
+using HealthManager.Application;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace HealthManager.Api.Controllers;
+
+[ApiController]
+[Authorize(Policy = "ClinicStaff")]
+public sealed class FinancialController(IFinancialService financialService) : ControllerBase
+{
+    [HttpGet("receivables")]
+    public async Task<ActionResult<PagedResult<ReceivableResponse>>> ListReceivables([FromQuery] FinancialQuery query, CancellationToken cancellationToken)
+        => Ok(await financialService.ListReceivablesAsync(query, cancellationToken));
+
+    [HttpPost("payments")]
+    public async Task<ActionResult<PaymentResponse>> CreatePayment([FromBody] CreatePaymentRequest request, CancellationToken cancellationToken)
+    {
+        var response = await financialService.CreatePaymentAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(CreatePayment), new { id = response.Id }, response);
+    }
+}
+

@@ -1,0 +1,276 @@
+@apiBaseUrl = http://localhost:8080
+@platformAdminEmail = platform@healthmanager.local
+@clinicAdminEmail = admin@clinicaaurora.com
+@defaultPassword = ChangeMe123!
+
+@seedClinicId = 11111111-1111-1111-1111-111111111111
+@seedDoctorId = cccccccc-cccc-cccc-cccc-cccccccccccc
+@seedPatientId = dddddddd-dddd-dddd-dddd-dddddddddddd
+@seedAppointmentId = eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee
+@seedReceivableId = ffffffff-ffff-ffff-ffff-ffffffffffff
+
+###
+# Health check
+GET {{apiBaseUrl}}/health
+Accept: application/json
+
+###
+# Login como PlatformAdmin
+POST {{apiBaseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{platformAdminEmail}}",
+  "password": "{{defaultPassword}}"
+}
+
+> {% client.global.set("platformToken", response.body.accessToken); %}
+
+###
+# Login como Admin da clinica demo
+POST {{apiBaseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{clinicAdminEmail}}",
+  "password": "{{defaultPassword}}"
+}
+
+> {% client.global.set("clinicToken", response.body.accessToken); %}
+> {% client.global.set("clinicRefreshToken", response.body.refreshToken); %}
+
+###
+# Refresh token
+POST {{apiBaseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{clinicRefreshToken}}"
+}
+
+###
+# Dashboard da clinica
+GET {{apiBaseUrl}}/dashboard/summary
+Authorization: Bearer {{clinicToken}}
+Accept: application/json
+
+###
+# Listar pacientes
+GET {{apiBaseUrl}}/patients?page=1&pageSize=20&search=
+Authorization: Bearer {{clinicToken}}
+Accept: application/json
+
+###
+# Criar paciente
+POST {{apiBaseUrl}}/patients
+Authorization: Bearer {{clinicToken}}
+Content-Type: application/json
+
+{
+  "name": "Bruno Araujo",
+  "cpf": "56412309876",
+  "birthDate": "1988-09-12",
+  "phone": "11991144500",
+  "email": "bruno@email.com",
+  "healthInsurance": "Particular",
+  "notes": "Paciente criado pelo arquivo HTTP."
+}
+
+###
+# Atualizar paciente do seed
+PATCH {{apiBaseUrl}}/patients/{{seedPatientId}}
+Authorization: Bearer {{clinicToken}}
+Content-Type: application/json
+
+{
+  "name": "Ana Martins Atualizada",
+  "phone": "11999990000",
+  "email": "ana.atualizada@email.com",
+  "healthInsurance": "Particular",
+  "notes": "Cadastro atualizado via arquivo HTTP."
+}
+
+###
+# Upload multipart real para o paciente do seed
+POST {{apiBaseUrl}}/patients/{{seedPatientId}}/documents/upload
+Authorization: Bearer {{clinicToken}}
+Content-Type: multipart/form-data; boundary=HealthManagerBoundary
+
+--HealthManagerBoundary
+Content-Disposition: form-data; name="file"; filename="laudo-cardiologia.pdf"
+Content-Type: application/pdf
+
+conteudo-demo-pdf
+--HealthManagerBoundary--
+
+###
+# Vincular metadata de documento ao paciente do seed
+POST {{apiBaseUrl}}/patients/{{seedPatientId}}/documents
+Authorization: Bearer {{clinicToken}}
+Content-Type: application/json
+
+{
+  "fileName": "pedido-exame.pdf",
+  "contentType": "application/pdf",
+  "sizeInBytes": 204800
+}
+
+###
+# Listar documentos do paciente do seed
+GET {{apiBaseUrl}}/patients/{{seedPatientId}}/documents
+Authorization: Bearer {{clinicToken}}
+Accept: application/json
+
+###
+# Download autenticado do primeiro documento retornado
+GET {{apiBaseUrl}}/patients/{{seedPatientId}}/documents/{{documentId}}/download
+Authorization: Bearer {{clinicToken}}
+
+###
+# Remover documento do paciente do seed
+DELETE {{apiBaseUrl}}/patients/{{seedPatientId}}/documents/{{documentId}}
+Authorization: Bearer {{clinicToken}}
+
+###
+# Listar medicos
+GET {{apiBaseUrl}}/doctors
+Authorization: Bearer {{clinicToken}}
+Accept: application/json
+
+###
+# Criar medico
+POST {{apiBaseUrl}}/doctors
+Authorization: Bearer {{clinicToken}}
+Content-Type: application/json
+
+{
+  "name": "Dra. Luciana Costa",
+  "specialty": "Dermatologia",
+  "crm": "CRM-SP-987654",
+  "phone": "11997776655",
+  "email": "luciana.costa@clinicaaurora.com"
+}
+
+###
+# Atualizar medico do seed
+PATCH {{apiBaseUrl}}/doctors/{{seedDoctorId}}
+Authorization: Bearer {{clinicToken}}
+Content-Type: application/json
+
+{
+  "name": "Dr. Carlos Eduardo",
+  "specialty": "Cardiologia clinica",
+  "phone": "11995550011",
+  "email": "carlos.eduardo@clinicaaurora.com",
+  "isActive": true
+}
+
+###
+# Listar agenda do dia
+GET {{apiBaseUrl}}/appointments?date=2026-05-07
+Authorization: Bearer {{clinicToken}}
+Accept: application/json
+
+###
+# Criar consulta nova
+POST {{apiBaseUrl}}/appointments
+Authorization: Bearer {{clinicToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{seedPatientId}}",
+  "doctorId": "{{seedDoctorId}}",
+  "startAt": "2026-05-08T15:00:00Z",
+  "durationMinutes": 30,
+  "notes": "Consulta criada manualmente para smoke test.",
+  "type": "Retorno",
+  "amount": 180
+}
+
+###
+# Confirmar consulta seed
+POST {{apiBaseUrl}}/appointments/{{seedAppointmentId}}/confirm
+Authorization: Bearer {{clinicToken}}
+Accept: application/json
+
+###
+# Cancelar consulta seed
+POST {{apiBaseUrl}}/appointments/{{seedAppointmentId}}/cancel
+Authorization: Bearer {{clinicToken}}
+Accept: application/json
+
+###
+# Listar contas a receber
+GET {{apiBaseUrl}}/receivables
+Authorization: Bearer {{clinicToken}}
+Accept: application/json
+
+###
+# Registrar pagamento parcial
+POST {{apiBaseUrl}}/payments
+Authorization: Bearer {{clinicToken}}
+Content-Type: application/json
+
+{
+  "receivableId": "{{seedReceivableId}}",
+  "amount": 50,
+  "paymentMethod": "Pix",
+  "paidAt": "2026-05-07T13:30:00Z",
+  "notes": "Entrada registrada via arquivo HTTP."
+}
+
+###
+# Simular webhook de confirmacao por WhatsApp
+POST {{apiBaseUrl}}/whatsapp/webhook
+Content-Type: application/json
+
+{
+  "clinicId": "{{seedClinicId}}",
+  "appointmentId": "{{seedAppointmentId}}",
+  "phone": "11999998888",
+  "message": "CONFIRMAR",
+  "providerMessageId": "meta-demo-001"
+}
+
+###
+# Provisionar nova clinica como PlatformAdmin
+POST {{apiBaseUrl}}/internal/clinics
+Authorization: Bearer {{platformToken}}
+Content-Type: application/json
+
+{
+  "name": "Clinica Horizonte",
+  "slug": "clinica-horizonte",
+  "timezone": "America/Sao_Paulo",
+  "businessHoursJson": "{\"start\":\"08:00\",\"end\":\"18:00\"}",
+  "cnpj": "12345678000199",
+  "email": "contato@clinicahorizonte.com",
+  "phone": "1130304040",
+  "address": "Rua das Palmeiras, 42 - Sao Paulo",
+  "adminName": "Mariana Costa",
+  "adminEmail": "admin@clinicahorizonte.com",
+  "adminPassword": "ChangeMe123!"
+}
+
+###
+# Criar usuario em clinica existente como PlatformAdmin
+POST {{apiBaseUrl}}/internal/clinics/{{seedClinicId}}/users
+Authorization: Bearer {{platformToken}}
+Content-Type: application/json
+
+{
+  "name": "Secretaria Demo",
+  "email": "secretaria@clinicaaurora.com",
+  "password": "ChangeMe123!",
+  "role": "Secretary"
+}
+
+###
+# Logout
+POST {{apiBaseUrl}}/auth/logout
+Authorization: Bearer {{clinicToken}}
+Content-Type: application/json
+
+{
+  "refreshToken": "{{clinicRefreshToken}}"
+}

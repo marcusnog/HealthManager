@@ -1,0 +1,1099 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "HealthManager API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "operationId": "auth_login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "auth_refresh",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "auth_logout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/patients": {
+      "get": {
+        "operationId": "patients_list",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedPatientResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "patients_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePatientRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}": {
+      "patch": {
+        "operationId": "patients_update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePatientRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}/access-token/regenerate": {
+      "post": {
+        "operationId": "patientsRegenerateAccessToken",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "type": "string", "format": "uuid" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}/documents": {
+      "get": {
+        "operationId": "patients_documents_list",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PatientDocumentResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "patients_documents_create",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePatientDocumentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientDocumentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}/documents/upload": {
+      "post": {
+        "operationId": "patients_documents_upload",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadPatientDocumentForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientDocumentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}/documents/{documentId}/download": {
+      "get": {
+        "operationId": "patients_documents_download",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}/documents/{documentId}": {
+      "delete": {
+        "operationId": "patients_documents_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/doctors": {
+      "get": {
+        "operationId": "doctors_list",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DoctorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "doctors_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDoctorRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctors/{id}": {
+      "patch": {
+        "operationId": "doctors_update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDoctorRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointments": {
+      "get": {
+        "operationId": "appointments_list",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "doctorId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedAppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "appointments_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAppointmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointments/{id}/confirm": {
+      "post": {
+        "operationId": "appointments_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointments/{id}/cancel": {
+      "post": {
+        "operationId": "appointments_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/receivables": {
+      "get": {
+        "operationId": "receivables_list",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["Pending", "Partial", "Paid"]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedReceivableResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments": {
+      "post": {
+        "operationId": "payments_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/summary": {
+      "get": {
+        "operationId": "dashboard_summary",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/auth": {
+      "post": {
+        "operationId": "portal_auth",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PatientPortalLoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PatientPortalAuthResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/me": {
+      "get": {
+        "operationId": "portal_me",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PatientPortalProfileResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/appointments": {
+      "get": {
+        "operationId": "portal_appointments",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/PatientPortalAppointmentResponse" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/receivables": {
+      "get": {
+        "operationId": "portal_receivables",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/PatientPortalReceivableResponse" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/documents": {
+      "get": {
+        "operationId": "portal_documents",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/PatientDocumentResponse" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "RefreshTokenRequest": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": {
+          "refreshToken": { "type": "string" }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "user": { "$ref": "#/components/schemas/UserResponse" }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "clinicId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string" }
+        }
+      },
+      "CreatePatientRequest": {
+        "type": "object",
+        "required": ["name", "cpf", "phone"],
+        "properties": {
+          "name": { "type": "string" },
+          "cpf": { "type": "string" },
+          "birthDate": { "type": "string", "format": "date" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "healthInsurance": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      },
+      "CreatePatientDocumentRequest": {
+        "type": "object",
+        "required": ["fileName", "contentType", "sizeInBytes"],
+        "properties": {
+          "fileName": { "type": "string" },
+          "contentType": { "type": "string" },
+          "sizeInBytes": { "type": "integer", "format": "int64" }
+        }
+      },
+      "UploadPatientDocumentForm": {
+        "type": "object",
+        "required": ["file"],
+        "properties": {
+          "file": { "type": "string", "format": "binary" }
+        }
+      },
+      "PatientDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "fileName": { "type": "string" },
+          "contentType": { "type": "string" },
+          "sizeInBytes": { "type": "integer", "format": "int64" },
+          "storagePath": { "type": "string" }
+        }
+      },
+      "PatientResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "cpf": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "healthInsurance": { "type": "string" },
+          "notes": { "type": "string" },
+          "patientAccessToken": { "type": "string", "format": "uuid" }
+        }
+      },
+      "UpdatePatientRequest": {
+        "type": "object",
+        "required": ["name", "phone"],
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "healthInsurance": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      },
+      "PagedPatientResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PatientResponse" }
+          },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+      "PagedAppointmentResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AppointmentResponse" }
+          },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+      "PagedReceivableResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ReceivableResponse" }
+          },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+      "CreateDoctorRequest": {
+        "type": "object",
+        "required": ["name", "crm", "specialty"],
+        "properties": {
+          "name": { "type": "string" },
+          "crm": { "type": "string" },
+          "specialty": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" }
+        }
+      },
+      "DoctorResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "crm": { "type": "string" },
+          "specialty": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "UpdateDoctorRequest": {
+        "type": "object",
+        "required": ["name", "specialty", "isActive"],
+        "properties": {
+          "name": { "type": "string" },
+          "specialty": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "CreateAppointmentRequest": {
+        "type": "object",
+        "required": ["patientId", "doctorId", "startAt"],
+        "properties": {
+          "patientId": { "type": "string", "format": "uuid" },
+          "doctorId": { "type": "string", "format": "uuid" },
+          "startAt": { "type": "string", "format": "date-time" },
+          "durationMinutes": { "type": "integer", "default": 30 },
+          "notes": { "type": "string" },
+          "type": { "type": "string" },
+          "amount": { "type": "number", "format": "decimal" }
+        }
+      },
+      "AppointmentResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "patientId": { "type": "string", "format": "uuid" },
+          "doctorId": { "type": "string", "format": "uuid" },
+          "startAt": { "type": "string", "format": "date-time" },
+          "endAt": { "type": "string", "format": "date-time" },
+          "status": { "type": "string" },
+          "confirmationStatus": { "type": "string" },
+          "type": { "type": "string" },
+          "amount": { "type": "number", "format": "decimal" },
+          "notes": { "type": "string" }
+        }
+      },
+      "ReceivableResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "appointmentId": { "type": "string", "format": "uuid" },
+          "originalAmount": { "type": "number", "format": "decimal" },
+          "receivedAmount": { "type": "number", "format": "decimal" },
+          "outstandingAmount": { "type": "number", "format": "decimal" },
+          "status": { "type": "string" },
+          "dueDate": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreatePaymentRequest": {
+        "type": "object",
+        "required": ["receivableId", "amount", "paymentMethod"],
+        "properties": {
+          "receivableId": { "type": "string", "format": "uuid" },
+          "amount": { "type": "number", "format": "decimal" },
+          "paymentMethod": { "type": "string" },
+          "paidAt": { "type": "string", "format": "date-time" },
+          "notes": { "type": "string" }
+        }
+      },
+      "PaymentResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "receivableId": { "type": "string", "format": "uuid" },
+          "amount": { "type": "number", "format": "decimal" },
+          "paymentMethod": { "type": "string" },
+          "paidAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DashboardSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "appointmentsToday": { "type": "integer" },
+          "confirmedToday": { "type": "integer" },
+          "cancelledToday": { "type": "integer" },
+          "monthlyRevenue": { "type": "number", "format": "decimal" },
+          "noShowRate": { "type": "number", "format": "double" },
+          "confirmationRate": { "type": "number", "format": "double" }
+        }
+      },
+      "PatientPortalLoginRequest": {
+        "type": "object",
+        "required": ["cpf", "accessToken"],
+        "properties": {
+          "cpf": { "type": "string" },
+          "accessToken": { "type": "string" }
+        }
+      },
+      "PatientPortalProfileResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "cpf": { "type": "string" },
+          "birthDate": { "type": "string", "format": "date" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "healthInsurance": { "type": "string" }
+        }
+      },
+      "PatientPortalAuthResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "patient": { "$ref": "#/components/schemas/PatientPortalProfileResponse" }
+        }
+      },
+      "PatientPortalAppointmentResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "doctorName": { "type": "string" },
+          "doctorSpecialty": { "type": "string" },
+          "startAt": { "type": "string", "format": "date-time" },
+          "endAt": { "type": "string", "format": "date-time" },
+          "status": { "type": "string" },
+          "type": { "type": "string" },
+          "notes": { "type": "string" },
+          "amount": { "type": "number" }
+        }
+      },
+      "PatientPortalReceivableResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "originalAmount": { "type": "number" },
+          "receivedAmount": { "type": "number" },
+          "outstandingAmount": { "type": "number" },
+          "status": { "type": "string" },
+          "dueDate": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
