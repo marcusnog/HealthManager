@@ -13,7 +13,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "healthmanager-terraform-state" # substitua pelo nome real do bucket criado no bootstrap
+    bucket         = "healthmanager-terraform-state-mn4821"
     key            = "production/terraform.tfstate"
     region         = "us-east-2"
     dynamodb_table = "healthmanager-terraform-locks"
