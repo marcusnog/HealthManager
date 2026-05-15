@@ -14,7 +14,10 @@
       "PowerShell(head -20)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\NITRO V\\\\Documents\\\\HealthManager\" -Force)",
       "Bash(Select-Object Name, FullName)",
-      "PowerShell(\\(Get-ChildItem -Path \"c:\\\\Users\\\\NITRO V\\\\Documents\\\\healthmanager-web\" | Measure-Object\\).Count)"
+      "PowerShell(\\(Get-ChildItem -Path \"c:\\\\Users\\\\NITRO V\\\\Documents\\\\healthmanager-web\" | Measure-Object\\).Count)",
+      "Bash(dotnet add *)",
+      "Bash(cat \"C:\\\\Users\\\\NITROV~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-NITRO-V-Documents-HealthManager\\\\f880f3d2-de26-4fea-ac73-7854c2buf3188\\\\tasks\\\\bp7kki2c9.output\" 2>/dev/null || cat \"C:\\\\Users\\\\NITRO V\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-NITRO-V-Documents-HealthManager\\\\f880f3d2-de26-4fea-ac73-7854c2bd3188\\\\tasks\\\\bp7kki2c9.output\")",
+      "Read(//c/Users/NITRO V/AppData/Local/Temp/claude/c--Users-NITRO-V-Documents-HealthManager/f880f3d2-de26-4fea-ac73-7854c2bd3188/tasks/**)"
     ]
   }
 }

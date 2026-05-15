@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace HealthManager.Tests.Integration;
 
@@ -30,6 +31,11 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
                 ["INMEMORY_DATABASE_NAME"] = databaseName,
                 ["SENTRY_DSN"] = ""
             });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            services.Replace(ServiceDescriptor.Singleton<IStorageService, FakeStorageService>());
         });
     }
 

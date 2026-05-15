@@ -7,7 +7,7 @@ using Serilog;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddHostedService<OutboxWorker>();
 
 builder.Services.AddSerilog(configuration => configuration.WriteTo.Console());

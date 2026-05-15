@@ -4,14 +4,14 @@ services:
     container_name: healthmanager-postgres
     environment:
       POSTGRES_DB: healthmanager
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d healthmanager"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d healthmanager"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -26,14 +26,15 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      DATABASE_URL: Host=postgres;Port=5432;Database=healthmanager;Username=postgres;Password=postgres
-      JWT_ISSUER: healthmanager
-      JWT_AUDIENCE: healthmanager-web
-      JWT_SECRET: dev-secret-change-me-with-32-bytes
-      JWT_ACCESS_TOKEN_MINUTES: 30
-      JWT_REFRESH_TOKEN_DAYS: 30
-      SUPABASE_BUCKET: patient-documents
-      WHATSAPP_VERIFY_TOKEN: local-whatsapp-verify
+      DATABASE_URL: ${DATABASE_URL:-Host=postgres;Port=5432;Database=healthmanager;Username=postgres;Password=postgres}
+      JWT_ISSUER: ${JWT_ISSUER:-healthmanager}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-healthmanager-web}
+      JWT_SECRET: ${JWT_SECRET:-change-me-super-secret-key-32-bytes}
+      JWT_ACCESS_TOKEN_MINUTES: ${JWT_ACCESS_TOKEN_MINUTES:-30}
+      JWT_REFRESH_TOKEN_DAYS: ${JWT_REFRESH_TOKEN_DAYS:-30}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
     ports:
       - "8080:8080"
 
@@ -49,13 +50,11 @@ services:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      DATABASE_URL: Host=postgres;Port=5432;Database=healthmanager;Username=postgres;Password=postgres
-      JWT_ISSUER: healthmanager
-      JWT_AUDIENCE: healthmanager-web
-      JWT_SECRET: dev-secret-change-me-with-32-bytes
-      JWT_ACCESS_TOKEN_MINUTES: 30
-      JWT_REFRESH_TOKEN_DAYS: 30
-      SUPABASE_BUCKET: patient-documents
+      DATABASE_URL: ${DATABASE_URL:-Host=postgres;Port=5432;Database=healthmanager;Username=postgres;Password=postgres}
+      JWT_ISSUER: ${JWT_ISSUER:-healthmanager}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-healthmanager-web}
+      JWT_SECRET: ${JWT_SECRET:-change-me-super-secret-key-32-bytes}
+      SENTRY_DSN: ${SENTRY_DSN:-}
 
 volumes:
   postgres_data:

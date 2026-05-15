@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Amazon.S3;
+using Amazon.S3.Model;
 using BCrypt.Net;
 using HealthManager.Application;
 using HealthManager.Domain;
@@ -39,85 +41,54 @@ public sealed class RequestTenantProvider(IHttpContextAccessor httpContextAccess
     private static Guid? ParseGuid(string? value) => Guid.TryParse(value, out var parsed) ? parsed : null;
 }
 
-public sealed class StorageService(HttpClient httpClient, IConfiguration configuration) : IStorageService
+public sealed class StorageService(IAmazonS3 s3, IConfiguration configuration) : IStorageService
 {
-    private readonly string bucket = configuration["SUPABASE_BUCKET"] ?? "patient-documents";
-    private readonly string? supabaseUrl = configuration["SUPABASE_URL"];
-    private readonly string? supabaseKey = configuration["SUPABASE_KEY"];
+    private readonly string? bucket = configuration["AWS_S3_BUCKET"];
     private readonly string localStorageRoot = configuration["LOCAL_STORAGE_ROOT"] ?? Path.Combine(Path.GetTempPath(), "healthmanager-storage");
 
     public string BuildPatientDocumentPath(Guid clinicId, Guid patientId, string fileName)
     {
         var sanitized = fileName.Replace(" ", "-").ToLowerInvariant();
-        return $"{bucket}/clinics/{clinicId}/patients/{patientId}/{sanitized}";
+        return $"clinics/{clinicId}/patients/{patientId}/{sanitized}";
     }
 
     public async Task UploadPatientDocumentAsync(string storagePath, Stream content, string contentType, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(supabaseKey))
+        if (string.IsNullOrWhiteSpace(bucket))
         {
-            var localAbsolutePath = ResolveLocalPath(storagePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(localAbsolutePath)!);
-            await using var fileStream = File.Create(localAbsolutePath);
+            var localPath = ResolveLocalPath(storagePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+            await using var fileStream = File.Create(localPath);
             await content.CopyToAsync(fileStream, cancellationToken);
             return;
         }
 
-        var objectKey = storagePath.StartsWith($"{bucket}/", StringComparison.OrdinalIgnoreCase)
-            ? storagePath[(bucket.Length + 1)..]
-            : storagePath;
-        var encodedObjectKey = string.Join("/", objectKey.Split('/').Select(Uri.EscapeDataString));
-        var requestUri = $"{supabaseUrl.TrimEnd('/')}/storage/v1/object/{bucket}/{encodedObjectKey}";
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", supabaseKey);
-        request.Headers.Add("apikey", supabaseKey);
-        request.Headers.Add("x-upsert", "false");
-
-        var streamContent = new StreamContent(content);
-        streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
-        request.Content = streamContent;
-
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        var request = new PutObjectRequest
         {
-            var error = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Falha ao enviar arquivo para o Supabase Storage: {(int)response.StatusCode} {error}");
-        }
+            BucketName  = bucket,
+            Key         = storagePath,
+            InputStream = content,
+            ContentType = contentType,
+        };
+
+        var response = await s3.PutObjectAsync(request, cancellationToken);
+        if ((int)response.HttpStatusCode >= 300)
+            throw new InvalidOperationException($"Falha ao enviar arquivo para o S3: {response.HttpStatusCode}");
     }
 
     public async Task<Stream> DownloadPatientDocumentAsync(string storagePath, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(supabaseKey))
+        if (string.IsNullOrWhiteSpace(bucket))
         {
-            var localAbsolutePath = ResolveLocalPath(storagePath);
-            if (!File.Exists(localAbsolutePath))
-            {
+            var localPath = ResolveLocalPath(storagePath);
+            if (!File.Exists(localPath))
                 throw new KeyNotFoundException("Arquivo nao encontrado no storage local.");
-            }
-
-            return File.OpenRead(localAbsolutePath);
+            return File.OpenRead(localPath);
         }
 
-        var objectKey = storagePath.StartsWith($"{bucket}/", StringComparison.OrdinalIgnoreCase)
-            ? storagePath[(bucket.Length + 1)..]
-            : storagePath;
-        var encodedObjectKey = string.Join("/", objectKey.Split('/').Select(Uri.EscapeDataString));
-        var requestUri = $"{supabaseUrl.TrimEnd('/')}/storage/v1/object/authenticated/{bucket}/{encodedObjectKey}";
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", supabaseKey);
-        request.Headers.Add("apikey", supabaseKey);
-
-        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            var error = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Falha ao baixar arquivo do Supabase Storage: {(int)response.StatusCode} {error}");
-        }
-
+        var response = await s3.GetObjectAsync(bucket, storagePath, cancellationToken);
         var memoryStream = new MemoryStream();
-        await response.Content.CopyToAsync(memoryStream, cancellationToken);
+        await response.ResponseStream.CopyToAsync(memoryStream, cancellationToken);
         memoryStream.Position = 0;
         return memoryStream;
     }

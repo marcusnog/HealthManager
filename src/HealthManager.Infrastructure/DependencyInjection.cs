@@ -1,3 +1,4 @@
+using Amazon.S3;
 using HealthManager.Application;
 using HealthManager.Domain;
 using HealthManager.Infrastructure.Persistence;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -12,13 +14,17 @@ namespace HealthManager.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
+        var jwtSecret = configuration["JWT_SECRET"];
+        if (environment.IsProduction() && string.IsNullOrWhiteSpace(jwtSecret))
+            throw new InvalidOperationException("JWT_SECRET must be set in production.");
+
         services.Configure<JwtOptions>(options =>
         {
             options.Issuer = configuration["JWT_ISSUER"] ?? "healthmanager";
             options.Audience = configuration["JWT_AUDIENCE"] ?? "healthmanager-web";
-            options.Secret = configuration["JWT_SECRET"] ?? "change-me-super-secret-key-32-bytes";
+            options.Secret = jwtSecret ?? "change-me-super-secret-key-32-bytes";
             options.AccessTokenMinutes = int.TryParse(configuration["JWT_ACCESS_TOKEN_MINUTES"], out var accessMinutes) ? accessMinutes : 30;
             options.RefreshTokenDays = int.TryParse(configuration["JWT_REFRESH_TOKEN_DAYS"], out var refreshDays) ? refreshDays : 30;
         });
@@ -27,7 +33,8 @@ public static class DependencyInjection
         services.AddScoped<ITenantProvider, RequestTenantProvider>();
         services.AddScoped<IClock, SystemClock>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
-        services.AddHttpClient<IStorageService, StorageService>();
+        services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client());
+        services.AddScoped<IStorageService, StorageService>();
         services.AddScoped<IOutboxService, OutboxService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<OutboxProcessor>();
@@ -56,7 +63,7 @@ public static class DependencyInjection
         {
             Issuer = configuration["JWT_ISSUER"] ?? "healthmanager",
             Audience = configuration["JWT_AUDIENCE"] ?? "healthmanager-web",
-            Secret = configuration["JWT_SECRET"] ?? "change-me-super-secret-key-32-bytes"
+            Secret = jwtSecret ?? "change-me-super-secret-key-32-bytes"
         };
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

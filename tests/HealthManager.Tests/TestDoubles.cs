@@ -25,12 +25,22 @@ internal sealed class FakeClock(DateTimeOffset now) : IClock
 
 internal sealed class FakeStorageService : IStorageService
 {
-    public string BuildPatientDocumentPath(Guid clinicId, Guid patientId, string fileName) =>
-        $"bucket/clinics/{clinicId}/patients/{patientId}/{fileName}";
+    private readonly Dictionary<string, byte[]> _store = [];
 
-    public Task UploadPatientDocumentAsync(string storagePath, Stream content, string contentType, CancellationToken cancellationToken)
-        => Task.CompletedTask;
+    public string BuildPatientDocumentPath(Guid clinicId, Guid patientId, string fileName) =>
+        $"clinics/{clinicId}/patients/{patientId}/{fileName}";
+
+    public async Task UploadPatientDocumentAsync(string storagePath, Stream content, string contentType, CancellationToken cancellationToken)
+    {
+        using var ms = new MemoryStream();
+        await content.CopyToAsync(ms, cancellationToken);
+        _store[storagePath] = ms.ToArray();
+    }
 
     public Task<Stream> DownloadPatientDocumentAsync(string storagePath, CancellationToken cancellationToken)
-        => Task.FromResult<Stream>(new MemoryStream("fake-file"u8.ToArray()));
+    {
+        if (!_store.TryGetValue(storagePath, out var data))
+            throw new KeyNotFoundException($"Arquivo nao encontrado no storage fake: {storagePath}");
+        return Task.FromResult<Stream>(new MemoryStream(data));
+    }
 }
