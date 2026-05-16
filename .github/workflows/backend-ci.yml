@@ -8,10 +8,9 @@ on:
 env:
   AWS_REGION: us-east-2
   ECR_API_REPO: healthmanager-api
-  ECR_WORKER_REPO: healthmanager-worker
   ECS_CLUSTER: healthmanager-cluster
   ECS_API_SERVICE: healthmanager-api
-  ECS_WORKER_SERVICE: healthmanager-worker
+  LAMBDA_OUTBOX_FUNCTION: healthmanager-outbox
 
 jobs:
   build-test:
@@ -67,6 +66,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -90,14 +94,21 @@ jobs:
           docker push $REGISTRY/$ECR_API_REPO:$TAG
           docker push $REGISTRY/$ECR_API_REPO:latest
 
-      - name: Build and push Worker image
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          TAG: ${{ steps.tag.outputs.TAG }}
+      - name: Publish Lambda
         run: |
-          docker build -f Dockerfile.worker -t $REGISTRY/$ECR_WORKER_REPO:$TAG -t $REGISTRY/$ECR_WORKER_REPO:latest .
-          docker push $REGISTRY/$ECR_WORKER_REPO:$TAG
-          docker push $REGISTRY/$ECR_WORKER_REPO:latest
+          dotnet publish src/HealthManager.Lambda/HealthManager.Lambda.csproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained true \
+            --output /tmp/lambda-publish
+          cd /tmp/lambda-publish && zip -r /tmp/outbox-lambda.zip .
+
+      - name: Deploy Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name $LAMBDA_OUTBOX_FUNCTION \
+            --zip-file fileb:///tmp/outbox-lambda.zip \
+            --architectures x86_64
 
       - name: Deploy API to ECS
         env:
@@ -109,17 +120,6 @@ jobs:
             '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)')
           NEW_TASK_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
           aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_API_SERVICE --task-definition $NEW_TASK_ARN --force-new-deployment
-
-      - name: Deploy Worker to ECS
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          TAG: ${{ steps.tag.outputs.TAG }}
-        run: |
-          TASK_DEF=$(aws ecs describe-task-definition --task-definition healthmanager-worker --query taskDefinition)
-          NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$REGISTRY/$ECR_WORKER_REPO:$TAG" \
-            '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)')
-          NEW_TASK_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
-          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_WORKER_SERVICE --task-definition $NEW_TASK_ARN --force-new-deployment
 
       - name: Wait for API deployment
         run: aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_API_SERVICE

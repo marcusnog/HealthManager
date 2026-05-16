@@ -10,14 +10,18 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
   }
 
   backend "s3" {
-    bucket         = "healthmanager-terraform-state-mn4821"
-    key            = "production/terraform.tfstate"
-    region         = "us-east-2"
-    dynamodb_table = "healthmanager-terraform-locks"
-    encrypt        = true
+    bucket       = "healthmanager-terraform-state-mn4821"
+    key          = "production/terraform.tfstate"
+    region       = "us-east-2"
+    use_lockfile = true
+    encrypt      = true
   }
 }
 
@@ -57,6 +61,7 @@ module "compute" {
   project               = var.project
   vpc_id                = module.network.vpc_id
   public_subnet_ids     = module.network.public_subnet_ids
+  private_subnet_ids    = module.network.private_subnet_ids
   alb_sg_id             = module.network.alb_sg_id
   api_sg_id             = module.network.api_sg_id
   worker_sg_id          = module.network.worker_sg_id

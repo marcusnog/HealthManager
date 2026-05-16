@@ -21,7 +21,8 @@
       "Bash(aws ecr *)",
       "Bash(docker login *)",
       "Bash(docker build *)",
-      "PowerShell(gh run list --repo marcusnog/HealthManager --limit 3 2>&1)"
+      "PowerShell(gh run list --repo marcusnog/HealthManager --limit 3 2>&1)",
+      "Bash(dotnet restore *)"
     ]
   }
 }

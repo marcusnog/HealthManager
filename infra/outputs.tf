@@ -8,11 +8,6 @@ output "ecr_api_url" {
   value       = module.compute.ecr_api_url
 }
 
-output "ecr_worker_url" {
-  description = "ECR URL for Worker image — use in CI/CD"
-  value       = module.compute.ecr_worker_url
-}
-
 output "ecs_cluster_name" {
   value = module.compute.ecs_cluster_name
 }
@@ -21,8 +16,9 @@ output "ecs_api_service_name" {
   value = module.compute.ecs_api_service_name
 }
 
-output "ecs_worker_service_name" {
-  value = module.compute.ecs_worker_service_name
+output "lambda_outbox_function_name" {
+  description = "Lambda function name for outbox processor — use in CI/CD"
+  value       = module.compute.lambda_outbox_function_name
 }
 
 output "rds_address" {

@@ -12,15 +12,6 @@ resource "aws_ecr_repository" "api" {
   }
 }
 
-resource "aws_ecr_repository" "worker" {
-  name                 = "${var.project}-worker"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-}
-
 resource "aws_ecr_lifecycle_policy" "api" {
   repository = aws_ecr_repository.api.name
   policy = jsonencode({
@@ -35,11 +26,6 @@ resource "aws_ecr_lifecycle_policy" "api" {
       action = { type = "expire" }
     }]
   })
-}
-
-resource "aws_ecr_lifecycle_policy" "worker" {
-  repository = aws_ecr_repository.worker.name
-  policy     = aws_ecr_lifecycle_policy.api.policy
 }
 
 # ── Secrets Manager ──────────────────────────────────────────────────────────
@@ -137,8 +123,8 @@ resource "aws_cloudwatch_log_group" "api" {
   retention_in_days = 14
 }
 
-resource "aws_cloudwatch_log_group" "worker" {
-  name              = "/ecs/${var.project}-worker"
+resource "aws_cloudwatch_log_group" "lambda_outbox" {
+  name              = "/aws/lambda/${var.project}-outbox"
   retention_in_days = 14
 }
 
@@ -255,48 +241,129 @@ resource "aws_ecs_task_definition" "api" {
   }])
 }
 
-resource "aws_ecs_task_definition" "worker" {
-  family                   = "${var.project}-worker"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = 256
-  memory                   = 512
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
+# ── Lambda outbox ─────────────────────────────────────────────────────────────
 
-  container_definitions = jsonencode([{
-    name      = "worker"
-    image     = "${aws_ecr_repository.worker.repository_url}:latest"
-    essential = true
+data "archive_file" "lambda_placeholder" {
+  type        = "zip"
+  output_path = "${path.module}/lambda-placeholder.zip"
 
-    environment = [
-      { name = "ASPNETCORE_ENVIRONMENT", value = "Production" },
-      { name = "AWS_REGION", value = local.region },
-      { name = "AWS_S3_BUCKET", value = var.documents_bucket_name },
-      { name = "JWT_ISSUER", value = "healthmanager" },
-      { name = "JWT_AUDIENCE", value = "healthmanager-web" },
-    ]
+  source {
+    content  = "placeholder"
+    filename = "placeholder.txt"
+  }
+}
 
-    secrets = [
-      {
-        name      = "DATABASE_URL"
-        valueFrom = aws_secretsmanager_secret.database_url.arn
-      },
-      {
-        name      = "JWT_SECRET"
-        valueFrom = aws_secretsmanager_secret.jwt_secret.arn
-      },
-    ]
+resource "aws_iam_role" "lambda_outbox" {
+  name = "${var.project}-lambda-outbox"
 
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.worker.name
-        "awslogs-region"        = local.region
-        "awslogs-stream-prefix" = "ecs"
-      }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+# VPC access execution role includes ENI + CloudWatch Logs permissions
+resource "aws_iam_role_policy_attachment" "lambda_outbox_vpc" {
+  role       = aws_iam_role.lambda_outbox.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_outbox_s3" {
+  name = "${var.project}-lambda-outbox-s3"
+  role = aws_iam_role.lambda_outbox.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+      Resource = "${var.documents_bucket_arn}/*"
+    }]
+  })
+}
+
+resource "aws_lambda_function" "outbox" {
+  function_name = "${var.project}-outbox"
+  role          = aws_iam_role.lambda_outbox.arn
+  runtime       = "provided.al2023"
+  handler       = "bootstrap"
+  timeout       = 60
+  memory_size   = 512
+
+  filename         = data.archive_file.lambda_placeholder.output_path
+  source_code_hash = data.archive_file.lambda_placeholder.output_base64sha256
+
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [var.worker_sg_id]
+  }
+
+  environment {
+    variables = {
+      ASPNETCORE_ENVIRONMENT = "Production"
+      DATABASE_URL           = var.database_url
+      JWT_SECRET             = var.jwt_secret
+      AWS_S3_BUCKET          = var.documents_bucket_name
+      JWT_ISSUER             = "healthmanager"
+      JWT_AUDIENCE           = "healthmanager-web"
     }
-  }])
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda_outbox]
+
+  # CI/CD manages function code — Terraform only controls infra
+  lifecycle {
+    ignore_changes = [filename, source_code_hash]
+  }
+}
+
+# ── EventBridge Scheduler ─────────────────────────────────────────────────────
+
+resource "aws_iam_role" "scheduler" {
+  name = "${var.project}-scheduler"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "scheduler.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "scheduler_invoke" {
+  name = "${var.project}-scheduler-invoke"
+  role = aws_iam_role.scheduler.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.outbox.arn
+    }]
+  })
+}
+
+resource "aws_scheduler_schedule" "outbox" {
+  name       = "${var.project}-outbox"
+  group_name = "default"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  schedule_expression = "rate(1 minute)"
+
+  target {
+    arn      = aws_lambda_function.outbox.arn
+    role_arn = aws_iam_role.scheduler.arn
+  }
 }
 
 # ── ECS services ─────────────────────────────────────────────────────────────
@@ -328,24 +395,3 @@ resource "aws_ecs_service" "api" {
   depends_on = [aws_lb_listener.http]
 }
 
-resource "aws_ecs_service" "worker" {
-  name            = "${var.project}-worker"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.worker.arn
-  desired_count   = 1
-
-  capacity_provider_strategy {
-    capacity_provider = "FARGATE_SPOT"
-    weight            = 1
-  }
-
-  network_configuration {
-    subnets          = var.public_subnet_ids
-    security_groups  = [var.worker_sg_id]
-    assign_public_ip = true
-  }
-
-  lifecycle {
-    ignore_changes = [task_definition]
-  }
-}
