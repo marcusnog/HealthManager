@@ -134,12 +134,12 @@ resource "aws_iam_role_policy" "ecs_task_s3" {
 
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/ecs/${var.project}-api"
-  retention_in_days = 30
+  retention_in_days = 14
 }
 
 resource "aws_cloudwatch_log_group" "worker" {
   name              = "/ecs/${var.project}-worker"
-  retention_in_days = 30
+  retention_in_days = 14
 }
 
 # ── ECS cluster ──────────────────────────────────────────────────────────────
@@ -149,13 +149,13 @@ resource "aws_ecs_cluster" "main" {
 
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = "disabled"
   }
 }
 
 resource "aws_ecs_cluster_capacity_providers" "main" {
   cluster_name       = aws_ecs_cluster.main.name
-  capacity_providers = ["FARGATE"]
+  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
 }
 
 # ── ALB ──────────────────────────────────────────────────────────────────────
@@ -333,7 +333,11 @@ resource "aws_ecs_service" "worker" {
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.worker.arn
   desired_count   = 1
-  launch_type     = "FARGATE"
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 1
+  }
 
   network_configuration {
     subnets          = var.public_subnet_ids

@@ -20,7 +20,8 @@
       "Read(//c/Users/NITRO V/AppData/Local/Temp/claude/c--Users-NITRO-V-Documents-HealthManager/f880f3d2-de26-4fea-ac73-7854c2bd3188/tasks/**)",
       "Bash(aws ecr *)",
       "Bash(docker login *)",
-      "Bash(docker build *)"
+      "Bash(docker build *)",
+      "PowerShell(gh run list --repo marcusnog/HealthManager --limit 3 2>&1)"
     ]
   }
 }
