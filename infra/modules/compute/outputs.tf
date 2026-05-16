@@ -17,3 +17,7 @@ output "ecs_api_service_name" {
 output "lambda_outbox_function_name" {
   value = aws_lambda_function.outbox.function_name
 }
+
+output "cloudfront_domain_name" {
+  value = aws_cloudfront_distribution.api.domain_name
+}

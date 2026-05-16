@@ -21,6 +21,11 @@ output "lambda_outbox_function_name" {
   value       = module.compute.lambda_outbox_function_name
 }
 
+output "cloudfront_domain_name" {
+  description = "CloudFront HTTPS endpoint — use as NEXT_PUBLIC_API_BASE_URL no Amplify"
+  value       = "https://${module.compute.cloudfront_domain_name}"
+}
+
 output "rds_address" {
   description = "RDS endpoint — for debugging only, not exposed publicly"
   value       = module.database.db_address
