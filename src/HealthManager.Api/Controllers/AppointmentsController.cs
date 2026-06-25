@@ -20,6 +20,10 @@ public sealed class AppointmentsController(IAppointmentService appointmentServic
         return CreatedAtAction(nameof(Create), new { id = response.Id }, response);
     }
 
+    [HttpPatch("{id:guid}")]
+    public async Task<ActionResult<AppointmentResponse>> Update(Guid id, [FromBody] UpdateAppointmentRequest request, CancellationToken cancellationToken)
+        => Ok(await appointmentService.UpdateAsync(id, request, cancellationToken));
+
     [HttpPost("{id:guid}/confirm")]
     public async Task<ActionResult<AppointmentResponse>> Confirm(Guid id, CancellationToken cancellationToken)
         => Ok(await appointmentService.ConfirmAsync(id, cancellationToken));

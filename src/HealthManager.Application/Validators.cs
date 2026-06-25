@@ -95,6 +95,21 @@ public sealed class CreateAppointmentRequestValidator : AbstractValidator<Create
     }
 }
 
+public sealed class UpdateAppointmentRequestValidator : AbstractValidator<UpdateAppointmentRequest>
+{
+    public UpdateAppointmentRequestValidator()
+    {
+        When(x => x.DurationMinutes.HasValue, () =>
+        {
+            RuleFor(x => x.DurationMinutes!.Value).InclusiveBetween(15, 240);
+        });
+        When(x => x.Amount.HasValue, () =>
+        {
+            RuleFor(x => x.Amount!.Value).GreaterThanOrEqualTo(0);
+        });
+    }
+}
+
 public sealed class CreatePaymentRequestValidator : AbstractValidator<CreatePaymentRequest>
 {
     public CreatePaymentRequestValidator()

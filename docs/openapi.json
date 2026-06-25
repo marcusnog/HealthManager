@@ -214,6 +214,23 @@
               }
             }
           }
+      "delete": {
+        "operationId": "patients_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
         }
       }
     },
@@ -416,16 +433,38 @@
     "/doctors": {
       "get": {
         "operationId": "doctors_list",
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DoctorResponse"
-                  }
+                  "$ref": "#/components/schemas/PagedDoctorResponse"
                 }
               }
             }
@@ -492,6 +531,25 @@
                 }
               }
             }
+          }
+        }
+      }
+      "delete": {
+        "operationId": "doctors_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -636,6 +694,44 @@
         }
       }
     },
+    "/appointments/{id}": {
+      "patch": {
+        "operationId": "appointments_update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppointmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/receivables": {
       "get": {
         "operationId": "receivables_list",
@@ -696,6 +792,63 @@
       }
     },
     "/payments": {
+      "get": {
+        "operationId": "payments_list",
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "ReceivableId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "DateFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "DateTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedPaymentResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "payments_create",
         "requestBody": {
@@ -970,6 +1123,41 @@
           "page": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "total": { "type": "integer" }
+        }
+      },
+      "PagedDoctorResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DoctorResponse" }
+          },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+      "PagedPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PaymentResponse" }
+          },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+      "UpdateAppointmentRequest": {
+        "type": "object",
+        "properties": {
+          "doctorId": { "type": "string", "format": "uuid" },
+          "startAt": { "type": "string", "format": "date-time" },
+          "durationMinutes": { "type": "integer" },
+          "notes": { "type": "string" },
+          "type": { "type": "string" },
+          "amount": { "type": "number", "format": "decimal" }
         }
       },
       "CreateDoctorRequest": {

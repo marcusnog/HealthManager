@@ -10,8 +10,8 @@ namespace HealthManager.Api.Controllers;
 public sealed class DoctorsController(IDoctorService doctorService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<DoctorResponse>>> List(CancellationToken cancellationToken)
-        => Ok(await doctorService.ListAsync(cancellationToken));
+    public async Task<ActionResult<PagedResult<DoctorResponse>>> List([FromQuery] DoctorQuery query, CancellationToken cancellationToken)
+        => Ok(await doctorService.ListAsync(query, cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<DoctorResponse>> Create([FromBody] CreateDoctorRequest request, CancellationToken cancellationToken)
@@ -23,5 +23,12 @@ public sealed class DoctorsController(IDoctorService doctorService) : Controller
     [HttpPatch("{id:guid}")]
     public async Task<ActionResult<DoctorResponse>> Update(Guid id, [FromBody] UpdateDoctorRequest request, CancellationToken cancellationToken)
         => Ok(await doctorService.UpdateAsync(id, request, cancellationToken));
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        await doctorService.DeleteAsync(id, cancellationToken);
+        return NoContent();
+    }
 }
 

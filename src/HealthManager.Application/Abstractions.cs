@@ -77,6 +77,7 @@ public interface IPatientService
     Task<PagedResult<PatientResponse>> ListAsync(PatientQuery query, CancellationToken cancellationToken);
     Task<PatientResponse> CreateAsync(CreatePatientRequest request, CancellationToken cancellationToken);
     Task<PatientResponse> UpdateAsync(Guid patientId, UpdatePatientRequest request, CancellationToken cancellationToken);
+    Task DeleteAsync(Guid patientId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PatientDocumentResponse>> ListDocumentsAsync(Guid patientId, CancellationToken cancellationToken);
     Task<PatientDocumentResponse> UploadDocumentAsync(Guid patientId, UploadPatientDocumentRequest request, CancellationToken cancellationToken);
     Task<DownloadPatientDocumentResult> DownloadDocumentAsync(Guid patientId, Guid documentId, CancellationToken cancellationToken);
@@ -86,15 +87,17 @@ public interface IPatientService
 
 public interface IDoctorService
 {
-    Task<IReadOnlyList<DoctorResponse>> ListAsync(CancellationToken cancellationToken);
+    Task<PagedResult<DoctorResponse>> ListAsync(DoctorQuery query, CancellationToken cancellationToken);
     Task<DoctorResponse> CreateAsync(CreateDoctorRequest request, CancellationToken cancellationToken);
     Task<DoctorResponse> UpdateAsync(Guid doctorId, UpdateDoctorRequest request, CancellationToken cancellationToken);
+    Task DeleteAsync(Guid doctorId, CancellationToken cancellationToken);
 }
 
 public interface IAppointmentService
 {
     Task<PagedResult<AppointmentResponse>> ListAsync(AppointmentQuery query, CancellationToken cancellationToken);
     Task<AppointmentResponse> CreateAsync(CreateAppointmentRequest request, CancellationToken cancellationToken);
+    Task<AppointmentResponse> UpdateAsync(Guid appointmentId, UpdateAppointmentRequest request, CancellationToken cancellationToken);
     Task<AppointmentResponse> ConfirmAsync(Guid appointmentId, CancellationToken cancellationToken);
     Task<AppointmentResponse> CancelAsync(Guid appointmentId, CancellationToken cancellationToken);
 }
@@ -102,6 +105,7 @@ public interface IAppointmentService
 public interface IFinancialService
 {
     Task<PagedResult<ReceivableResponse>> ListReceivablesAsync(FinancialQuery query, CancellationToken cancellationToken);
+    Task<PagedResult<PaymentResponse>> ListPaymentsAsync(PaymentQuery query, CancellationToken cancellationToken);
     Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken);
 }
 

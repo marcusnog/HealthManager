@@ -39,6 +39,7 @@ public sealed class AppointmentServiceTests
             dbContext,
             new FakeTenantProvider(clinicId),
             new CreateAppointmentRequestValidator(),
+            new UpdateAppointmentRequestValidator(),
             new HealthManager.Infrastructure.OutboxService(dbContext));
 
         var action = async () => await service.CreateAsync(

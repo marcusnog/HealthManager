@@ -25,6 +25,13 @@ public sealed class PatientsController(IPatientService patientService, IPatientP
     public async Task<ActionResult<PatientResponse>> Update(Guid id, [FromBody] UpdatePatientRequest request, CancellationToken cancellationToken)
         => Ok(await patientService.UpdateAsync(id, request, cancellationToken));
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        await patientService.DeleteAsync(id, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("{id:guid}/documents")]
     public async Task<ActionResult<IReadOnlyList<PatientDocumentResponse>>> ListDocuments(Guid id, CancellationToken cancellationToken)
         => Ok(await patientService.ListDocumentsAsync(id, cancellationToken));

@@ -252,6 +252,29 @@ public sealed class PatientService(
         return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.Notes, patient.PatientAccessToken);
     }
 
+    public async Task DeleteAsync(Guid patientId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var patient = await dbContext.Patients
+            .FirstOrDefaultAsync(x => x.Id == patientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Paciente nao encontrado.");
+
+        patient.DeletedAt = DateTimeOffset.UtcNow;
+        patient.UpdatedAt = DateTimeOffset.UtcNow;
+
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            ClinicId = clinicId,
+            UserId = tenantProvider.UserId,
+            Action = "patient.deleted",
+            EntityName = nameof(Patient),
+            EntityId = patient.Id,
+            PayloadJson = JsonSerializer.Serialize(new { patient.Name, patient.Cpf })
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<PatientResponse> UpdateAsync(Guid patientId, UpdatePatientRequest request, CancellationToken cancellationToken)
     {
         await updateValidator.ValidateAndThrowAsync(request, cancellationToken);
@@ -416,14 +439,76 @@ public sealed class DoctorService(
     IValidator<CreateDoctorRequest> createValidator,
     IValidator<UpdateDoctorRequest> updateValidator) : IDoctorService
 {
-    public async Task<IReadOnlyList<DoctorResponse>> ListAsync(CancellationToken cancellationToken)
+    public async Task<PagedResult<DoctorResponse>> ListAsync(DoctorQuery query, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
-        return await dbContext.Doctors.AsNoTracking()
-            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null)
-            .OrderBy(x => x.Name)
+        var doctorsQuery = dbContext.Doctors.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
+
+        var normalizedSearch = query.Search?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            doctorsQuery = doctorsQuery.Where(x =>
+                x.Name.ToLower().Contains(normalizedSearch) ||
+                x.Specialty.ToLower().Contains(normalizedSearch) ||
+                x.Crm.Contains(normalizedSearch) ||
+                (x.Email != null && x.Email.ToLower().Contains(normalizedSearch)));
+        }
+
+        var total = await doctorsQuery.CountAsync(cancellationToken);
+
+        var sortBy = (query.SortBy ?? "name").ToLowerInvariant();
+        var sortDesc = string.Equals(query.SortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+        IOrderedQueryable<Doctor> ordered = sortBy switch
+        {
+            "specialty" => sortDesc
+                ? doctorsQuery.OrderByDescending(x => x.Specialty)
+                : doctorsQuery.OrderBy(x => x.Specialty),
+            "crm" => sortDesc
+                ? doctorsQuery.OrderByDescending(x => x.Crm)
+                : doctorsQuery.OrderBy(x => x.Crm),
+            "email" => sortDesc
+                ? doctorsQuery.OrderByDescending(x => x.Email ?? "")
+                : doctorsQuery.OrderBy(x => x.Email ?? ""),
+            "isactive" => sortDesc
+                ? doctorsQuery.OrderByDescending(x => x.IsActive)
+                : doctorsQuery.OrderBy(x => x.IsActive),
+            _ => sortDesc
+                ? doctorsQuery.OrderByDescending(x => x.Name)
+                : doctorsQuery.OrderBy(x => x.Name),
+        };
+
+        var items = await ordered
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
             .Select(x => new DoctorResponse(x.Id, x.Name, x.Specialty, x.Crm, x.Phone, x.Email, x.IsActive))
             .ToListAsync(cancellationToken);
+
+        return new PagedResult<DoctorResponse>(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task DeleteAsync(Guid doctorId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var doctor = await dbContext.Doctors
+            .FirstOrDefaultAsync(x => x.Id == doctorId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Medico nao encontrado.");
+
+        doctor.DeletedAt = DateTimeOffset.UtcNow;
+        doctor.UpdatedAt = DateTimeOffset.UtcNow;
+
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            ClinicId = clinicId,
+            UserId = tenantProvider.UserId,
+            Action = "doctor.deleted",
+            EntityName = nameof(Doctor),
+            EntityId = doctor.Id,
+            PayloadJson = JsonSerializer.Serialize(new { doctor.Name, doctor.Specialty })
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<DoctorResponse> CreateAsync(CreateDoctorRequest request, CancellationToken cancellationToken)
@@ -468,7 +553,8 @@ public sealed class DoctorService(
 public sealed class AppointmentService(
     IApplicationDbContext dbContext,
     ITenantProvider tenantProvider,
-    IValidator<CreateAppointmentRequest> validator,
+    IValidator<CreateAppointmentRequest> createValidator,
+    IValidator<UpdateAppointmentRequest> updateValidator,
     IOutboxService outboxService) : IAppointmentService
 {
     public async Task<PagedResult<AppointmentResponse>> ListAsync(AppointmentQuery query, CancellationToken cancellationToken)
@@ -507,7 +593,7 @@ public sealed class AppointmentService(
 
     public async Task<AppointmentResponse> CreateAsync(CreateAppointmentRequest request, CancellationToken cancellationToken)
     {
-        await validator.ValidateAndThrowAsync(request, cancellationToken);
+        await createValidator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
         var clinic = await dbContext.Clinics.FirstOrDefaultAsync(x => x.Id == clinicId && x.DeletedAt == null, cancellationToken)
@@ -566,6 +652,88 @@ public sealed class AppointmentService(
         }
 
         await outboxService.EnqueueAsync(clinicId, "appointment.created", new
+        {
+            appointment.Id,
+            appointment.PatientId,
+            appointment.DoctorId,
+            appointment.StartAt
+        }, cancellationToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(appointment);
+    }
+
+    public async Task<AppointmentResponse> UpdateAsync(Guid appointmentId, UpdateAppointmentRequest request, CancellationToken cancellationToken)
+    {
+        await updateValidator.ValidateAndThrowAsync(request, cancellationToken);
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var appointment = await dbContext.Appointments
+            .FirstOrDefaultAsync(x => x.Id == appointmentId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Consulta nao encontrada.");
+
+        if (appointment.Status == AppointmentStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Nao e possivel editar uma consulta cancelada.");
+        }
+
+        if (request.DoctorId.HasValue || request.StartAt.HasValue || request.DurationMinutes.HasValue)
+        {
+            var targetDoctorId = request.DoctorId ?? appointment.DoctorId;
+            var targetStartAt = request.StartAt ?? appointment.StartAt;
+            var targetDuration = request.DurationMinutes ?? (int)(appointment.EndAt - appointment.StartAt).TotalMinutes;
+            var targetEndAt = targetStartAt.AddMinutes(targetDuration);
+
+            if (targetDoctorId != appointment.DoctorId || targetStartAt != appointment.StartAt || targetDuration != (int)(appointment.EndAt - appointment.StartAt).TotalMinutes)
+            {
+                var clinic = await dbContext.Clinics.FirstOrDefaultAsync(x => x.Id == clinicId && x.DeletedAt == null, cancellationToken)
+                    ?? throw new KeyNotFoundException("Clinica nao encontrada.");
+
+                ValidateBusinessHours(clinic, targetStartAt, targetEndAt);
+
+                var conflict = await dbContext.Appointments.AnyAsync(x =>
+                    x.ClinicId == clinicId &&
+                    x.DoctorId == targetDoctorId &&
+                    x.Id != appointmentId &&
+                    x.DeletedAt == null &&
+                    x.Status != AppointmentStatus.Cancelled &&
+                    targetStartAt < x.EndAt &&
+                    targetEndAt > x.StartAt, cancellationToken);
+
+                if (conflict)
+                {
+                    throw new InvalidOperationException("Conflito de horario para o medico selecionado.");
+                }
+
+                appointment.DoctorId = targetDoctorId;
+                appointment.StartAt = targetStartAt;
+                appointment.EndAt = targetEndAt;
+            }
+        }
+
+        if (request.Notes is not null)
+            appointment.Notes = request.Notes;
+
+        if (request.Type is not null)
+            appointment.Type = request.Type;
+
+        if (request.Amount.HasValue && request.Amount.Value != appointment.Amount)
+        {
+            var receivable = await dbContext.Receivables
+                .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.DeletedAt == null, cancellationToken);
+
+            if (receivable is not null)
+            {
+                var diff = request.Amount.Value - appointment.Amount;
+                receivable.OriginalAmount += diff;
+                receivable.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            appointment.Amount = request.Amount.Value;
+        }
+
+        appointment.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await outboxService.EnqueueAsync(clinicId, "appointment.updated", new
         {
             appointment.Id,
             appointment.PatientId,
@@ -711,6 +879,40 @@ public sealed class FinancialService(
             .ToListAsync(cancellationToken);
 
         return new PagedResult<ReceivableResponse>(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<PagedResult<PaymentResponse>> ListPaymentsAsync(PaymentQuery query, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var paymentsQuery = dbContext.Payments.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
+
+        if (query.ReceivableId.HasValue)
+        {
+            paymentsQuery = paymentsQuery.Where(x => x.ReceivableId == query.ReceivableId.Value);
+        }
+
+        if (query.DateFrom.HasValue)
+        {
+            var from = query.DateFrom.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            paymentsQuery = paymentsQuery.Where(x => x.PaidAt >= from);
+        }
+
+        if (query.DateTo.HasValue)
+        {
+            var to = query.DateTo.Value.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+            paymentsQuery = paymentsQuery.Where(x => x.PaidAt <= to);
+        }
+
+        var total = await paymentsQuery.CountAsync(cancellationToken);
+        var items = await paymentsQuery
+            .OrderByDescending(x => x.PaidAt)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(x => new PaymentResponse(x.Id, x.ReceivableId, x.Amount, x.PaymentMethod, x.PaidAt, x.Status))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<PaymentResponse>(items, query.Page, query.PageSize, total);
     }
 
     public async Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken)

@@ -12,6 +12,10 @@ public sealed class FinancialController(IFinancialService financialService) : Co
     public async Task<ActionResult<PagedResult<ReceivableResponse>>> ListReceivables([FromQuery] FinancialQuery query, CancellationToken cancellationToken)
         => Ok(await financialService.ListReceivablesAsync(query, cancellationToken));
 
+    [HttpGet("payments")]
+    public async Task<ActionResult<PagedResult<PaymentResponse>>> ListPayments([FromQuery] PaymentQuery query, CancellationToken cancellationToken)
+        => Ok(await financialService.ListPaymentsAsync(query, cancellationToken));
+
     [HttpPost("payments")]
     public async Task<ActionResult<PaymentResponse>> CreatePayment([FromBody] CreatePaymentRequest request, CancellationToken cancellationToken)
     {

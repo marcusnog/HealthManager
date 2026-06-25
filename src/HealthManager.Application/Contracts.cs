@@ -51,6 +51,7 @@ public sealed record DownloadPatientDocumentResult(Stream Content, string Conten
 public sealed record PatientDocumentResponse(Guid Id, string FileName, string ContentType, long SizeInBytes, string StoragePath);
 public sealed record PatientResponse(Guid Id, string Name, string Cpf, DateOnly? BirthDate, string Phone, string? Email, string? HealthInsurance, string? Notes, Guid PatientAccessToken);
 
+public sealed record DoctorQuery(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null);
 public sealed record CreateDoctorRequest(string Name, string Specialty, string Crm, string? Phone, string? Email);
 public sealed record UpdateDoctorRequest(string Name, string Specialty, string? Phone, string? Email, bool IsActive);
 public sealed record DoctorResponse(Guid Id, string Name, string Specialty, string Crm, string? Phone, string? Email, bool IsActive);
@@ -63,6 +64,14 @@ public sealed record CreateAppointmentRequest(
     string? Notes,
     string Type,
     decimal Amount);
+
+public sealed record UpdateAppointmentRequest(
+    Guid? DoctorId,
+    DateTimeOffset? StartAt,
+    int? DurationMinutes,
+    string? Notes,
+    string? Type,
+    decimal? Amount);
 
 public sealed record AppointmentResponse(
     Guid Id,
@@ -85,6 +94,7 @@ public sealed record ReceivableResponse(
     ReceivableStatus Status,
     DateTimeOffset DueDate);
 
+public sealed record PaymentQuery(int Page = 1, int PageSize = 20, Guid? ReceivableId = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
 public sealed record CreatePaymentRequest(Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
 public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status);
 public sealed record DashboardSummaryResponse(int AppointmentsToday, int ConfirmedToday, int CancelledToday, decimal MonthlyRevenue, double NoShowRate, double ConfirmationRate);
