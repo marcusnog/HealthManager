@@ -450,6 +450,12 @@ public sealed class AppointmentService(
             appointmentsQuery = appointmentsQuery.Where(x => x.DoctorId == query.DoctorId.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(query.Status) &&
+            Enum.TryParse<AppointmentStatus>(query.Status, ignoreCase: true, out var parsedStatus))
+        {
+            appointmentsQuery = appointmentsQuery.Where(x => x.Status == parsedStatus);
+        }
+
         var total = await appointmentsQuery.CountAsync(cancellationToken);
         var items = await appointmentsQuery
             .OrderBy(x => x.StartAt)

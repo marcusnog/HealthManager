@@ -503,6 +503,14 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["Scheduled", "Confirmed", "Cancelled", "Completed", "NoShow"]
+            }
           }
         ],
         "responses": {
