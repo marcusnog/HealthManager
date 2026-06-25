@@ -171,15 +171,53 @@ public sealed class PatientService(
             patientsQuery = patientsQuery.Where(x =>
                 x.Name.ToLower().Contains(normalizedSearch) ||
                 x.Cpf.Contains(normalizedSearch) ||
-                x.Phone.Contains(normalizedSearch));
+                x.Phone.Contains(normalizedSearch) ||
+                (x.Email != null && x.Email.ToLower().Contains(normalizedSearch)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Email))
+        {
+            var normalizedEmail = query.Email.Trim().ToLowerInvariant();
+            patientsQuery = patientsQuery.Where(x => x.Email != null && x.Email.ToLower().Contains(normalizedEmail));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.HealthInsurance))
+        {
+            var normalizedHI = query.HealthInsurance.Trim().ToLowerInvariant();
+            patientsQuery = patientsQuery.Where(x => x.HealthInsurance != null && x.HealthInsurance.ToLower().Contains(normalizedHI));
         }
 
         var total = await patientsQuery.CountAsync(cancellationToken);
-        var items = await patientsQuery
-            .OrderBy(x => x.Name)
+
+        var sortBy = (query.SortBy ?? "name").ToLowerInvariant();
+        var sortDesc = string.Equals(query.SortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+        IOrderedQueryable<Patient> ordered = sortBy switch
+        {
+            "cpf" => sortDesc
+                ? patientsQuery.OrderByDescending(x => x.Cpf)
+                : patientsQuery.OrderBy(x => x.Cpf),
+            "phone" => sortDesc
+                ? patientsQuery.OrderByDescending(x => x.Phone)
+                : patientsQuery.OrderBy(x => x.Phone),
+            "email" => sortDesc
+                ? patientsQuery.OrderByDescending(x => x.Email ?? "")
+                : patientsQuery.OrderBy(x => x.Email ?? ""),
+            "healthinsurance" => sortDesc
+                ? patientsQuery.OrderByDescending(x => x.HealthInsurance ?? "")
+                : patientsQuery.OrderBy(x => x.HealthInsurance ?? ""),
+            "createdat" => sortDesc
+                ? patientsQuery.OrderByDescending(x => x.CreatedAt)
+                : patientsQuery.OrderBy(x => x.CreatedAt),
+            _ => sortDesc
+                ? patientsQuery.OrderByDescending(x => x.Name)
+                : patientsQuery.OrderBy(x => x.Name),
+        };
+
+        var items = await ordered
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .Select(x => new PatientResponse(x.Id, x.Name, x.Cpf, x.Phone, x.Email, x.HealthInsurance, x.Notes, x.PatientAccessToken))
+            .Select(x => new PatientResponse(x.Id, x.Name, x.Cpf, x.BirthDate, x.Phone, x.Email, x.HealthInsurance, x.Notes, x.PatientAccessToken))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<PatientResponse>(items, query.Page, query.PageSize, total);
@@ -211,7 +249,7 @@ public sealed class PatientService(
 
         dbContext.Patients.Add(patient);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.Phone, patient.Email, patient.HealthInsurance, patient.Notes, patient.PatientAccessToken);
+        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.Notes, patient.PatientAccessToken);
     }
 
     public async Task<PatientResponse> UpdateAsync(Guid patientId, UpdatePatientRequest request, CancellationToken cancellationToken)
@@ -230,7 +268,7 @@ public sealed class PatientService(
         patient.UpdatedAt = DateTimeOffset.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.Phone, patient.Email, patient.HealthInsurance, patient.Notes, patient.PatientAccessToken);
+        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.Notes, patient.PatientAccessToken);
     }
 
     public async Task<IReadOnlyList<PatientDocumentResponse>> ListDocumentsAsync(Guid patientId, CancellationToken cancellationToken)

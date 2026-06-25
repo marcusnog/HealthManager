@@ -110,6 +110,34 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortDirection",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "healthInsurance",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -889,6 +917,7 @@
           "id": { "type": "string", "format": "uuid" },
           "name": { "type": "string" },
           "cpf": { "type": "string" },
+          "birthDate": { "type": "string", "format": "date" },
           "phone": { "type": "string" },
           "email": { "type": "string" },
           "healthInsurance": { "type": "string" },

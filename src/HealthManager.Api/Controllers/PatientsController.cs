@@ -11,8 +11,8 @@ namespace HealthManager.Api.Controllers;
 public sealed class PatientsController(IPatientService patientService, IPatientPortalService portalService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<PagedResult<PatientResponse>>> List([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null, CancellationToken cancellationToken = default)
-        => Ok(await patientService.ListAsync(new PatientQuery(page, pageSize, search), cancellationToken));
+    public async Task<ActionResult<PagedResult<PatientResponse>>> List([FromQuery] PatientQuery query, CancellationToken cancellationToken)
+        => Ok(await patientService.ListAsync(query, cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<PatientResponse>> Create([FromBody] CreatePatientRequest request, CancellationToken cancellationToken)

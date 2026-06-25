@@ -24,7 +24,7 @@ public sealed record CreateClinicRequest(
 public sealed record CreateClinicUserRequest(string Name, string Email, string Password, UserRole Role);
 public sealed record ClinicProvisioningResponse(Guid ClinicId, Guid AdminUserId);
 
-public sealed record PatientQuery(int Page = 1, int PageSize = 20, string? Search = null);
+public sealed record PatientQuery(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null, string? Email = null, string? HealthInsurance = null);
 public sealed record AppointmentQuery(int Page = 1, int PageSize = 20, DateOnly? Date = null, Guid? DoctorId = null, string? Status = null);
 public sealed record FinancialQuery(int Page = 1, int PageSize = 20, string? Status = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int Total);
@@ -49,7 +49,7 @@ public sealed record CreatePatientDocumentRequest(string FileName, string Conten
 public sealed record UploadPatientDocumentRequest(string FileName, string ContentType, long SizeInBytes, Stream Content);
 public sealed record DownloadPatientDocumentResult(Stream Content, string ContentType, string FileName);
 public sealed record PatientDocumentResponse(Guid Id, string FileName, string ContentType, long SizeInBytes, string StoragePath);
-public sealed record PatientResponse(Guid Id, string Name, string Cpf, string Phone, string? Email, string? HealthInsurance, string? Notes, Guid PatientAccessToken);
+public sealed record PatientResponse(Guid Id, string Name, string Cpf, DateOnly? BirthDate, string Phone, string? Email, string? HealthInsurance, string? Notes, Guid PatientAccessToken);
 
 public sealed record CreateDoctorRequest(string Name, string Specialty, string Crm, string? Phone, string? Email);
 public sealed record UpdateDoctorRequest(string Name, string Specialty, string? Phone, string? Email, bool IsActive);
