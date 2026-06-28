@@ -581,12 +581,15 @@ public sealed class AppointmentService(
         }
 
         var total = await appointmentsQuery.CountAsync(cancellationToken);
-        var items = await appointmentsQuery
+        var appointments = await appointmentsQuery
+            .Include(x => x.Patient)
+            .Include(x => x.Doctor)
             .OrderBy(x => x.StartAt)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .Select(x => ToResponse(x))
             .ToListAsync(cancellationToken);
+
+        var items = appointments.Select(x => ToResponse(x, x.Patient, x.Doctor)).ToList();
 
         return new PagedResult<AppointmentResponse>(items, query.Page, query.PageSize, total);
     }
@@ -599,10 +602,10 @@ public sealed class AppointmentService(
         var clinic = await dbContext.Clinics.FirstOrDefaultAsync(x => x.Id == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Clinica nao encontrada.");
 
-        var patientExists = await dbContext.Patients.AnyAsync(x => x.Id == request.PatientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken);
+        var patient = await dbContext.Patients.FirstOrDefaultAsync(x => x.Id == request.PatientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken);
         var doctor = await dbContext.Doctors.FirstOrDefaultAsync(x => x.Id == request.DoctorId && x.ClinicId == clinicId && x.DeletedAt == null && x.IsActive, cancellationToken);
 
-        if (!patientExists || doctor is null)
+        if (patient is null || doctor is null)
         {
             throw new InvalidOperationException("Paciente ou medico invalido.");
         }
@@ -660,7 +663,7 @@ public sealed class AppointmentService(
         }, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return ToResponse(appointment);
+        return ToResponse(appointment, patient, doctor);
     }
 
     public async Task<AppointmentResponse> UpdateAsync(Guid appointmentId, UpdateAppointmentRequest request, CancellationToken cancellationToken)
@@ -668,6 +671,8 @@ public sealed class AppointmentService(
         await updateValidator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var appointment = await dbContext.Appointments
+            .Include(x => x.Patient)
+            .Include(x => x.Doctor)
             .FirstOrDefaultAsync(x => x.Id == appointmentId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Consulta nao encontrada.");
 
@@ -742,22 +747,22 @@ public sealed class AppointmentService(
         }, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return ToResponse(appointment);
+        return ToResponse(appointment, appointment.Patient, appointment.Doctor);
     }
 
     public async Task<AppointmentResponse> ConfirmAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
-        var appointment = await FindAppointmentAsync(appointmentId, cancellationToken);
+        var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
         appointment.ConfirmationStatus = ConfirmationStatus.Confirmed;
         appointment.Status = AppointmentStatus.Confirmed;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
-        return ToResponse(appointment);
+        return ToResponse(appointment, patient, doctor);
     }
 
     public async Task<AppointmentResponse> CancelAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
-        var appointment = await FindAppointmentAsync(appointmentId, cancellationToken);
+        var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
         appointment.Status = AppointmentStatus.Cancelled;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
         await outboxService.EnqueueAsync(appointment.ClinicId, "appointment.cancelled", new
@@ -767,14 +772,18 @@ public sealed class AppointmentService(
             appointment.StartAt
         }, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return ToResponse(appointment);
+        return ToResponse(appointment, patient, doctor);
     }
 
-    private async Task<Appointment> FindAppointmentAsync(Guid appointmentId, CancellationToken cancellationToken)
+    private async Task<(Appointment, Patient?, Doctor?)> FindAppointmentWithDetailsAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
-        return await dbContext.Appointments.FirstOrDefaultAsync(x => x.Id == appointmentId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+        var appointment = await dbContext.Appointments
+            .Include(x => x.Patient)
+            .Include(x => x.Doctor)
+            .FirstOrDefaultAsync(x => x.Id == appointmentId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Consulta nao encontrada.");
+        return (appointment, appointment.Patient, appointment.Doctor);
     }
 
     private async Task<(DateTimeOffset StartUtc, DateTimeOffset EndUtc)> GetClinicDayBoundsAsync(Guid clinicId, DateOnly date, CancellationToken cancellationToken)
@@ -818,7 +827,7 @@ public sealed class AppointmentService(
         }
     }
 
-    private static AppointmentResponse ToResponse(Appointment appointment) =>
+    private static AppointmentResponse ToResponse(Appointment appointment, Patient? patient = null, Doctor? doctor = null) =>
         new(
             appointment.Id,
             appointment.PatientId,
@@ -829,7 +838,11 @@ public sealed class AppointmentService(
             appointment.ConfirmationStatus,
             appointment.Type,
             appointment.Amount,
-            appointment.Notes);
+            appointment.Notes,
+            patient?.Name,
+            patient?.Phone,
+            doctor?.Name,
+            doctor?.Specialty);
 
     private sealed record BusinessHoursWindow(string? Start, string? End);
 }
@@ -954,7 +967,7 @@ public sealed class DashboardService(
     ITenantProvider tenantProvider,
     IClock clock) : IDashboardService
 {
-    public async Task<DashboardSummaryResponse> GetSummaryAsync(CancellationToken cancellationToken)
+    public async Task<DashboardSummaryResponse> GetSummaryAsync(Guid? doctorId = null, CancellationToken cancellationToken = default)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var clinic = await dbContext.Clinics.FirstAsync(x => x.Id == clinicId, cancellationToken);
@@ -967,11 +980,16 @@ public sealed class DashboardService(
         var monthStart = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(monthStartLocal, zone));
         var monthEnd = monthStart.AddMonths(1);
 
-        var appointmentsToday = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= dayStart && x.StartAt < dayEnd && x.DeletedAt == null, cancellationToken);
-        var confirmedToday = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= dayStart && x.StartAt < dayEnd && x.ConfirmationStatus == ConfirmationStatus.Confirmed && x.DeletedAt == null, cancellationToken);
-        var cancelledToday = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= dayStart && x.StartAt < dayEnd && x.Status == AppointmentStatus.Cancelled && x.DeletedAt == null, cancellationToken);
-        var noShowCount = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= monthStart && x.StartAt < monthEnd && x.Status == AppointmentStatus.NoShow && x.DeletedAt == null, cancellationToken);
-        var monthlyAppointments = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= monthStart && x.StartAt < monthEnd && x.DeletedAt == null, cancellationToken);
+        var appointmentsToday = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= dayStart && x.StartAt < dayEnd && x.DeletedAt == null
+            && (!doctorId.HasValue || x.DoctorId == doctorId.Value), cancellationToken);
+        var confirmedToday = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= dayStart && x.StartAt < dayEnd && x.ConfirmationStatus == ConfirmationStatus.Confirmed && x.DeletedAt == null
+            && (!doctorId.HasValue || x.DoctorId == doctorId.Value), cancellationToken);
+        var cancelledToday = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= dayStart && x.StartAt < dayEnd && x.Status == AppointmentStatus.Cancelled && x.DeletedAt == null
+            && (!doctorId.HasValue || x.DoctorId == doctorId.Value), cancellationToken);
+        var noShowCount = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= monthStart && x.StartAt < monthEnd && x.Status == AppointmentStatus.NoShow && x.DeletedAt == null
+            && (!doctorId.HasValue || x.DoctorId == doctorId.Value), cancellationToken);
+        var monthlyAppointments = await dbContext.Appointments.CountAsync(x => x.ClinicId == clinicId && x.StartAt >= monthStart && x.StartAt < monthEnd && x.DeletedAt == null
+            && (!doctorId.HasValue || x.DoctorId == doctorId.Value), cancellationToken);
         var monthlyRevenue = await dbContext.Payments.Where(x => x.ClinicId == clinicId && x.PaidAt >= monthStart && x.PaidAt < monthEnd && x.DeletedAt == null)
             .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
 

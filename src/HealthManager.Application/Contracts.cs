@@ -83,7 +83,11 @@ public sealed record AppointmentResponse(
     ConfirmationStatus ConfirmationStatus,
     string Type,
     decimal Amount,
-    string? Notes);
+    string? Notes,
+    string? PatientName = null,
+    string? PatientPhone = null,
+    string? DoctorName = null,
+    string? DoctorSpecialty = null);
 
 public sealed record ReceivableResponse(
     Guid Id,

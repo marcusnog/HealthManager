@@ -111,7 +111,7 @@ public interface IFinancialService
 
 public interface IDashboardService
 {
-    Task<DashboardSummaryResponse> GetSummaryAsync(CancellationToken cancellationToken);
+    Task<DashboardSummaryResponse> GetSummaryAsync(Guid? doctorId = null, CancellationToken cancellationToken = default);
 }
 
 public interface IWhatsAppWebhookService

@@ -10,7 +10,7 @@ namespace HealthManager.Api.Controllers;
 public sealed class DashboardController(IDashboardService dashboardService) : ControllerBase
 {
     [HttpGet("summary")]
-    public async Task<ActionResult<DashboardSummaryResponse>> GetSummary(CancellationToken cancellationToken)
-        => Ok(await dashboardService.GetSummaryAsync(cancellationToken));
+    public async Task<ActionResult<DashboardSummaryResponse>> GetSummary([FromQuery] Guid? doctorId = null, CancellationToken cancellationToken = default)
+        => Ok(await dashboardService.GetSummaryAsync(doctorId, cancellationToken));
 }
 
