@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FluentValidation;
 using HealthManager.Application;
 using HealthManager.Domain;
 using HealthManager.Infrastructure.Persistence;
