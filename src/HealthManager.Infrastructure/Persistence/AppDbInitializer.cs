@@ -79,6 +79,19 @@ public static class AppDbInitializer
             UpdatedAt = now
         };
 
+        var doctorUserId = Guid.Parse("a1a2a3a4-a1a2-a1a2-a1a2-a1a2a3a4a5a6");
+        var doctorUser = new User
+        {
+            Id = doctorUserId,
+            ClinicId = clinicId,
+            Name = "Dr. Henrique Lima",
+            Email = "henrique.lima@clinicaaurora.com",
+            PasswordHash = passwordHasher.Hash("ChangeMe123!"),
+            Role = UserRole.Doctor,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
         var doctor = new Doctor
         {
             Id = doctorId,
@@ -152,7 +165,7 @@ public static class AppDbInitializer
             UpdatedAt = now
         };
 
-        dbContext.AddRange(clinic, platformAdmin, clinicAdmin, doctor, patient, appointment, receivable, outbox);
+        dbContext.AddRange(clinic, platformAdmin, clinicAdmin, doctorUser, doctor, patient, appointment, receivable, outbox);
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Seed completed. Demo clinic and users created.");
     }
