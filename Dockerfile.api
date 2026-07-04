@@ -8,6 +8,8 @@ RUN dotnet publish src/HealthManager.Api/HealthManager.Api.csproj -c Release -o 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y libkrb5-3 --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_URLS=http://+:8080

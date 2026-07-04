@@ -8,6 +8,8 @@ RUN dotnet publish src/HealthManager.Worker/HealthManager.Worker.csproj -c Relea
 FROM mcr.microsoft.com/dotnet/runtime:10.0
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y libkrb5-3 --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish .
 
 USER app
