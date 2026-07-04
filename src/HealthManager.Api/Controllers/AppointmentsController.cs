@@ -31,5 +31,17 @@ public sealed class AppointmentsController(AppointmentService appointmentService
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<AppointmentResponse>> Cancel(Guid id, CancellationToken cancellationToken)
         => Ok(await appointmentService.CancelAsync(id, cancellationToken));
+
+    [HttpPost("{id:guid}/in-progress")]
+    public async Task<ActionResult<AppointmentResponse>> MarkInProgress(Guid id, CancellationToken cancellationToken)
+        => Ok(await appointmentService.MarkInProgressAsync(id, cancellationToken));
+
+    [HttpPost("{id:guid}/complete")]
+    public async Task<ActionResult<AppointmentResponse>> Complete(Guid id, CancellationToken cancellationToken)
+        => Ok(await appointmentService.CompleteAsync(id, cancellationToken));
+
+    [HttpPost("{id:guid}/no-show")]
+    public async Task<ActionResult<AppointmentResponse>> MarkNoShow(Guid id, CancellationToken cancellationToken)
+        => Ok(await appointmentService.MarkNoShowAsync(id, cancellationToken));
 }
 

@@ -595,7 +595,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["Scheduled", "Confirmed", "Cancelled", "Completed", "NoShow"]
+              "enum": ["Scheduled", "Confirmed", "Cancelled", "Completed", "NoShow", "InProgress"]
             }
           },
           {
@@ -685,6 +685,90 @@
     "/appointments/{id}/cancel": {
       "post": {
         "operationId": "appointments_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointments/{id}/in-progress": {
+      "post": {
+        "operationId": "appointments_in_progress",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointments/{id}/complete": {
+      "post": {
+        "operationId": "appointments_complete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointments/{id}/no-show": {
+      "post": {
+        "operationId": "appointments_no_show",
         "parameters": [
           {
             "name": "id",

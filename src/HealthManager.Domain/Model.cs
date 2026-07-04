@@ -186,7 +186,8 @@ public enum AppointmentStatus
     Confirmed = 2,
     Cancelled = 3,
     Completed = 4,
-    NoShow = 5
+    NoShow = 5,
+    InProgress = 6
 }
 
 public enum ConfirmationStatus

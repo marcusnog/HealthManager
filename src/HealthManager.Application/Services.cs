@@ -733,6 +733,33 @@ public sealed class AppointmentService(
         return ToResponse(appointment, patient, doctor);
     }
 
+    public async Task<AppointmentResponse> MarkInProgressAsync(Guid appointmentId, CancellationToken cancellationToken)
+    {
+        var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        appointment.Status = AppointmentStatus.InProgress;
+        appointment.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(appointment, patient, doctor);
+    }
+
+    public async Task<AppointmentResponse> CompleteAsync(Guid appointmentId, CancellationToken cancellationToken)
+    {
+        var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        appointment.Status = AppointmentStatus.Completed;
+        appointment.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(appointment, patient, doctor);
+    }
+
+    public async Task<AppointmentResponse> MarkNoShowAsync(Guid appointmentId, CancellationToken cancellationToken)
+    {
+        var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        appointment.Status = AppointmentStatus.NoShow;
+        appointment.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(appointment, patient, doctor);
+    }
+
     private async Task<(Appointment, Patient?, Doctor?)> FindAppointmentWithDetailsAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
