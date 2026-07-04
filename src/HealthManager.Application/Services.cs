@@ -518,6 +518,16 @@ public sealed class AppointmentService(
             var bounds = await GetClinicDayBoundsAsync(clinicId, query.Date.Value, cancellationToken);
             appointmentsQuery = appointmentsQuery.Where(x => x.StartAt >= bounds.StartUtc && x.StartAt < bounds.EndUtc);
         }
+        else if (query.DateFrom is not null)
+        {
+            var fromBounds = await GetClinicDayBoundsAsync(clinicId, query.DateFrom.Value, cancellationToken);
+            appointmentsQuery = appointmentsQuery.Where(x => x.StartAt >= fromBounds.StartUtc);
+            if (query.DateTo is not null)
+            {
+                var toBounds = await GetClinicDayBoundsAsync(clinicId, query.DateTo.Value, cancellationToken);
+                appointmentsQuery = appointmentsQuery.Where(x => x.StartAt < toBounds.EndUtc);
+            }
+        }
 
         if (query.DoctorId is not null)
         {

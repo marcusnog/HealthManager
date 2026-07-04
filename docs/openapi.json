@@ -597,6 +597,22 @@
               "type": "string",
               "enum": ["Scheduled", "Confirmed", "Cancelled", "Completed", "NoShow"]
             }
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
           }
         ],
         "responses": {
