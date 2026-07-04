@@ -31,9 +31,9 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
         services.AddScoped<ITenantProvider, RequestTenantProvider>();
-        services.AddScoped<IClock, SystemClock>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
-        services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client());
+        if (!string.IsNullOrWhiteSpace(configuration["AWS_S3_BUCKET"]))
+            services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client());
         services.AddScoped<IStorageService, StorageService>();
         services.AddScoped<IOutboxService, OutboxService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();

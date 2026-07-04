@@ -1,7 +1,7 @@
 using FluentAssertions;
-using FluentValidation;
 using HealthManager.Application;
 using HealthManager.Domain;
+using HealthManager.Infrastructure;
 using HealthManager.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,8 +51,7 @@ public sealed class WhatsAppWebhookServiceTests
         var service = new WhatsAppWebhookService(
             dbContext,
             new FakeTenantProvider(clinicId),
-            new WhatsAppWebhookRequestValidator(),
-            new HealthManager.Infrastructure.OutboxService(dbContext));
+            new OutboxService(dbContext));
 
         await service.ProcessAsync(
             new WhatsAppWebhookRequest(clinicId, appointmentId, "11999998888", "CONFIRMAR CONSULTA", "meta-test-001"),
@@ -111,8 +110,7 @@ public sealed class WhatsAppWebhookServiceTests
         var service = new WhatsAppWebhookService(
             dbContext,
             new FakeTenantProvider(clinicId),
-            new WhatsAppWebhookRequestValidator(),
-            new HealthManager.Infrastructure.OutboxService(dbContext));
+            new OutboxService(dbContext));
 
         await service.ProcessAsync(
             new WhatsAppWebhookRequest(clinicId, appointmentId, "11999998888", "CANCELAR CONSULTA", "meta-test-002"),
@@ -135,8 +133,7 @@ public sealed class WhatsAppWebhookServiceTests
         var service = new WhatsAppWebhookService(
             dbContext,
             new FakeTenantProvider(clinicId),
-            new WhatsAppWebhookRequestValidator(),
-            new HealthManager.Infrastructure.OutboxService(dbContext));
+            new OutboxService(dbContext));
 
         await service.ProcessAsync(
             new WhatsAppWebhookRequest(clinicId, null, "11999998888", "Mensagem generica", "meta-test-003"),
@@ -148,29 +145,5 @@ public sealed class WhatsAppWebhookServiceTests
         dbContext.OutboxEvents.IgnoreQueryFilters().Should().BeEmpty();
     }
 
-    [Fact]
-    public async Task ProcessAsync_ShouldThrow_WhenPhoneIsEmpty()
-    {
-        await using var dbContext = CreateDbContext();
-        var service = new WhatsAppWebhookService(
-            dbContext,
-            new FakeTenantProvider(Guid.NewGuid()),
-            new WhatsAppWebhookRequestValidator(),
-            new HealthManager.Infrastructure.OutboxService(dbContext));
-
-        var action = async () => await service.ProcessAsync(
-            new WhatsAppWebhookRequest(null, null, "", "mensagem", null),
-            CancellationToken.None);
-
-        await action.Should().ThrowAsync<ValidationException>();
-    }
-
-    private static AppDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDbContext() => TestHelpers.CreateDbContext();
 }

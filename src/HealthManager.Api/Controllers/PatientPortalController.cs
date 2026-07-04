@@ -6,7 +6,7 @@ namespace HealthManager.Api.Controllers;
 
 [ApiController]
 [Route("portal")]
-public sealed class PatientPortalController(IPatientPortalService portalService) : ControllerBase
+public sealed class PatientPortalController(PatientPortalService portalService) : ControllerBase
 {
     [HttpPost("auth")]
     [AllowAnonymous]

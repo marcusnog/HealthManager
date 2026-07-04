@@ -1,5 +1,4 @@
 using FluentAssertions;
-using FluentValidation;
 using HealthManager.Application;
 using HealthManager.Domain;
 using HealthManager.Infrastructure.Persistence;
@@ -20,10 +19,7 @@ public sealed class PatientServiceTests
         var service = new PatientService(
             dbContext,
             new FakeTenantProvider(clinicId),
-            new FakeStorageService(),
-            new CreatePatientRequestValidator(),
-            new UpdatePatientRequestValidator(),
-            new CreatePatientDocumentRequestValidator());
+            new FakeStorageService());
 
         var response = await service.CreateAsync(
             new CreatePatientRequest("Maria", "123.456.789-00", new DateOnly(1990, 1, 1), "11999999999", "maria@example.com", "Unimed", null),
@@ -33,13 +29,5 @@ public sealed class PatientServiceTests
         dbContext.Patients.Should().ContainSingle(x => x.Id == response.Id);
     }
 
-    private static AppDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDbContext() => TestHelpers.CreateDbContext();
 }
-

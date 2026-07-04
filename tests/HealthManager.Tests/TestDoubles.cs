@@ -18,11 +18,6 @@ internal sealed class FakeTenantProvider : ITenantProvider
     public bool IsPlatformAdmin { get; }
 }
 
-internal sealed class FakeClock(DateTimeOffset now) : IClock
-{
-    public DateTimeOffset UtcNow { get; } = now;
-}
-
 internal sealed class FakeStorageService : IStorageService
 {
     private readonly Dictionary<string, byte[]> _store = [];

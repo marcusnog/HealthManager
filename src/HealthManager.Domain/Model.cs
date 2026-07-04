@@ -116,15 +116,6 @@ public sealed class PatientDocument : TenantEntity
     public Patient? Patient { get; set; }
 }
 
-public sealed class Notification : TenantEntity
-{
-    public string Type { get; set; } = string.Empty;
-    public NotificationChannel Channel { get; set; } = NotificationChannel.WhatsApp;
-    public string Recipient { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    public NotificationStatus Status { get; set; } = NotificationStatus.Pending;
-    public DateTimeOffset? SentAt { get; set; }
-}
 
 public sealed class WhatsAppMessage : TenantEntity
 {
@@ -236,15 +227,7 @@ public enum PaymentStatus
 
 public enum NotificationChannel
 {
-    WhatsApp = 1,
-    Email = 2
-}
-
-public enum NotificationStatus
-{
-    Pending = 1,
-    Sent = 2,
-    Failed = 3
+    WhatsApp = 1
 }
 
 public enum MessageDirection

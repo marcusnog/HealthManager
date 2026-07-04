@@ -60,12 +60,5 @@ public sealed class OutboxProcessorTests
         dbContext.OutboxEvents.Count(x => x.Status == OutboxStatus.Processed).Should().Be(25);
     }
 
-    private static AppDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDbContext() => TestHelpers.CreateDbContext();
 }

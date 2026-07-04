@@ -14,7 +14,7 @@ public sealed class FinancialEndpointsTests
         await using var factory = new ApiTestFactory();
         using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
 
-        var response = await client.PostAsJsonAsync("/payments", new
+        var response = await client.PostAsJsonAsync("/financial/payments", new
         {
             receivableId = "ffffffff-ffff-ffff-ffff-ffffffffffff",
             amount = 50,

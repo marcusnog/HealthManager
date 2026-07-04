@@ -1,5 +1,4 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -16,11 +15,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace HealthManager.Infrastructure;
-
-public sealed class SystemClock : IClock
-{
-    public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
-}
 
 public sealed class PasswordHasher : IPasswordHasher
 {
@@ -203,19 +197,10 @@ public sealed class OutboxProcessor(AppDbContext dbContext)
 
         foreach (var pendingEvent in pendingEvents)
         {
-            try
-            {
-                pendingEvent.Status = OutboxStatus.Processed;
-                pendingEvent.ProcessedAt = DateTimeOffset.UtcNow;
-                pendingEvent.Attempts += 1;
-                pendingEvent.LastError = null;
-            }
-            catch (Exception ex)
-            {
-                pendingEvent.Status = OutboxStatus.Failed;
-                pendingEvent.Attempts += 1;
-                pendingEvent.LastError = ex.Message;
-            }
+            pendingEvent.Status = OutboxStatus.Processed;
+            pendingEvent.ProcessedAt = DateTimeOffset.UtcNow;
+            pendingEvent.Attempts += 1;
+            pendingEvent.LastError = null;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

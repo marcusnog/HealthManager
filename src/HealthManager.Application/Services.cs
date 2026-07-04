@@ -1,5 +1,4 @@
 using System.Text.Json;
-using FluentValidation;
 using HealthManager.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,8 +7,7 @@ namespace HealthManager.Application;
 public sealed class AuthService(
     IApplicationDbContext dbContext,
     IPasswordHasher passwordHasher,
-    IJwtTokenService jwtTokenService,
-    IClock clock) : IAuthService
+    IJwtTokenService jwtTokenService)
 {
     public async Task<AuthResponse> LoginAsync(LoginRequest request, string? userAgent, CancellationToken cancellationToken)
     {
@@ -30,14 +28,14 @@ public sealed class AuthService(
     {
         var activeTokens = await dbContext.RefreshTokens
             .Include(x => x.User)
-            .Where(x => x.RevokedAt == null && x.ExpiresAt > clock.UtcNow)
+            .Where(x => x.RevokedAt == null && x.ExpiresAt > DateTimeOffset.UtcNow)
             .ToListAsync(cancellationToken);
 
         var refreshToken = activeTokens.FirstOrDefault(x => passwordHasher.Verify(request.RefreshToken, x.TokenHash))
             ?? throw new InvalidOperationException("Refresh token invalido.");
 
-        refreshToken.RevokedAt = clock.UtcNow;
-        refreshToken.UpdatedAt = clock.UtcNow;
+        refreshToken.RevokedAt = DateTimeOffset.UtcNow;
+        refreshToken.UpdatedAt = DateTimeOffset.UtcNow;
 
         return await IssueTokensAsync(refreshToken.User!, userAgent, cancellationToken);
     }
@@ -45,7 +43,7 @@ public sealed class AuthService(
     public async Task LogoutAsync(RefreshTokenRequest request, CancellationToken cancellationToken)
     {
         var activeTokens = await dbContext.RefreshTokens
-            .Where(x => x.RevokedAt == null && x.ExpiresAt > clock.UtcNow)
+            .Where(x => x.RevokedAt == null && x.ExpiresAt > DateTimeOffset.UtcNow)
             .ToListAsync(cancellationToken);
 
         var refreshToken = activeTokens.FirstOrDefault(x => passwordHasher.Verify(request.RefreshToken, x.TokenHash));
@@ -54,8 +52,8 @@ public sealed class AuthService(
             return;
         }
 
-        refreshToken.RevokedAt = clock.UtcNow;
-        refreshToken.UpdatedAt = clock.UtcNow;
+        refreshToken.RevokedAt = DateTimeOffset.UtcNow;
+        refreshToken.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -83,14 +81,10 @@ public sealed class AuthService(
 
 public sealed class ClinicProvisioningService(
     IApplicationDbContext dbContext,
-    IPasswordHasher passwordHasher,
-    IValidator<CreateClinicRequest> validator,
-    IValidator<CreateClinicUserRequest> userValidator) : IClinicProvisioningService
+    IPasswordHasher passwordHasher)
 {
     public async Task<ClinicProvisioningResponse> CreateClinicAsync(CreateClinicRequest request, CancellationToken cancellationToken)
     {
-        await validator.ValidateAndThrowAsync(request, cancellationToken);
-
         var exists = await dbContext.Clinics.AnyAsync(x => x.Slug == request.Slug && x.DeletedAt == null, cancellationToken);
         if (exists)
         {
@@ -128,8 +122,6 @@ public sealed class ClinicProvisioningService(
 
     public async Task<UserResponse> CreateClinicUserAsync(Guid clinicId, CreateClinicUserRequest request, CancellationToken cancellationToken)
     {
-        await userValidator.ValidateAndThrowAsync(request, cancellationToken);
-
         var clinicExists = await dbContext.Clinics.AnyAsync(x => x.Id == clinicId && x.DeletedAt == null, cancellationToken);
         if (!clinicExists)
         {
@@ -154,10 +146,7 @@ public sealed class ClinicProvisioningService(
 public sealed class PatientService(
     IApplicationDbContext dbContext,
     ITenantProvider tenantProvider,
-    IStorageService storageService,
-    IValidator<CreatePatientRequest> createValidator,
-    IValidator<UpdatePatientRequest> updateValidator,
-    IValidator<CreatePatientDocumentRequest> documentValidator) : IPatientService
+    IStorageService storageService)
 {
     public async Task<PagedResult<PatientResponse>> ListAsync(PatientQuery query, CancellationToken cancellationToken)
     {
@@ -225,10 +214,9 @@ public sealed class PatientService(
 
     public async Task<PatientResponse> CreateAsync(CreatePatientRequest request, CancellationToken cancellationToken)
     {
-        await createValidator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
-        var normalizedCpf = NormalizeDigits(request.Cpf);
+        var normalizedCpf = AppHelpers.NormalizeDigits(request.Cpf);
         var exists = await dbContext.Patients.AnyAsync(x => x.ClinicId == clinicId && x.Cpf == normalizedCpf && x.DeletedAt == null, cancellationToken);
         if (exists)
         {
@@ -277,7 +265,6 @@ public sealed class PatientService(
 
     public async Task<PatientResponse> UpdateAsync(Guid patientId, UpdatePatientRequest request, CancellationToken cancellationToken)
     {
-        await updateValidator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
         var patient = await dbContext.Patients.FirstOrDefaultAsync(x => x.Id == patientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
@@ -319,14 +306,8 @@ public sealed class PatientService(
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<PatientDocumentResponse> UploadDocumentAsync(Guid patientId, UploadPatientDocumentRequest request, CancellationToken cancellationToken)
+    public async Task<PatientDocumentResponse> UploadDocumentAsync(Guid patientId, CreatePatientDocumentRequest request, CancellationToken cancellationToken)
     {
-        var metadataRequest = new CreatePatientDocumentRequest(
-            request.FileName,
-            request.ContentType,
-            request.SizeInBytes);
-
-        await documentValidator.ValidateAndThrowAsync(metadataRequest, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var patientExists = await dbContext.Patients.AnyAsync(x => x.Id == patientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken);
         if (!patientExists)
@@ -335,7 +316,9 @@ public sealed class PatientService(
         }
 
         var storagePath = storageService.BuildPatientDocumentPath(clinicId, patientId, request.FileName);
-        await storageService.UploadPatientDocumentAsync(storagePath, request.Content, request.ContentType, cancellationToken);
+
+        if (request.Content is not null)
+            await storageService.UploadPatientDocumentAsync(storagePath, request.Content, request.ContentType, cancellationToken);
 
         var document = new PatientDocument
         {
@@ -404,40 +387,11 @@ public sealed class PatientService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<PatientDocumentResponse> AddDocumentAsync(Guid patientId, CreatePatientDocumentRequest request, CancellationToken cancellationToken)
-    {
-        await documentValidator.ValidateAndThrowAsync(request, cancellationToken);
-        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
-        var patientExists = await dbContext.Patients.AnyAsync(x => x.Id == patientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken);
-        if (!patientExists)
-        {
-            throw new KeyNotFoundException("Paciente nao encontrado.");
-        }
-
-        var document = new PatientDocument
-        {
-            ClinicId = clinicId,
-            PatientId = patientId,
-            FileName = request.FileName,
-            ContentType = request.ContentType,
-            SizeInBytes = request.SizeInBytes,
-            StoragePath = storageService.BuildPatientDocumentPath(clinicId, patientId, request.FileName)
-        };
-
-        dbContext.PatientDocuments.Add(document);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return new PatientDocumentResponse(document.Id, document.FileName, document.ContentType, document.SizeInBytes, document.StoragePath);
-    }
-
-    private static string NormalizeDigits(string value) => new(value.Where(char.IsDigit).ToArray());
 }
 
 public sealed class DoctorService(
     IApplicationDbContext dbContext,
-    ITenantProvider tenantProvider,
-    IValidator<CreateDoctorRequest> createValidator,
-    IValidator<UpdateDoctorRequest> updateValidator) : IDoctorService
+    ITenantProvider tenantProvider)
 {
     public async Task<PagedResult<DoctorResponse>> ListAsync(DoctorQuery query, CancellationToken cancellationToken)
     {
@@ -513,7 +467,6 @@ public sealed class DoctorService(
 
     public async Task<DoctorResponse> CreateAsync(CreateDoctorRequest request, CancellationToken cancellationToken)
     {
-        await createValidator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
         var doctor = new Doctor
@@ -533,7 +486,6 @@ public sealed class DoctorService(
 
     public async Task<DoctorResponse> UpdateAsync(Guid doctorId, UpdateDoctorRequest request, CancellationToken cancellationToken)
     {
-        await updateValidator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var doctor = await dbContext.Doctors.FirstOrDefaultAsync(x => x.Id == doctorId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Medico nao encontrado.");
@@ -553,9 +505,7 @@ public sealed class DoctorService(
 public sealed class AppointmentService(
     IApplicationDbContext dbContext,
     ITenantProvider tenantProvider,
-    IValidator<CreateAppointmentRequest> createValidator,
-    IValidator<UpdateAppointmentRequest> updateValidator,
-    IOutboxService outboxService) : IAppointmentService
+    IOutboxService outboxService)
 {
     public async Task<PagedResult<AppointmentResponse>> ListAsync(AppointmentQuery query, CancellationToken cancellationToken)
     {
@@ -596,7 +546,6 @@ public sealed class AppointmentService(
 
     public async Task<AppointmentResponse> CreateAsync(CreateAppointmentRequest request, CancellationToken cancellationToken)
     {
-        await createValidator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
         var clinic = await dbContext.Clinics.FirstOrDefaultAsync(x => x.Id == clinicId && x.DeletedAt == null, cancellationToken)
@@ -668,7 +617,6 @@ public sealed class AppointmentService(
 
     public async Task<AppointmentResponse> UpdateAsync(Guid appointmentId, UpdateAppointmentRequest request, CancellationToken cancellationToken)
     {
-        await updateValidator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var appointment = await dbContext.Appointments
             .Include(x => x.Patient)
@@ -789,7 +737,7 @@ public sealed class AppointmentService(
     private async Task<(DateTimeOffset StartUtc, DateTimeOffset EndUtc)> GetClinicDayBoundsAsync(Guid clinicId, DateOnly date, CancellationToken cancellationToken)
     {
         var clinic = await dbContext.Clinics.FirstAsync(x => x.Id == clinicId, cancellationToken);
-        var zone = ResolveTimeZone(clinic.Timezone);
+        var zone = AppHelpers.ResolveTimeZone(clinic.Timezone);
         var localStart = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Unspecified);
         var localEnd = localStart.AddDays(1);
         return (
@@ -799,7 +747,7 @@ public sealed class AppointmentService(
 
     private static void ValidateBusinessHours(Clinic clinic, DateTimeOffset startAt, DateTimeOffset endAt)
     {
-        var zone = ResolveTimeZone(clinic.Timezone);
+        var zone = AppHelpers.ResolveTimeZone(clinic.Timezone);
         var localStart = TimeZoneInfo.ConvertTime(startAt, zone);
         var localEnd = TimeZoneInfo.ConvertTime(endAt, zone);
         var hours = JsonSerializer.Deserialize<BusinessHoursWindow>(
@@ -812,18 +760,6 @@ public sealed class AppointmentService(
         if (localStart.TimeOfDay < startOfBusiness.ToTimeSpan() || localEnd.TimeOfDay > endOfBusiness.ToTimeSpan())
         {
             throw new InvalidOperationException("Consulta fora do expediente da clinica.");
-        }
-    }
-
-    private static TimeZoneInfo ResolveTimeZone(string timezone)
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById(timezone);
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
         }
     }
 
@@ -849,8 +785,7 @@ public sealed class AppointmentService(
 
 public sealed class FinancialService(
     IApplicationDbContext dbContext,
-    ITenantProvider tenantProvider,
-    IValidator<CreatePaymentRequest> validator) : IFinancialService
+    ITenantProvider tenantProvider)
 {
     public async Task<PagedResult<ReceivableResponse>> ListReceivablesAsync(FinancialQuery query, CancellationToken cancellationToken)
     {
@@ -930,7 +865,6 @@ public sealed class FinancialService(
 
     public async Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken)
     {
-        await validator.ValidateAndThrowAsync(request, cancellationToken);
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var receivable = await dbContext.Receivables.FirstOrDefaultAsync(x => x.Id == request.ReceivableId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Conta a receber nao encontrada.");
@@ -964,15 +898,14 @@ public sealed class FinancialService(
 
 public sealed class DashboardService(
     IApplicationDbContext dbContext,
-    ITenantProvider tenantProvider,
-    IClock clock) : IDashboardService
+    ITenantProvider tenantProvider)
 {
     public async Task<DashboardSummaryResponse> GetSummaryAsync(Guid? doctorId = null, CancellationToken cancellationToken = default)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var clinic = await dbContext.Clinics.FirstAsync(x => x.Id == clinicId, cancellationToken);
-        var zone = ResolveTimeZone(clinic.Timezone);
-        var localNow = TimeZoneInfo.ConvertTime(clock.UtcNow, zone);
+        var zone = AppHelpers.ResolveTimeZone(clinic.Timezone);
+        var localNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
         var localDayStart = new DateTime(localNow.Year, localNow.Month, localNow.Day, 0, 0, 0, DateTimeKind.Unspecified);
         var dayStart = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localDayStart, zone));
         var dayEnd = dayStart.AddDays(1);
@@ -999,29 +932,15 @@ public sealed class DashboardService(
         return new DashboardSummaryResponse(appointmentsToday, confirmedToday, cancelledToday, monthlyRevenue, noShowRate, confirmationRate);
     }
 
-    private static TimeZoneInfo ResolveTimeZone(string timezone)
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById(timezone);
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
-        }
-    }
 }
 
 public sealed class WhatsAppWebhookService(
     IApplicationDbContext dbContext,
     ITenantProvider tenantProvider,
-    IValidator<WhatsAppWebhookRequest> validator,
-    IOutboxService outboxService) : IWhatsAppWebhookService
+    IOutboxService outboxService)
 {
     public async Task ProcessAsync(WhatsAppWebhookRequest request, CancellationToken cancellationToken)
     {
-        await validator.ValidateAndThrowAsync(request, cancellationToken);
-
         dbContext.WebhookEvents.Add(new WebhookEvent
         {
             ClinicId = request.ClinicId ?? tenantProvider.ClinicId,
@@ -1071,14 +990,11 @@ public sealed class WhatsAppWebhookService(
 public sealed class PatientPortalService(
     IApplicationDbContext dbContext,
     ITenantProvider tenantProvider,
-    IJwtTokenService jwtTokenService,
-    IClock clock) : IPatientPortalService
+    IJwtTokenService jwtTokenService)
 {
-    private static readonly DateTimeOffset PortalTokenExpiry = DateTimeOffset.UtcNow.AddDays(7);
-
     public async Task<PatientPortalAuthResponse> LoginAsync(PatientPortalLoginRequest request, CancellationToken cancellationToken)
     {
-        var normalizedCpf = new string(request.Cpf.Where(char.IsDigit).ToArray());
+        var normalizedCpf = AppHelpers.NormalizeDigits(request.Cpf);
         if (!Guid.TryParse(request.AccessToken, out var tokenGuid))
         {
             throw new UnauthorizedAccessException("Credenciais invalidas.");
@@ -1090,7 +1006,7 @@ public sealed class PatientPortalService(
             ?? throw new UnauthorizedAccessException("CPF ou token invalido.");
 
         var accessToken = jwtTokenService.GeneratePatientToken(patient);
-        var expiresAt = clock.UtcNow.AddDays(7);
+        var expiresAt = DateTimeOffset.UtcNow.AddDays(7);
         var profile = ToProfile(patient);
         return new PatientPortalAuthResponse(accessToken, expiresAt, profile);
     }
@@ -1164,7 +1080,7 @@ public sealed class PatientPortalService(
             .FirstOrDefaultAsync(x => x.Id == patientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Paciente nao encontrado.");
         patient.PatientAccessToken = Guid.NewGuid();
-        patient.UpdatedAt = clock.UtcNow;
+        patient.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         return patient.PatientAccessToken;
     }
@@ -1174,6 +1090,23 @@ public sealed class PatientPortalService(
 
     private static PatientPortalProfileResponse ToProfile(Patient patient) =>
         new(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance);
+}
+
+internal static class AppHelpers
+{
+    internal static string NormalizeDigits(string value) => new(value.Where(char.IsDigit).ToArray());
+
+    internal static TimeZoneInfo ResolveTimeZone(string timezone)
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timezone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
+        }
+    }
 }
 
 internal static class TenantGuard

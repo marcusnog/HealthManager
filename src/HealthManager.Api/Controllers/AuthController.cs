@@ -6,7 +6,7 @@ namespace HealthManager.Api.Controllers;
 
 [ApiController]
 [Route("auth")]
-public sealed class AuthController(IAuthService authService) : ControllerBase
+public sealed class AuthController(AuthService authService) : ControllerBase
 {
     [AllowAnonymous]
     [HttpPost("login")]

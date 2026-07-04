@@ -1,6 +1,7 @@
 using FluentAssertions;
 using HealthManager.Application;
 using HealthManager.Domain;
+using HealthManager.Infrastructure;
 using HealthManager.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,9 +39,7 @@ public sealed class AppointmentServiceTests
         var service = new AppointmentService(
             dbContext,
             new FakeTenantProvider(clinicId),
-            new CreateAppointmentRequestValidator(),
-            new UpdateAppointmentRequestValidator(),
-            new HealthManager.Infrastructure.OutboxService(dbContext));
+            new OutboxService(dbContext));
 
         var action = async () => await service.CreateAsync(
             new CreateAppointmentRequest(patientB, doctorId, startAt.AddMinutes(10), 30, null, "Consulta", 150),
@@ -50,13 +49,5 @@ public sealed class AppointmentServiceTests
             .WithMessage("*Conflito de horario*");
     }
 
-    private static AppDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDbContext() => TestHelpers.CreateDbContext();
 }
-

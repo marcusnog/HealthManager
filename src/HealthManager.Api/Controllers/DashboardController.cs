@@ -7,7 +7,7 @@ namespace HealthManager.Api.Controllers;
 [ApiController]
 [Authorize(Policy = "ClinicStaff")]
 [Route("dashboard")]
-public sealed class DashboardController(IDashboardService dashboardService) : ControllerBase
+public sealed class DashboardController(DashboardService dashboardService) : ControllerBase
 {
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryResponse>> GetSummary([FromQuery] Guid? doctorId = null, CancellationToken cancellationToken = default)

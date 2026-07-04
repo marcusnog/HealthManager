@@ -7,7 +7,7 @@ namespace HealthManager.Api.Controllers;
 [ApiController]
 [AllowAnonymous]
 [Route("whatsapp")]
-public sealed class WhatsAppController(IWhatsAppWebhookService whatsAppWebhookService, IConfiguration configuration) : ControllerBase
+public sealed class WhatsAppController(WhatsAppWebhookService whatsAppWebhookService, IConfiguration configuration) : ControllerBase
 {
     [HttpGet("webhook")]
     public IActionResult Verify([FromQuery(Name = "hub.verify_token")] string verifyToken, [FromQuery(Name = "hub.challenge")] string challenge)

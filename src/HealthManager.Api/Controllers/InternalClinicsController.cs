@@ -7,7 +7,7 @@ namespace HealthManager.Api.Controllers;
 [ApiController]
 [Authorize(Policy = "PlatformAdminOnly")]
 [Route("internal/clinics")]
-public sealed class InternalClinicsController(IClinicProvisioningService clinicProvisioningService) : ControllerBase
+public sealed class InternalClinicsController(ClinicProvisioningService clinicProvisioningService) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<ClinicProvisioningResponse>> CreateClinic([FromBody] CreateClinicRequest request, CancellationToken cancellationToken)

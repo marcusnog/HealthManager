@@ -8,7 +8,7 @@ namespace HealthManager.Api.Controllers;
 [ApiController]
 [Authorize(Policy = "ClinicStaff")]
 [Route("patients")]
-public sealed class PatientsController(IPatientService patientService, IPatientPortalService portalService) : ControllerBase
+public sealed class PatientsController(PatientService patientService, PatientPortalService portalService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<PatientResponse>>> List([FromQuery] PatientQuery query, CancellationToken cancellationToken)
@@ -48,7 +48,7 @@ public sealed class PatientsController(IPatientService patientService, IPatientP
         await using var content = file.OpenReadStream();
         var response = await patientService.UploadDocumentAsync(
             id,
-            new UploadPatientDocumentRequest(file.FileName, file.ContentType, file.Length, content),
+            new CreatePatientDocumentRequest(file.FileName, file.ContentType, file.Length, content),
             cancellationToken);
 
         return Ok(response);
@@ -70,7 +70,7 @@ public sealed class PatientsController(IPatientService patientService, IPatientP
 
     [HttpPost("{id:guid}/documents")]
     public async Task<ActionResult<PatientDocumentResponse>> AddDocument(Guid id, [FromBody] CreatePatientDocumentRequest request, CancellationToken cancellationToken)
-        => Ok(await patientService.AddDocumentAsync(id, request, cancellationToken));
+        => Ok(await patientService.UploadDocumentAsync(id, request, cancellationToken));
 
     [HttpPost("{id:guid}/access-token/regenerate")]
     [Authorize(Policy = "ClinicAdminOrSecretary")]

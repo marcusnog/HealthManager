@@ -18,7 +18,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Receivable> Receivables => Set<Receivable>();
     public DbSet<Payment> Payments => Set<Payment>();
-    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
@@ -84,7 +83,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         modelBuilder.Entity<Appointment>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<Receivable>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<Payment>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
-        modelBuilder.Entity<Notification>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<WhatsAppMessage>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<AuditLog>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<PatientDocument>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));

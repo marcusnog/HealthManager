@@ -28,6 +28,8 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef`, `reportgenerator`.
 
 CI (`dotnet-version: 10.0.x`) builds with `--configuration Release` and also publishes Lambda with `--self-contained --runtime linux-x64`.
 
+No Serilog, no FluentValidation — built-in `Microsoft.Extensions.Logging` + `System.ComponentModel.DataAnnotations`. No service-layer interfaces (services registered as concrete classes in DI). Boundary interfaces (`IApplicationDbContext`, `IPasswordHasher`, `IJwtTokenService`, `IOutboxService`) remain for layer separation. `IClock` removed — inline `DateTimeOffset.UtcNow`.
+
 ## Projects
 
 | Project | Role | References |
@@ -41,16 +43,17 @@ CI (`dotnet-version: 10.0.x`) builds with `--configuration Release` and also pub
 
 ## Architecture
 
-- Modular monolith (not microservices) — wired via `AddApplication()` + `AddInfrastructure()` in `Program.cs:37-38`
-- Tenant isolation via `clinic_id` on every entity, enforced by EF Core query filters in `AppDbContext.cs:80-93`
+- Modular monolith (not microservices) — wired via `AddApplication()` + `AddInfrastructure()` in `Program.cs`
+- Tenant isolation via `clinic_id` on `TenantEntity` — enforced by EF Core query filters on every tenant entity (`AppDbContext.cs`)
 - Soft delete via `DeletedAt` — global query filter on every entity
-- Finance uses `receivables + payments` (partial payments via `ReceivedAmount` on Receivable)
+- Finance uses `receivables + payments`; partial payments tracked via `ReceivedAmount` on `Receivable`
 - Dates in UTC; display in clinic timezone
 - Outbox + Worker: `OutboxEvent` entity, Worker polls every 15s
 - `Program.cs` is `partial class Program` — required for `WebApplicationFactory<Program>` in integration tests
-- `Directory.Build.props`: `TreatWarningsAsErrors=false`, `LangVersion=12.0`, nullable enabled, implicit usings, central TFM (`net10.0`). Individual `.csproj` files must NOT set `<TargetFramework>` — only `Directory.Build.props` defines it.
+- `Directory.Build.props`: `TreatWarningsAsErrors=false`, nullable enabled, implicit usings, central TFM (`net10.0`). Individual `.csproj` files must NOT set `<TargetFramework>` — only `Directory.Build.props` defines it.
 - `global.json` pins SDK `10.0.301` with `rollForward: latestMajor`
 - Brazil-first: `pt-BR`, CPF/phone BR, BRL, clinic timezone
+- PatientPortal auth: login via `CPF + PatientAccessToken` (separate JWT lifetime, not refresh tokens)
 
 ## Testing
 
@@ -59,7 +62,7 @@ CI (`dotnet-version: 10.0.x`) builds with `--configuration Release` and also pub
 - Stack: xUnit + FluentAssertions + `Microsoft.AspNetCore.Mvc.Testing` + EF Core InMemory
 - `ApiTestFactory` exposes `LoginAsync()` and `CreateAuthenticatedClientAsync()` helpers
 - `FakeStorageService` is an in-memory `Dictionary<string, byte[]>` — register `IStorageService` singleton in tests
-- Unit tests for `OutboxProcessor` (Services.cs:194) and `WhatsAppWebhookService` (Services.cs:997) use `AppDbContext` + InMemory DB directly, following the same pattern as `PatientServiceTests`
+- Unit tests for `OutboxProcessor` and `WhatsAppWebhookService` use `AppDbContext` + InMemory DB directly, following the same pattern as `PatientServiceTests`
 
 ## Seed data
 
@@ -83,6 +86,7 @@ Used in `HealthManager.Api.http` and `docs/local-smoke-test.md`. Integration tes
 | `JWT_ACCESS_TOKEN_MINUTES` | No | `30` |
 | `JWT_REFRESH_TOKEN_DAYS` | No | `30` |
 | `CORS_ORIGINS` | No | `http://localhost:3000` |
+| `USE_INMEMORY_DATABASE` | No | `false` — tests set `true` + `INMEMORY_DATABASE_NAME` (per-class random) |
 | `SUPABASE_URL`/`KEY`/`BUCKET` | No | Without them, document upload stores metadata only |
 | `SENTRY_DSN` | No | Optional, enables Sentry |
 | `WHATSAPP_*` | No | WhatsApp webhook |
@@ -97,4 +101,4 @@ Manual testing via `src/HealthManager.Api/HealthManager.Api.http`.
 
 ## Infra
 
-Terraform in `infra/` targets AWS (ECS Fargate + RDS + CloudFront + Lambda). CI/CD at `.github/workflows/backend-ci.yml` pushes ECR images and updates ECS service. Lambda builds `--self-contained --runtime linux-x64`.
+Terraform in `infra/` targets AWS (ECS Fargate + RDS + CloudFront + Lambda). CI/CD at `.github/workflows/backend-ci.yml` — deploy job only runs on master/main pushes (not PRs). Lambda builds `--self-contained --runtime linux-x64`.

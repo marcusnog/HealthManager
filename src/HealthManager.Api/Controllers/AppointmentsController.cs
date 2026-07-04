@@ -7,7 +7,7 @@ namespace HealthManager.Api.Controllers;
 [ApiController]
 [Authorize(Policy = "ClinicStaff")]
 [Route("appointments")]
-public sealed class AppointmentsController(IAppointmentService appointmentService) : ControllerBase
+public sealed class AppointmentsController(AppointmentService appointmentService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<AppointmentResponse>>> List([FromQuery] AppointmentQuery query, CancellationToken cancellationToken)

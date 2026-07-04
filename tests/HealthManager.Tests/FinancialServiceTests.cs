@@ -27,7 +27,7 @@ public sealed class FinancialServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        var service = new FinancialService(dbContext, new FakeTenantProvider(clinicId), new CreatePaymentRequestValidator());
+        var service = new FinancialService(dbContext, new FakeTenantProvider(clinicId));
         var response = await service.CreatePaymentAsync(
             new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, DateTimeOffset.UtcNow, null),
             CancellationToken.None);
@@ -37,12 +37,5 @@ public sealed class FinancialServiceTests
         dbContext.Receivables.Single().ReceivedAmount.Should().Be(50);
     }
 
-    private static AppDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        return new AppDbContext(options);
-    }
+    private static AppDbContext CreateDbContext() => TestHelpers.CreateDbContext();
 }

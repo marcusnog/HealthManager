@@ -6,7 +6,8 @@ namespace HealthManager.Api.Controllers;
 
 [ApiController]
 [Authorize(Policy = "ClinicStaff")]
-public sealed class FinancialController(IFinancialService financialService) : ControllerBase
+[Route("financial")]
+public sealed class FinancialController(FinancialService financialService) : ControllerBase
 {
     [HttpGet("receivables")]
     public async Task<ActionResult<PagedResult<ReceivableResponse>>> ListReceivables([FromQuery] FinancialQuery query, CancellationToken cancellationToken)
