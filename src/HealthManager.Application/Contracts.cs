@@ -101,11 +101,13 @@ public sealed record ReceivableResponse(
     decimal ReceivedAmount,
     decimal OutstandingAmount,
     ReceivableStatus Status,
-    DateTimeOffset DueDate);
+    DateTimeOffset DueDate,
+    Guid? PatientId = null,
+    string? PatientName = null);
 
 public sealed record PaymentQuery(int Page = 1, int PageSize = 20, Guid? ReceivableId = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
 public sealed record CreatePaymentRequest([Required] Guid ReceivableId, [Range(0.01, double.MaxValue)] decimal Amount, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
-public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status);
+public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status, string? PatientName = null);
 public sealed record DashboardSummaryResponse(int AppointmentsToday, int ConfirmedToday, int CancelledToday, decimal MonthlyRevenue, double NoShowRate, double ConfirmationRate);
 
 public sealed record WhatsAppWebhookRequest(Guid? ClinicId, Guid? AppointmentId, [Required] string Phone, [Required] string Message, string? ProviderMessageId);

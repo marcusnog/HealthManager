@@ -860,7 +860,9 @@ public sealed class FinancialService(
                 x.ReceivedAmount,
                 x.OriginalAmount - x.ReceivedAmount,
                 x.Status,
-                x.DueDate))
+                x.DueDate,
+                x.Appointment != null ? x.Appointment.PatientId : null,
+                x.Appointment != null && x.Appointment.Patient != null ? x.Appointment.Patient.Name : null))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<ReceivableResponse>(items, query.Page, query.PageSize, total);
@@ -894,7 +896,14 @@ public sealed class FinancialService(
             .OrderByDescending(x => x.PaidAt)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .Select(x => new PaymentResponse(x.Id, x.ReceivableId, x.Amount, x.PaymentMethod, x.PaidAt, x.Status))
+            .Select(x => new PaymentResponse(
+                x.Id,
+                x.ReceivableId,
+                x.Amount,
+                x.PaymentMethod,
+                x.PaidAt,
+                x.Status,
+                x.Receivable != null && x.Receivable.Appointment != null && x.Receivable.Appointment.Patient != null ? x.Receivable.Appointment.Patient.Name : null))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<PaymentResponse>(items, query.Page, query.PageSize, total);
@@ -903,7 +912,8 @@ public sealed class FinancialService(
     public async Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
-        var receivable = await dbContext.Receivables.FirstOrDefaultAsync(x => x.Id == request.ReceivableId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+        var receivable = await dbContext.Receivables
+            .FirstOrDefaultAsync(x => x.Id == request.ReceivableId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Conta a receber nao encontrada.");
 
         var newReceivedAmount = receivable.ReceivedAmount + request.Amount;

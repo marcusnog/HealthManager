@@ -1331,7 +1331,9 @@
           "receivedAmount": { "type": "number", "format": "decimal" },
           "outstandingAmount": { "type": "number", "format": "decimal" },
           "status": { "type": "string" },
-          "dueDate": { "type": "string", "format": "date-time" }
+          "dueDate": { "type": "string", "format": "date-time" },
+          "patientId": { "type": "string", "format": "uuid" },
+          "patientName": { "type": "string" }
         }
       },
       "CreatePaymentRequest": {
@@ -1352,7 +1354,8 @@
           "receivableId": { "type": "string", "format": "uuid" },
           "amount": { "type": "number", "format": "decimal" },
           "paymentMethod": { "type": "string" },
-          "paidAt": { "type": "string", "format": "date-time" }
+          "paidAt": { "type": "string", "format": "date-time" },
+          "patientName": { "type": "string" }
         }
       },
       "DashboardSummaryResponse": {
