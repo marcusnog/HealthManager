@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HealthManager.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260705033519_AddFilteredUserEmailIndex")]
+    [Migration("20260705035847_AddFilteredUserEmailIndex")]
     partial class AddFilteredUserEmailIndex
     {
         /// <inheritdoc />
@@ -538,7 +538,7 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique()
-                        .HasFilter("[DeletedAt] IS NULL");
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Users");
                 });

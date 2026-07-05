@@ -19,7 +19,7 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                 table: "Users",
                 column: "Email",
                 unique: true,
-                filter: "[DeletedAt] IS NULL");
+                filter: "\"DeletedAt\" IS NULL");
         }
 
         /// <inheritdoc />
