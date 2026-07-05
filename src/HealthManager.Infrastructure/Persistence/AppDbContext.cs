@@ -30,7 +30,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<Clinic>().HasIndex(x => x.Slug).IsUnique();
-        modelBuilder.Entity<User>().HasIndex(x => x.Email).IsUnique();
+        modelBuilder.Entity<User>().HasIndex(x => x.Email).IsUnique().HasFilter("[DeletedAt] IS NULL");
         modelBuilder.Entity<Patient>().HasIndex(x => new { x.ClinicId, x.Cpf }).IsUnique();
         modelBuilder.Entity<Doctor>().HasIndex(x => new { x.ClinicId, x.Crm }).IsUnique();
 

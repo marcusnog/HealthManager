@@ -499,7 +499,7 @@ public sealed class DoctorService(
 
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
-            var existing = await dbContext.Users.AnyAsync(x => x.Email == request.Email && x.DeletedAt == null, cancellationToken);
+            var existing = await dbContext.Users.IgnoreQueryFilters().AnyAsync(x => x.Email == request.Email, cancellationToken);
             if (!existing)
             {
                 dbContext.Users.Add(new User
