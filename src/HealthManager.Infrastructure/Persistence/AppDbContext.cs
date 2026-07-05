@@ -56,7 +56,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             .HasOne(x => x.Appointment)
             .WithMany()
             .HasForeignKey(x => x.AppointmentId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<Payment>()
             .HasOne(x => x.Receivable)

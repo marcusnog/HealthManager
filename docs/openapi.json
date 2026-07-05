@@ -891,6 +891,34 @@
         }
       }
     },
+    "/receivables/manual": {
+      "post": {
+        "operationId": "receivables_manual",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManualReceivableRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivableResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/payments": {
       "get": {
         "operationId": "payments_list",
@@ -1326,7 +1354,7 @@
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "appointmentId": { "type": "string", "format": "uuid" },
+          "appointmentId": { "type": "string", "format": "uuid", "nullable": true },
           "originalAmount": { "type": "number", "format": "decimal" },
           "receivedAmount": { "type": "number", "format": "decimal" },
           "outstandingAmount": { "type": "number", "format": "decimal" },
@@ -1342,6 +1370,18 @@
         "properties": {
           "receivableId": { "type": "string", "format": "uuid" },
           "amount": { "type": "number", "format": "decimal" },
+          "paymentMethod": { "type": "string" },
+          "paidAt": { "type": "string", "format": "date-time" },
+          "notes": { "type": "string" }
+        }
+      },
+      "CreateManualReceivableRequest": {
+        "type": "object",
+        "required": ["amount", "paymentMethod"],
+        "properties": {
+          "amount": { "type": "number", "format": "decimal" },
+          "description": { "type": "string" },
+          "dueDate": { "type": "string", "format": "date-time" },
           "paymentMethod": { "type": "string" },
           "paidAt": { "type": "string", "format": "date-time" },
           "notes": { "type": "string" }

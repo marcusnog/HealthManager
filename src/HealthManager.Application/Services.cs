@@ -909,6 +909,46 @@ public sealed class FinancialService(
         return new PagedResult<PaymentResponse>(items, query.Page, query.PageSize, total);
     }
 
+    public async Task<ReceivableResponse> CreateManualReceivableAsync(CreateManualReceivableRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+
+        var receivable = new Receivable
+        {
+            ClinicId = clinicId,
+            AppointmentId = null,
+            OriginalAmount = request.Amount,
+            ReceivedAmount = request.Amount,
+            Status = ReceivableStatus.Paid,
+            DueDate = request.DueDate ?? DateTimeOffset.UtcNow,
+            Description = request.Description
+        };
+
+        dbContext.Receivables.Add(receivable);
+
+        var payment = new Payment
+        {
+            ClinicId = clinicId,
+            ReceivableId = receivable.Id,
+            Amount = request.Amount,
+            PaymentMethod = request.PaymentMethod,
+            PaidAt = request.PaidAt ?? DateTimeOffset.UtcNow,
+            Notes = request.Notes
+        };
+
+        dbContext.Payments.Add(payment);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new ReceivableResponse(
+            receivable.Id,
+            receivable.AppointmentId,
+            receivable.OriginalAmount,
+            receivable.ReceivedAmount,
+            receivable.OriginalAmount - receivable.ReceivedAmount,
+            receivable.Status,
+            receivable.DueDate);
+    }
+
     public async Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);

@@ -96,7 +96,7 @@ public sealed record AppointmentResponse(
 
 public sealed record ReceivableResponse(
     Guid Id,
-    Guid AppointmentId,
+    Guid? AppointmentId,
     decimal OriginalAmount,
     decimal ReceivedAmount,
     decimal OutstandingAmount,
@@ -107,6 +107,7 @@ public sealed record ReceivableResponse(
 
 public sealed record PaymentQuery(int Page = 1, int PageSize = 20, Guid? ReceivableId = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
 public sealed record CreatePaymentRequest([Required] Guid ReceivableId, [Range(0.01, double.MaxValue)] decimal Amount, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
+public sealed record CreateManualReceivableRequest([Range(0.01, double.MaxValue)] decimal Amount, string? Description, DateTimeOffset? DueDate, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
 public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status, string? PatientName = null);
 public sealed record DashboardSummaryResponse(int AppointmentsToday, int ConfirmedToday, int CancelledToday, decimal MonthlyRevenue, double NoShowRate, double ConfirmationRate);
 

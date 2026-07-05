@@ -23,5 +23,12 @@ public sealed class FinancialController(FinancialService financialService) : Con
         var response = await financialService.CreatePaymentAsync(request, cancellationToken);
         return CreatedAtAction(nameof(CreatePayment), new { id = response.Id }, response);
     }
+
+    [HttpPost("receivables/manual")]
+    public async Task<ActionResult<ReceivableResponse>> CreateManualReceivable([FromBody] CreateManualReceivableRequest request, CancellationToken cancellationToken)
+    {
+        var response = await financialService.CreateManualReceivableAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(CreateManualReceivable), new { id = response.Id }, response);
+    }
 }
 

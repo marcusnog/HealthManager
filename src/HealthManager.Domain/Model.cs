@@ -85,7 +85,7 @@ public sealed class Appointment : TenantEntity
 
 public sealed class Receivable : TenantEntity
 {
-    public Guid AppointmentId { get; set; }
+    public Guid? AppointmentId { get; set; }
     public decimal OriginalAmount { get; set; }
     public decimal ReceivedAmount { get; set; }
     public ReceivableStatus Status { get; set; } = ReceivableStatus.Pending;
