@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using HealthManager.Application;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,6 +24,15 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken)
     {
         await authService.LogoutAsync(request, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        await authService.ChangePasswordAsync(userId, request, cancellationToken);
         return NoContent();
     }
 }

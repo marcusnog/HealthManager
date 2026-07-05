@@ -77,6 +77,21 @@ public sealed class AuthService(
             bundle.ExpiresAt,
             new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role));
     }
+
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Usuario nao encontrado.");
+
+        if (!passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))
+        {
+            throw new InvalidOperationException("Senha atual incorreta.");
+        }
+
+        user.PasswordHash = passwordHasher.Hash(request.NewPassword);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
 }
 
 public sealed class ClinicProvisioningService(
@@ -391,7 +406,8 @@ public sealed class PatientService(
 
 public sealed class DoctorService(
     IApplicationDbContext dbContext,
-    ITenantProvider tenantProvider)
+    ITenantProvider tenantProvider,
+    IPasswordHasher passwordHasher)
 {
     public async Task<PagedResult<DoctorResponse>> ListAsync(DoctorQuery query, CancellationToken cancellationToken)
     {
@@ -480,6 +496,23 @@ public sealed class DoctorService(
         };
 
         dbContext.Doctors.Add(doctor);
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var existing = await dbContext.Users.AnyAsync(x => x.Email == request.Email && x.DeletedAt == null, cancellationToken);
+            if (!existing)
+            {
+                dbContext.Users.Add(new User
+                {
+                    ClinicId = clinicId,
+                    Name = request.Name,
+                    Email = request.Email,
+                    PasswordHash = passwordHasher.Hash("mude2026"),
+                    Role = UserRole.Doctor
+                });
+            }
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return new DoctorResponse(doctor.Id, doctor.Name, doctor.Specialty, doctor.Crm, doctor.Phone, doctor.Email, doctor.IsActive);
     }
