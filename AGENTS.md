@@ -24,9 +24,9 @@ dotnet tool run dotnet-ef migrations add <Nome> --project src/HealthManager.Infr
 
 `dotnet` may not be in PATH — fallback: `C:\Program Files\dotnet\dotnet.exe`.
 
-Local tools in `.config/dotnet-tools.json`: `dotnet-ef`, `reportgenerator`.
+Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenerator` (v5.5.10). Coverage via `coverlet.collector` (test csproj).
 
-CI (`dotnet-version: 10.0.x`) builds with `--configuration Release` and also publishes Lambda with `--self-contained --runtime linux-x64`.
+CI (`dotnet-version: 10.0.x`) builds `--configuration Release`, publishes Lambda `--self-contained --runtime linux-x64`, deploys API image to ECS Fargate, Lambda zip to AWS Lambda. Uses OIDC auth with AWS. Deploy runs only on master/main pushes.
 
 No Serilog, no FluentValidation — built-in `Microsoft.Extensions.Logging` + `System.ComponentModel.DataAnnotations`. No service-layer interfaces (services registered as concrete classes in DI). Boundary interfaces (`IApplicationDbContext`, `IPasswordHasher`, `IJwtTokenService`, `IOutboxService`) remain for layer separation. `IClock` removed — inline `DateTimeOffset.UtcNow`.
 
@@ -44,25 +44,29 @@ No Serilog, no FluentValidation — built-in `Microsoft.Extensions.Logging` + `S
 ## Architecture
 
 - Modular monolith (not microservices) — wired via `AddApplication()` + `AddInfrastructure()` in `Program.cs`
-- Tenant isolation via `clinic_id` on `TenantEntity` — enforced by EF Core query filters on every tenant entity (`AppDbContext.cs`)
+- Tenant isolation via `clinic_id` on `TenantEntity` — enforced by EF Core query filters on every tenant entity (`AppDbContext.cs`). PlatformAdmin bypasses the filter.
 - Soft delete via `DeletedAt` — global query filter on every entity
 - Finance uses `receivables + payments`; partial payments tracked via `ReceivedAmount` on `Receivable`
 - Dates in UTC; display in clinic timezone
-- Outbox + Worker: `OutboxEvent` entity, Worker polls every 15s
+- Outbox + Worker: `OutboxEvent` entity, `OutboxWorker` polls every 15s (`BackgroundService`, `Task.Delay(15s)`)
 - `Program.cs` is `partial class Program` — required for `WebApplicationFactory<Program>` in integration tests
-- `Directory.Build.props`: `TreatWarningsAsErrors=false`, nullable enabled, implicit usings, central TFM (`net10.0`). Individual `.csproj` files must NOT set `<TargetFramework>` — only `Directory.Build.props` defines it.
+- `Directory.Build.props`: `TreatWarningsAsErrors=false`, nullable enabled, implicit usings, central TFM (`net10.0`). Individual `.csproj` files must NOT set `<TargetFramework>`.
 - `global.json` pins SDK `10.0.301` with `rollForward: latestMajor`
 - Brazil-first: `pt-BR`, CPF/phone BR, BRL, clinic timezone
 - PatientPortal auth: login via `CPF + PatientAccessToken` (separate JWT lifetime, not refresh tokens)
+- `X-Clinic-Id` header accepted as tenant override (falls back to JWT `clinic_id` claim)
+- Worker has its own `appsettings.json` / `appsettings.Production.json` (src/HealthManager.Worker/)
+- No `.env.*` files exist in this repo (README is stale). Settings via environment variables or `appsettings.json`.
+- `AppDbContextFactory` (design-time) in `AppDbContext.cs` for EF Core CLI migrations
 
 ## Testing
 
-- Integration: each test class creates `new ApiTestFactory()` — EF Core InMemory, `FakeStorageService`, seeded DB per class. `ApiTestFactory` sets `USE_INMEMORY_DATABASE=true` + `SENTRY_DSN=""` + `Testing` env (bypasses HTTPS).
-- Unit: use `FakeTenantProvider`, `FakeClock`, `FakeStorageService` from `TestDoubles.cs`
-- Stack: xUnit + FluentAssertions + `Microsoft.AspNetCore.Mvc.Testing` + EF Core InMemory
+- Integration: each test class creates `new ApiTestFactory()` — EF Core InMemory, `FakeStorageService`, seeded DB per class. `ApiTestFactory` sets `USE_INMEMORY_DATABASE=true` + `SENTRY_DSN=""` + `Testing` env (bypasses HTTPS at `Program.cs:68-71`).
+- Unit: use `FakeTenantProvider`, `FakeClock`, `FakeStorageService` from `TestDoubles.cs` + `TestHelpers.CreateDbContext()` (fresh InMemory DB per test).
+- Stack: xUnit + FluentAssertions + `Microsoft.AspNetCore.Mvc.Testing` + EF Core InMemory + `coverlet.collector`
 - `ApiTestFactory` exposes `LoginAsync()` and `CreateAuthenticatedClientAsync()` helpers
-- `FakeStorageService` is an in-memory `Dictionary<string, byte[]>` — register `IStorageService` singleton in tests
-- Unit tests for `OutboxProcessor` and `WhatsAppWebhookService` use `AppDbContext` + InMemory DB directly, following the same pattern as `PatientServiceTests`
+- `FakeStorageService` is an in-memory `Dictionary<string, byte[]>` — registered as `IStorageService` singleton
+- `AppDbContext` creation in tests via `new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString())`
 
 ## Seed data
 
@@ -90,8 +94,6 @@ Used in `HealthManager.Api.http` and `docs/local-smoke-test.md`. Integration tes
 | `SUPABASE_URL`/`KEY`/`BUCKET` | No | Without them, document upload stores metadata only |
 | `SENTRY_DSN` | No | Optional, enables Sentry |
 | `WHATSAPP_*` | No | WhatsApp webhook |
-
-`X-Clinic-Id` header accepted as tenant override (falls back to JWT `clinic_id` claim).
 
 ## API contract
 

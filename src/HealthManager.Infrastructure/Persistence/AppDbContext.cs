@@ -22,6 +22,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<PatientDocument> PatientDocuments => Set<PatientDocument>();
+    public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
 
@@ -87,6 +88,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         modelBuilder.Entity<AuditLog>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<PatientDocument>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<Expense>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<WebhookEvent>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<OutboxEvent>().HasQueryFilter(x => x.DeletedAt == null);
     }

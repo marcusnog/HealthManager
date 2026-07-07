@@ -110,7 +110,14 @@ public sealed record PaymentQuery(int Page = 1, int PageSize = 20, Guid? Receiva
 public sealed record CreatePaymentRequest([Required] Guid ReceivableId, [Range(0.01, double.MaxValue)] decimal Amount, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
 public sealed record CreateManualReceivableRequest([Range(0.01, double.MaxValue)] decimal Amount, string? Description, DateTimeOffset? DueDate, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
 public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status, string? PatientName = null);
-public sealed record DashboardSummaryResponse(int AppointmentsToday, int ConfirmedToday, int CancelledToday, decimal MonthlyRevenue, double NoShowRate, double ConfirmationRate);
+
+public sealed record ExpenseQuery(int Page = 1, int PageSize = 20, string? Category = null, string? Status = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
+public sealed record ExpenseRequest([Required][StringLength(300)] string Description, [Range(0.01, double.MaxValue)] decimal Amount, ExpenseCategory Category, PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, ExpenseStatus? Status, string? Notes);
+public sealed record ExpenseResponse(Guid Id, string Description, decimal Amount, ExpenseCategory Category, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, ExpenseStatus Status, string? Notes);
+
+public sealed record FinancialSummaryResponse(decimal TotalReceived, decimal TotalExpenses, decimal Balance);
+
+public sealed record DashboardSummaryResponse(int AppointmentsToday, int ConfirmedToday, int CancelledToday, decimal MonthlyRevenue, double NoShowRate, double ConfirmationRate, decimal MonthlyExpenses, decimal MonthlyBalance);
 
 public sealed record WhatsAppWebhookRequest(Guid? ClinicId, Guid? AppointmentId, [Required] string Phone, [Required] string Message, string? ProviderMessageId);
 

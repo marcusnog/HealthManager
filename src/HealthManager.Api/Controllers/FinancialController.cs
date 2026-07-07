@@ -7,7 +7,9 @@ namespace HealthManager.Api.Controllers;
 [ApiController]
 [Authorize(Policy = "ClinicStaff")]
 [Route("financial")]
-public sealed class FinancialController(FinancialService financialService) : ControllerBase
+public sealed class FinancialController(
+    FinancialService financialService,
+    ExpenseService expenseService) : ControllerBase
 {
     [HttpGet("receivables")]
     public async Task<ActionResult<PagedResult<ReceivableResponse>>> ListReceivables([FromQuery] FinancialQuery query, CancellationToken cancellationToken)
@@ -30,5 +32,31 @@ public sealed class FinancialController(FinancialService financialService) : Con
         var response = await financialService.CreateManualReceivableAsync(request, cancellationToken);
         return CreatedAtAction(nameof(CreateManualReceivable), new { id = response.Id }, response);
     }
+
+    [HttpGet("expenses")]
+    public async Task<ActionResult<PagedResult<ExpenseResponse>>> ListExpenses([FromQuery] ExpenseQuery query, CancellationToken cancellationToken)
+        => Ok(await expenseService.ListAsync(query, cancellationToken));
+
+    [HttpPost("expenses")]
+    public async Task<ActionResult<ExpenseResponse>> CreateExpense([FromBody] ExpenseRequest request, CancellationToken cancellationToken)
+    {
+        var response = await expenseService.CreateAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(CreateExpense), new { id = response.Id }, response);
+    }
+
+    [HttpPut("expenses/{id:guid}")]
+    public async Task<ActionResult<ExpenseResponse>> UpdateExpense(Guid id, [FromBody] ExpenseRequest request, CancellationToken cancellationToken)
+        => Ok(await expenseService.UpdateAsync(id, request, cancellationToken));
+
+    [HttpDelete("expenses/{id:guid}")]
+    public async Task<ActionResult> DeleteExpense(Guid id, CancellationToken cancellationToken)
+    {
+        await expenseService.DeleteAsync(id, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("summary")]
+    public async Task<ActionResult<FinancialSummaryResponse>> GetSummary(CancellationToken cancellationToken)
+        => Ok(await expenseService.GetSummaryAsync(cancellationToken));
 }
 

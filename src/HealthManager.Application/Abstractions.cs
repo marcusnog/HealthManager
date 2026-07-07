@@ -46,6 +46,7 @@ public interface IApplicationDbContext
     DbSet<Payment> Payments { get; }
     DbSet<WhatsAppMessage> WhatsAppMessages { get; }
     DbSet<AuditLog> AuditLogs { get; }
+    DbSet<Expense> Expenses { get; }
     DbSet<OutboxEvent> OutboxEvents { get; }
     DbSet<PatientDocument> PatientDocuments { get; }
     DbSet<RefreshToken> RefreshTokens { get; }

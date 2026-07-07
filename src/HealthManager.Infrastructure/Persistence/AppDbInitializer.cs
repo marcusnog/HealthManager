@@ -154,6 +154,48 @@ public static class AppDbInitializer
             UpdatedAt = now
         };
 
+        var expense1 = new Expense
+        {
+            Id = Guid.Parse("eeeeeeee-1111-1111-1111-eeeeeeeeeeee"),
+            ClinicId = clinicId,
+            Description = "Aluguel da sala - Maio/2026",
+            Amount = 5000m,
+            Category = ExpenseCategory.Rent,
+            PaymentMethod = PaymentMethod.Pix,
+            PaidAt = new DateTimeOffset(2026, 5, 5, 0, 0, 0, TimeSpan.Zero),
+            Status = ExpenseStatus.Paid,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        var expense2 = new Expense
+        {
+            Id = Guid.Parse("eeeeeeee-2222-2222-2222-eeeeeeeeeeee"),
+            ClinicId = clinicId,
+            Description = "Material de escritorio",
+            Amount = 350m,
+            Category = ExpenseCategory.Supplies,
+            PaymentMethod = PaymentMethod.CreditCard,
+            PaidAt = new DateTimeOffset(2026, 5, 3, 0, 0, 0, TimeSpan.Zero),
+            Status = ExpenseStatus.Paid,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        var expense3 = new Expense
+        {
+            Id = Guid.Parse("eeeeeeee-3333-3333-3333-eeeeeeeeeeee"),
+            ClinicId = clinicId,
+            Description = "Conta de energia",
+            Amount = 890m,
+            Category = ExpenseCategory.Utilities,
+            PaymentMethod = PaymentMethod.DebitCard,
+            PaidAt = new DateTimeOffset(2026, 5, 10, 0, 0, 0, TimeSpan.Zero),
+            Status = ExpenseStatus.Pending,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
         var outbox = new OutboxEvent
         {
             ClinicId = clinicId,
@@ -165,7 +207,7 @@ public static class AppDbInitializer
             UpdatedAt = now
         };
 
-        dbContext.AddRange(clinic, platformAdmin, clinicAdmin, doctorUser, doctor, patient, appointment, receivable, outbox);
+        dbContext.AddRange(clinic, platformAdmin, clinicAdmin, doctorUser, doctor, patient, appointment, receivable, expense1, expense2, expense3, outbox);
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Seed completed. Demo clinic and users created.");
     }

@@ -106,6 +106,17 @@ public sealed class Payment : TenantEntity
     public Receivable? Receivable { get; set; }
 }
 
+public sealed class Expense : TenantEntity
+{
+    public string Description { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public ExpenseCategory Category { get; set; } = ExpenseCategory.Other;
+    public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Pix;
+    public DateTimeOffset PaidAt { get; set; } = DateTimeOffset.UtcNow;
+    public ExpenseStatus Status { get; set; } = ExpenseStatus.Paid;
+    public string? Notes { get; set; }
+}
+
 public sealed class PatientDocument : TenantEntity
 {
     public Guid PatientId { get; set; }
@@ -250,4 +261,22 @@ public enum OutboxStatus
     Pending = 1,
     Processed = 2,
     Failed = 3
+}
+
+public enum ExpenseCategory
+{
+    Supplies = 1,
+    Equipment = 2,
+    Salary = 3,
+    Marketing = 4,
+    Utilities = 5,
+    Rent = 6,
+    Other = 7
+}
+
+public enum ExpenseStatus
+{
+    Paid = 1,
+    Pending = 2,
+    Cancelled = 3
 }

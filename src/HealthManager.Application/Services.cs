@@ -1016,6 +1016,128 @@ public sealed class FinancialService(
     }
 }
 
+public sealed class ExpenseService(
+    IApplicationDbContext dbContext,
+    ITenantProvider tenantProvider)
+{
+    public async Task<PagedResult<ExpenseResponse>> ListAsync(ExpenseQuery query, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var queryable = dbContext.Expenses.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
+
+        if (!string.IsNullOrWhiteSpace(query.Category) &&
+            Enum.TryParse<ExpenseCategory>(query.Category, ignoreCase: true, out var parsedCategory))
+            queryable = queryable.Where(x => x.Category == parsedCategory);
+
+        if (!string.IsNullOrWhiteSpace(query.Status) &&
+            Enum.TryParse<ExpenseStatus>(query.Status, ignoreCase: true, out var parsedStatus))
+            queryable = queryable.Where(x => x.Status == parsedStatus);
+
+        if (query.DateFrom.HasValue)
+        {
+            var from = query.DateFrom.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            queryable = queryable.Where(x => x.PaidAt >= from);
+        }
+        if (query.DateTo.HasValue)
+        {
+            var to = query.DateTo.Value.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+            queryable = queryable.Where(x => x.PaidAt <= to);
+        }
+
+        var total = await queryable.CountAsync(cancellationToken);
+        var items = await queryable
+            .OrderByDescending(x => x.PaidAt)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(x => new ExpenseResponse(x.Id, x.Description, x.Amount, x.Category, x.PaymentMethod, x.PaidAt, x.Status, x.Notes))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<ExpenseResponse>(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<ExpenseResponse> CreateAsync(ExpenseRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var expense = Map(request, clinicId);
+        dbContext.Expenses.Add(expense);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(expense);
+    }
+
+    public async Task<ExpenseResponse> UpdateAsync(Guid id, ExpenseRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var expense = await dbContext.Expenses
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Despesa nao encontrada.");
+
+        Map(request, expense);
+        expense.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(expense);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var expense = await dbContext.Expenses
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Despesa nao encontrada.");
+
+        expense.DeletedAt = DateTimeOffset.UtcNow;
+        expense.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    // ponytail: month-boundary calc duplicates DashboardService; 5 lines, not worth extracting
+    public async Task<FinancialSummaryResponse> GetSummaryAsync(CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var clinic = await dbContext.Clinics.FirstAsync(x => x.Id == clinicId, cancellationToken);
+        var zone = AppHelpers.ResolveTimeZone(clinic.Timezone);
+        var localNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
+        var monthStart = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(new DateTime(localNow.Year, localNow.Month, 1, 0, 0, 0, DateTimeKind.Unspecified), zone));
+        var monthEnd = monthStart.AddMonths(1);
+
+        var totalReceived = await dbContext.Payments
+            .Where(x => x.ClinicId == clinicId && x.PaidAt >= monthStart && x.PaidAt < monthEnd && x.DeletedAt == null)
+            .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+
+        var totalExpenses = await dbContext.Expenses
+            .Where(x => x.ClinicId == clinicId && x.PaidAt >= monthStart && x.PaidAt < monthEnd && x.DeletedAt == null && x.Status == ExpenseStatus.Paid)
+            .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+
+        return new FinancialSummaryResponse(totalReceived, totalExpenses, totalReceived - totalExpenses);
+    }
+
+    private static ExpenseResponse ToResponse(Expense e) =>
+        new(e.Id, e.Description, e.Amount, e.Category, e.PaymentMethod, e.PaidAt, e.Status, e.Notes);
+
+    private static Expense Map(ExpenseRequest request, Guid clinicId) => new()
+    {
+        ClinicId = clinicId,
+        Description = request.Description,
+        Amount = request.Amount,
+        Category = request.Category,
+        PaymentMethod = request.PaymentMethod,
+        PaidAt = request.PaidAt ?? DateTimeOffset.UtcNow,
+        Status = request.Status ?? ExpenseStatus.Paid,
+        Notes = request.Notes
+    };
+
+    private static void Map(ExpenseRequest request, Expense expense)
+    {
+        expense.Description = request.Description;
+        expense.Amount = request.Amount;
+        expense.Category = request.Category;
+        expense.PaymentMethod = request.PaymentMethod;
+        expense.PaidAt = request.PaidAt ?? expense.PaidAt;
+        expense.Status = request.Status ?? expense.Status;
+        expense.Notes = request.Notes;
+    }
+}
+
 public sealed class DashboardService(
     IApplicationDbContext dbContext,
     ITenantProvider tenantProvider)
@@ -1045,11 +1167,13 @@ public sealed class DashboardService(
             && (!doctorId.HasValue || x.DoctorId == doctorId.Value), cancellationToken);
         var monthlyRevenue = await dbContext.Payments.Where(x => x.ClinicId == clinicId && x.PaidAt >= monthStart && x.PaidAt < monthEnd && x.DeletedAt == null)
             .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+        var monthlyExpenses = await dbContext.Expenses.Where(x => x.ClinicId == clinicId && x.PaidAt >= monthStart && x.PaidAt < monthEnd && x.DeletedAt == null && x.Status == ExpenseStatus.Paid)
+            .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
 
         var confirmationRate = appointmentsToday == 0 ? 0d : confirmedToday / (double)appointmentsToday;
         var noShowRate = monthlyAppointments == 0 ? 0d : noShowCount / (double)monthlyAppointments;
 
-        return new DashboardSummaryResponse(appointmentsToday, confirmedToday, cancelledToday, monthlyRevenue, noShowRate, confirmationRate);
+        return new DashboardSummaryResponse(appointmentsToday, confirmedToday, cancelledToday, monthlyRevenue, noShowRate, confirmationRate, monthlyExpenses, monthlyRevenue - monthlyExpenses);
     }
 
 }
