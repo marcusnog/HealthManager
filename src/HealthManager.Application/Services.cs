@@ -641,6 +641,7 @@ public sealed class AppointmentService(
                 AppointmentId = appointment.Id,
                 OriginalAmount = request.Amount,
                 ReceivedAmount = 0,
+                Status = ReceivableStatus.Pending,
                 DueDate = request.StartAt,
                 Description = $"Consulta {request.Type}"
             });
@@ -703,6 +704,14 @@ public sealed class AppointmentService(
                 appointment.DoctorId = targetDoctorId;
                 appointment.StartAt = targetStartAt;
                 appointment.EndAt = targetEndAt;
+
+                var receivableDue = await dbContext.Receivables
+                    .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.DeletedAt == null, cancellationToken);
+                if (receivableDue is not null)
+                {
+                    receivableDue.DueDate = targetStartAt;
+                    receivableDue.UpdatedAt = DateTimeOffset.UtcNow;
+                }
             }
         }
 
@@ -720,6 +729,10 @@ public sealed class AppointmentService(
             if (receivable is not null)
             {
                 var diff = request.Amount.Value - appointment.Amount;
+                if (receivable.ReceivedAmount > 0 && receivable.OriginalAmount + diff < receivable.ReceivedAmount)
+                {
+                    throw new InvalidOperationException("Valor nao pode ser reduzido abaixo do valor ja recebido.");
+                }
                 receivable.OriginalAmount += diff;
                 receivable.UpdatedAt = DateTimeOffset.UtcNow;
             }
@@ -756,6 +769,15 @@ public sealed class AppointmentService(
         var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
         appointment.Status = AppointmentStatus.Cancelled;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
+
+        var receivable = await dbContext.Receivables
+            .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.DeletedAt == null, cancellationToken);
+        if (receivable is not null && receivable.Status != ReceivableStatus.Paid)
+        {
+            receivable.Status = ReceivableStatus.Cancelled;
+            receivable.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
         await outboxService.EnqueueAsync(appointment.ClinicId, "appointment.cancelled", new
         {
             appointment.Id,
