@@ -62,7 +62,7 @@ No Serilog, no FluentValidation — built-in `Microsoft.Extensions.Logging` + `S
 ## Testing
 
 - Integration: each test class creates `new ApiTestFactory()` — EF Core InMemory, `FakeStorageService`, seeded DB per class. `ApiTestFactory` sets `USE_INMEMORY_DATABASE=true` + `SENTRY_DSN=""` + `Testing` env (bypasses HTTPS at `Program.cs:68-71`).
-- Unit: use `FakeTenantProvider`, `FakeClock`, `FakeStorageService` from `TestDoubles.cs` + `TestHelpers.CreateDbContext()` (fresh InMemory DB per test).
+- Unit: use `FakeTenantProvider`, `FakeStorageService` from `TestDoubles.cs` + `TestHelpers.CreateDbContext()` (fresh InMemory DB per test).
 - Stack: xUnit + FluentAssertions + `Microsoft.AspNetCore.Mvc.Testing` + EF Core InMemory + `coverlet.collector`
 - `ApiTestFactory` exposes `LoginAsync()` and `CreateAuthenticatedClientAsync()` helpers
 - `FakeStorageService` is an in-memory `Dictionary<string, byte[]>` — registered as `IStorageService` singleton
@@ -75,7 +75,7 @@ No Serilog, no FluentValidation — built-in `Microsoft.Extensions.Logging` + `S
 | PlatformAdmin | `platform@healthmanager.local` | `ChangeMe123!` |
 | Clinic Admin | `admin@clinicaaurora.com` | `ChangeMe123!` |
 
-Seed IDs: `clinicId=11111111-1111-1111-1111-111111111111`, `doctorId=cccccccc-cccc-cccc-cccc-cccccccccccc`, `patientId=dddddddd-dddd-dddd-dddd-dddddddddddd`, `appointmentId=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`, `receivableId=ffffffff-ffff-ffff-ffff-ffffffffffff`.
+Seed IDs: `clinicId=11111111-1111-1111-1111-111111111111`, `platformAdminId=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`, `clinicAdminId=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb`, `doctorId=cccccccc-cccc-cccc-cccc-cccccccccccc`, `patientId=dddddddd-dddd-dddd-dddd-dddddddddddd`, `appointmentId=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`, `receivableId=ffffffff-ffff-ffff-ffff-ffffffffffff`.
 
 Used in `HealthManager.Api.http` and `docs/local-smoke-test.md`. Integration tests reference these GUIDs directly.
 
@@ -91,7 +91,7 @@ Used in `HealthManager.Api.http` and `docs/local-smoke-test.md`. Integration tes
 | `JWT_REFRESH_TOKEN_DAYS` | No | `30` |
 | `CORS_ORIGINS` | No | `http://localhost:3000` |
 | `USE_INMEMORY_DATABASE` | No | `false` — tests set `true` + `INMEMORY_DATABASE_NAME` (per-class random) |
-| `SUPABASE_URL`/`KEY`/`BUCKET` | No | Without them, document upload stores metadata only |
+| `AWS_S3_BUCKET` | No | Without it, document storage falls back to local filesystem (`LOCAL_STORAGE_ROOT` or temp dir) |
 | `SENTRY_DSN` | No | Optional, enables Sentry |
 | `WHATSAPP_*` | No | WhatsApp webhook |
 

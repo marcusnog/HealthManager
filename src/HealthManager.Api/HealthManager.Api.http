@@ -201,13 +201,13 @@ Accept: application/json
 
 ###
 # Listar contas a receber
-GET {{apiBaseUrl}}/receivables
+GET {{apiBaseUrl}}/financial/receivables
 Authorization: Bearer {{clinicToken}}
 Accept: application/json
 
 ###
 # Registrar pagamento parcial
-POST {{apiBaseUrl}}/payments
+POST {{apiBaseUrl}}/financial/payments
 Authorization: Bearer {{clinicToken}}
 Content-Type: application/json
 

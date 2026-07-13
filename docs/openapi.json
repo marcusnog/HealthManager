@@ -234,6 +234,8 @@
               }
             }
           }
+        }
+      },
       "delete": {
         "operationId": "patients_delete",
         "parameters": [
@@ -553,7 +555,7 @@
             }
           }
         }
-      }
+      },
       "delete": {
         "operationId": "doctors_delete",
         "parameters": [
@@ -852,7 +854,7 @@
         }
       }
     },
-    "/receivables": {
+    "/financial/receivables": {
       "get": {
         "operationId": "receivables_list",
         "parameters": [
@@ -911,7 +913,7 @@
         }
       }
     },
-    "/receivables/manual": {
+    "/financial/receivables/manual": {
       "post": {
         "operationId": "receivables_manual",
         "parameters": [],
@@ -939,7 +941,7 @@
         }
       }
     },
-    "/payments": {
+    "/financial/payments": {
       "get": {
         "operationId": "payments_list",
         "parameters": [
@@ -1026,6 +1028,14 @@
     "/dashboard/summary": {
       "get": {
         "operationId": "dashboard_summary",
+        "parameters": [
+          {
+            "name": "doctorId",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1375,7 +1385,11 @@
           "confirmationStatus": { "type": "string" },
           "type": { "type": "string" },
           "amount": { "type": "number", "format": "decimal" },
-          "notes": { "type": "string" }
+          "notes": { "type": "string" },
+          "patientName": { "type": "string" },
+          "patientPhone": { "type": "string" },
+          "doctorName": { "type": "string" },
+          "doctorSpecialty": { "type": "string" }
         }
       },
       "ReceivableResponse": {
