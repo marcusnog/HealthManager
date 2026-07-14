@@ -487,6 +487,12 @@ public sealed class DoctorService(
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
+        var crmAlreadyExists = await dbContext.Doctors
+            .IgnoreQueryFilters()
+            .AnyAsync(x => x.ClinicId == clinicId && x.Crm == request.Crm, cancellationToken);
+        if (crmAlreadyExists)
+            throw new InvalidOperationException("CRM ja cadastrado para esta clinica.");
+
         var doctor = new Doctor
         {
             ClinicId = clinicId,

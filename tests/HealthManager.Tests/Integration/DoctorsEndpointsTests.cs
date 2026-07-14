@@ -7,6 +7,24 @@ namespace HealthManager.Tests.Integration;
 public sealed class DoctorsEndpointsTests
 {
     [Fact]
+    public async Task CreateDoctor_WithExistingCrm_ShouldReturnClearValidationError()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+
+        var response = await client.PostAsJsonAsync("/doctors", new
+        {
+            name = "Outro medico",
+            crm = "CRM-SP-123456",
+            specialtyIds = Array.Empty<Guid>()
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemHttpResponse>();
+        problem!.Detail.Should().Be("CRM ja cadastrado para esta clinica.");
+    }
+
+    [Fact]
     public async Task CreateDoctor_WithSpecialty_ShouldPersistDoctorAndLink()
     {
         await using var factory = new ApiTestFactory();
@@ -126,4 +144,5 @@ public sealed class DoctorsEndpointsTests
         List<SpecialtyHttpResponse> Specialties);
 
     private sealed record SpecialtyHttpResponse(Guid Id, string Name);
+    private sealed record ProblemHttpResponse(string Detail);
 }
