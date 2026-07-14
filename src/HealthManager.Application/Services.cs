@@ -594,13 +594,15 @@ public sealed class DoctorService(
                         continue;
                     }
 
-                    doctor.DoctorSpecialties.Add(new DoctorSpecialty
+                    var newLink = new DoctorSpecialty
                     {
                         ClinicId = clinicId,
                         DoctorId = doctor.Id,
                         SpecialtyId = specialtyId,
+                        Doctor = doctor,
                         Specialty = specialties.Single(x => x.Id == specialtyId)
-                    });
+                    };
+                    dbContext.DoctorSpecialties.Add(newLink);
                 }
             }
         }

@@ -28,6 +28,36 @@ public sealed class DoctorsEndpointsTests
     }
 
     [Fact]
+    public async Task UpdateDoctor_WithoutPreviousLink_ShouldAddSpecialty()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var specialtyId = Guid.Parse("d1d2d3d4-d1d2-d1d2-d1d2-d1d2d3d4d5d6");
+
+        var createdResponse = await client.PostAsJsonAsync("/doctors", new
+        {
+            name = "Dr. Sem Especialidade",
+            crm = "CRM-SP-777777",
+            specialtyIds = Array.Empty<Guid>()
+        });
+        createdResponse.EnsureSuccessStatusCode();
+        var created = await createdResponse.Content.ReadFromJsonAsync<DoctorHttpResponse>();
+
+        var updateResponse = await client.PutAsJsonAsync($"/doctors/{created!.Id}", new
+        {
+            name = created.Name,
+            phone = created.Phone,
+            email = created.Email,
+            isActive = true,
+            specialtyIds = new[] { specialtyId }
+        });
+
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await updateResponse.Content.ReadFromJsonAsync<DoctorHttpResponse>();
+        updated!.Specialties.Should().ContainSingle(x => x.Id == specialtyId);
+    }
+
+    [Fact]
     public async Task UpdateDoctor_ShouldPersistChangesForCurrentClinicDoctor()
     {
         await using var factory = new ApiTestFactory();
