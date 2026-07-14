@@ -75,13 +75,12 @@ public sealed class PatientsEndpointsTests
         using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
         var patientId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
-        var createResponse = await client.PostAsJsonAsync($"/patients/{patientId}/documents", new
-        {
-            fileName = "pedido-exame.pdf",
-            contentType = "application/pdf",
-            sizeInBytes = 204800
-        });
+        using var multipart = new MultipartFormDataContent();
+        using var fileContent = new ByteArrayContent("pedido-exame-pdf"u8.ToArray());
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
+        multipart.Add(fileContent, "file", "pedido-exame.pdf");
 
+        var createResponse = await client.PostAsync($"/patients/{patientId}/documents/upload", multipart);
         createResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var listResponse = await client.GetAsync($"/patients/{patientId}/documents");
@@ -93,7 +92,7 @@ public sealed class PatientsEndpointsTests
         payload!.Should().ContainSingle();
         payload[0].FileName.Should().Be("pedido-exame.pdf");
         payload[0].ContentType.Should().Be("application/pdf");
-        payload[0].StoragePath.Should().Contain("clinics/11111111-1111-1111-1111-111111111111/patients/dddddddd-dddd-dddd-dddd-dddddddddddd");
+        payload[0].StoragePath.Should().Contain($"clinics/11111111-1111-1111-1111-111111111111/patients/{patientId}");
     }
 
     [Fact]

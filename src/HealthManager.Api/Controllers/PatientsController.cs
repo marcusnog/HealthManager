@@ -68,10 +68,6 @@ public sealed class PatientsController(PatientService patientService, PatientPor
         return NoContent();
     }
 
-    [HttpPost("{id:guid}/documents")]
-    public async Task<ActionResult<PatientDocumentResponse>> AddDocument(Guid id, [FromBody] CreatePatientDocumentRequest request, CancellationToken cancellationToken)
-        => Ok(await patientService.UploadDocumentAsync(id, request, cancellationToken));
-
     [HttpPost("{id:guid}/access-token/regenerate")]
     [Authorize(Policy = "ClinicAdminOrSecretary")]
     public async Task<ActionResult<Guid>> RegenerateAccessToken(Guid id, CancellationToken cancellationToken)

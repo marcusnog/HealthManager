@@ -77,7 +77,6 @@ public sealed class Appointment : TenantEntity
     public DateTimeOffset EndAt { get; set; }
     public AppointmentStatus Status { get; set; } = AppointmentStatus.Scheduled;
     public ConfirmationStatus ConfirmationStatus { get; set; } = ConfirmationStatus.Pending;
-    public AppointmentSource Source { get; set; } = AppointmentSource.Internal;
     public string Type { get; set; } = "Consulta";
     public string? Notes { get; set; }
     public decimal Amount { get; set; }
@@ -241,12 +240,6 @@ public enum ConfirmationStatus
     Declined = 3
 }
 
-public enum AppointmentSource
-{
-    Internal = 1,
-    WhatsApp = 2
-}
-
 public enum ReceivableStatus
 {
     Pending = 1,
@@ -268,11 +261,6 @@ public enum PaymentStatus
 {
     Paid = 1,
     Refunded = 2
-}
-
-public enum NotificationChannel
-{
-    WhatsApp = 1
 }
 
 public enum MessageDirection

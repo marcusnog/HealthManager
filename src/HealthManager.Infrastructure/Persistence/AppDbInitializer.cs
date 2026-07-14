@@ -149,7 +149,6 @@ public static class AppDbInitializer
             EndAt = appointmentStart.AddMinutes(30),
             Status = AppointmentStatus.Scheduled,
             ConfirmationStatus = ConfirmationStatus.Pending,
-            Source = AppointmentSource.Internal,
             Type = "Primeira consulta",
             Amount = 250m,
             Notes = "Criado automaticamente pelo seed local.",

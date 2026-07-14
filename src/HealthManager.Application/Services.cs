@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Text.Json;
 using HealthManager.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -199,24 +200,12 @@ public sealed class PatientService(
 
         IOrderedQueryable<Patient> ordered = sortBy switch
         {
-            "cpf" => sortDesc
-                ? patientsQuery.OrderByDescending(x => x.Cpf)
-                : patientsQuery.OrderBy(x => x.Cpf),
-            "phone" => sortDesc
-                ? patientsQuery.OrderByDescending(x => x.Phone)
-                : patientsQuery.OrderBy(x => x.Phone),
-            "email" => sortDesc
-                ? patientsQuery.OrderByDescending(x => x.Email ?? "")
-                : patientsQuery.OrderBy(x => x.Email ?? ""),
-            "healthinsurance" => sortDesc
-                ? patientsQuery.OrderByDescending(x => x.HealthInsurance ?? "")
-                : patientsQuery.OrderBy(x => x.HealthInsurance ?? ""),
-            "createdat" => sortDesc
-                ? patientsQuery.OrderByDescending(x => x.CreatedAt)
-                : patientsQuery.OrderBy(x => x.CreatedAt),
-            _ => sortDesc
-                ? patientsQuery.OrderByDescending(x => x.Name)
-                : patientsQuery.OrderBy(x => x.Name),
+            "cpf" => AppHelpers.OrderByKey(patientsQuery, sortDesc, x => x.Cpf),
+            "phone" => AppHelpers.OrderByKey(patientsQuery, sortDesc, x => x.Phone),
+            "email" => AppHelpers.OrderByKey(patientsQuery, sortDesc, x => x.Email ?? ""),
+            "healthinsurance" => AppHelpers.OrderByKey(patientsQuery, sortDesc, x => x.HealthInsurance ?? ""),
+            "createdat" => AppHelpers.OrderByKey(patientsQuery, sortDesc, x => x.CreatedAt),
+            _ => AppHelpers.OrderByKey(patientsQuery, sortDesc, x => x.Name),
         };
 
         var items = await ordered
@@ -455,18 +444,10 @@ public sealed class DoctorService(
 
         IOrderedQueryable<Doctor> ordered = sortBy switch
         {
-            "crm" => sortDesc
-                ? doctorsQuery.OrderByDescending(x => x.Crm)
-                : doctorsQuery.OrderBy(x => x.Crm),
-            "email" => sortDesc
-                ? doctorsQuery.OrderByDescending(x => x.Email ?? "")
-                : doctorsQuery.OrderBy(x => x.Email ?? ""),
-            "isactive" => sortDesc
-                ? doctorsQuery.OrderByDescending(x => x.IsActive)
-                : doctorsQuery.OrderBy(x => x.IsActive),
-            _ => sortDesc
-                ? doctorsQuery.OrderByDescending(x => x.Name)
-                : doctorsQuery.OrderBy(x => x.Name),
+            "crm" => AppHelpers.OrderByKey(doctorsQuery, sortDesc, x => x.Crm),
+            "email" => AppHelpers.OrderByKey(doctorsQuery, sortDesc, x => x.Email ?? ""),
+            "isactive" => AppHelpers.OrderByKey(doctorsQuery, sortDesc, x => x.IsActive),
+            _ => AppHelpers.OrderByKey(doctorsQuery, sortDesc, x => x.Name),
         };
 
         var items = await ordered
@@ -515,6 +496,8 @@ public sealed class DoctorService(
             Email = request.Email
         };
 
+        dbContext.Doctors.Add(doctor);
+
         if (request.SpecialtyIds?.Count > 0)
         {
             var specialties = await dbContext.Specialties
@@ -526,13 +509,11 @@ public sealed class DoctorService(
                 doctor.DoctorSpecialties.Add(new DoctorSpecialty
                 {
                     ClinicId = clinicId,
-                    Doctor = doctor,
+                    DoctorId = doctor.Id,
                     SpecialtyId = s.Id
                 });
             }
         }
-
-        dbContext.Doctors.Add(doctor);
 
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
@@ -570,19 +551,29 @@ public sealed class DoctorService(
 
         if (request.SpecialtyIds is not null)
         {
-            dbContext.DoctorSpecialties.RemoveRange(doctor.DoctorSpecialties);
-            var specialties = await dbContext.Specialties
-                .Where(x => request.SpecialtyIds.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null)
-                .ToListAsync(cancellationToken);
+            var existingIds = doctor.DoctorSpecialties.Select(x => x.SpecialtyId).ToHashSet();
+            var requested = request.SpecialtyIds.ToHashSet();
 
-            foreach (var s in specialties)
+            var toRemove = doctor.DoctorSpecialties.Where(x => !requested.Contains(x.SpecialtyId)).ToList();
+            foreach (var r in toRemove)
+                dbContext.DoctorSpecialties.Remove(r);
+
+            var toAdd = requested.Where(id => !existingIds.Contains(id)).ToList();
+            if (toAdd.Count > 0)
             {
-                doctor.DoctorSpecialties.Add(new DoctorSpecialty
+                var specialties = await dbContext.Specialties
+                    .Where(x => toAdd.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var s in specialties)
                 {
-                    ClinicId = clinicId,
-                    DoctorId = doctor.Id,
-                    SpecialtyId = s.Id
-                });
+                    doctor.DoctorSpecialties.Add(new DoctorSpecialty
+                    {
+                        ClinicId = clinicId,
+                        DoctorId = doctor.Id,
+                        SpecialtyId = s.Id
+                    });
+                }
             }
         }
 
@@ -1728,6 +1719,9 @@ internal static class AppHelpers
             return TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
         }
     }
+
+    internal static IOrderedQueryable<T> OrderByKey<T, TKey>(IQueryable<T> query, bool desc, Expression<Func<T, TKey>> keySelector)
+        => desc ? query.OrderByDescending(keySelector) : query.OrderBy(keySelector);
 }
 
 internal static class TenantGuard

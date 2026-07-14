@@ -59,13 +59,6 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
-        var jwtSettings = new JwtOptions
-        {
-            Issuer = configuration["JWT_ISSUER"] ?? "healthmanager",
-            Audience = configuration["JWT_AUDIENCE"] ?? "healthmanager-web",
-            Secret = jwtSecret ?? "change-me-super-secret-key-32-bytes"
-        };
-
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -75,9 +68,9 @@ public static class DependencyInjection
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtSettings.Issuer,
-                    ValidAudience = jwtSettings.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret))
+                    ValidIssuer = configuration["JWT_ISSUER"] ?? "healthmanager",
+                    ValidAudience = configuration["JWT_AUDIENCE"] ?? "healthmanager-web",
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret ?? "change-me-super-secret-key-32-bytes"))
                 };
             });
 
