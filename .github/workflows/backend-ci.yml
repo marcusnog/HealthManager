@@ -31,6 +31,9 @@ jobs:
       - name: Build
         run: dotnet build HealthManager.sln --no-restore --configuration Release
 
+      - name: Verify EF migration snapshot
+        run: dotnet tool restore && dotnet tool run dotnet-ef migrations has-pending-model-changes --project src/HealthManager.Infrastructure --startup-project src/HealthManager.Api --context HealthManager.Infrastructure.Persistence.AppDbContext --no-build --configuration Release
+
       - name: Test
         run: dotnet test HealthManager.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory ./TestResults
 
@@ -119,7 +122,21 @@ jobs:
           NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$REGISTRY/$ECR_API_REPO:$TAG" \
             '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)')
           NEW_TASK_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
-          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_API_SERVICE --task-definition $NEW_TASK_ARN --force-new-deployment
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_API_SERVICE \
+            --task-definition $NEW_TASK_ARN \
+            --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true},maximumPercent=200,minimumHealthyPercent=100' \
+            --force-new-deployment
 
       - name: Wait for API deployment
-        run: aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_API_SERVICE
+        run: |
+          if ! aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_API_SERVICE; then
+            echo "::error::ECS deployment did not reach a stable state. Current deployments and recent service events follow."
+            aws ecs describe-services \
+              --cluster $ECS_CLUSTER \
+              --services $ECS_API_SERVICE \
+              --query 'services[0].{deployments:deployments[*].{status:status,taskDefinition:taskDefinition,rolloutState:rolloutState,rolloutStateReason:rolloutStateReason,failedTasks:failedTasks,runningCount:runningCount,pendingCount:pendingCount},events:events[0:10].[createdAt,message]}' \
+              --output json
+            exit 1
+          fi

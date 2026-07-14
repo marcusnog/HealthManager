@@ -375,6 +375,11 @@ resource "aws_ecs_service" "api" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   network_configuration {
     subnets          = var.public_subnet_ids
     security_groups  = [var.api_sg_id]

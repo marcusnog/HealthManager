@@ -4,6 +4,7 @@ using HealthManager.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,7 +51,8 @@ app.UseExceptionHandler(exceptionHandlerApp =>
             UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
             KeyNotFoundException => StatusCodes.Status404NotFound,
             DbUpdateConcurrencyException => StatusCodes.Status409Conflict,
-            DbUpdateException => StatusCodes.Status400BadRequest,
+            DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } => StatusCodes.Status409Conflict,
+            DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation } } => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
         context.Response.StatusCode = statusCode;
@@ -58,7 +60,9 @@ app.UseExceptionHandler(exceptionHandlerApp =>
         {
             Status = statusCode,
             Title = "Request failed",
-            Detail = exception?.Message
+            Detail = exception is DbUpdateException
+                ? "Nao foi possivel persistir os dados solicitados."
+                : exception?.Message
         });
     }));
 
