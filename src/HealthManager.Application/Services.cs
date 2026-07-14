@@ -168,6 +168,7 @@ public sealed class PatientService(
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var normalizedSearch = query.Search?.Trim().ToLowerInvariant();
         var patientsQuery = dbContext.Patients.AsNoTracking()
+            .Include(x => x.HealthInsuranceRef)
             .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
@@ -221,7 +222,11 @@ public sealed class PatientService(
         var items = await ordered
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .Select(x => new PatientResponse(x.Id, x.Name, x.Cpf, x.BirthDate, x.Phone, x.Email, x.HealthInsurance, x.Notes, x.PatientAccessToken))
+            .Select(x => new PatientResponse(
+                x.Id, x.Name, x.Cpf, x.BirthDate, x.Phone, x.Email,
+                x.HealthInsurance, x.HealthInsuranceId,
+                x.HealthInsuranceRef != null ? x.HealthInsuranceRef.Name : null,
+                x.Notes, x.PatientAccessToken))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<PatientResponse>(items, query.Page, query.PageSize, total);
@@ -232,11 +237,12 @@ public sealed class PatientService(
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
         var normalizedCpf = AppHelpers.NormalizeDigits(request.Cpf);
+        if (!AppHelpers.ValidateCpf(normalizedCpf))
+            throw new InvalidOperationException("CPF invalido.");
+
         var exists = await dbContext.Patients.AnyAsync(x => x.ClinicId == clinicId && x.Cpf == normalizedCpf && x.DeletedAt == null, cancellationToken);
         if (exists)
-        {
             throw new InvalidOperationException("Paciente ja cadastrado para esta clinica.");
-        }
 
         var patient = new Patient
         {
@@ -247,12 +253,20 @@ public sealed class PatientService(
             Phone = request.Phone,
             Email = request.Email,
             HealthInsurance = request.HealthInsurance,
+            HealthInsuranceId = request.HealthInsuranceId,
             Notes = request.Notes
         };
 
         dbContext.Patients.Add(patient);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.Notes, patient.PatientAccessToken);
+
+        var hiName = request.HealthInsuranceId.HasValue
+            ? await dbContext.HealthInsurances.AsNoTracking()
+                .Where(x => x.Id == request.HealthInsuranceId.Value)
+                .Select(x => x.Name).FirstOrDefaultAsync(cancellationToken)
+            : null;
+
+        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.HealthInsuranceId, hiName, patient.Notes, patient.PatientAccessToken);
     }
 
     public async Task DeleteAsync(Guid patientId, CancellationToken cancellationToken)
@@ -289,11 +303,19 @@ public sealed class PatientService(
         patient.Phone = request.Phone;
         patient.Email = request.Email;
         patient.HealthInsurance = request.HealthInsurance;
+        patient.HealthInsuranceId = request.HealthInsuranceId;
         patient.Notes = request.Notes;
         patient.UpdatedAt = DateTimeOffset.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.Notes, patient.PatientAccessToken);
+
+        var hiName = request.HealthInsuranceId.HasValue
+            ? await dbContext.HealthInsurances.AsNoTracking()
+                .Where(x => x.Id == request.HealthInsuranceId.Value)
+                .Select(x => x.Name).FirstOrDefaultAsync(cancellationToken)
+            : null;
+
+        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.HealthInsuranceId, hiName, patient.Notes, patient.PatientAccessToken);
     }
 
     public async Task<IReadOnlyList<PatientDocumentResponse>> ListDocumentsAsync(Guid patientId, CancellationToken cancellationToken)
@@ -413,6 +435,7 @@ public sealed class DoctorService(
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var doctorsQuery = dbContext.Doctors.AsNoTracking()
+            .Include(x => x.DoctorSpecialties).ThenInclude(x => x.Specialty)
             .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
 
         var normalizedSearch = query.Search?.Trim().ToLowerInvariant();
@@ -420,8 +443,8 @@ public sealed class DoctorService(
         {
             doctorsQuery = doctorsQuery.Where(x =>
                 x.Name.ToLower().Contains(normalizedSearch) ||
-                x.Specialty.ToLower().Contains(normalizedSearch) ||
                 x.Crm.Contains(normalizedSearch) ||
+                x.DoctorSpecialties.Any(s => s.Specialty.Name.ToLower().Contains(normalizedSearch)) ||
                 (x.Email != null && x.Email.ToLower().Contains(normalizedSearch)));
         }
 
@@ -432,9 +455,6 @@ public sealed class DoctorService(
 
         IOrderedQueryable<Doctor> ordered = sortBy switch
         {
-            "specialty" => sortDesc
-                ? doctorsQuery.OrderByDescending(x => x.Specialty)
-                : doctorsQuery.OrderBy(x => x.Specialty),
             "crm" => sortDesc
                 ? doctorsQuery.OrderByDescending(x => x.Crm)
                 : doctorsQuery.OrderBy(x => x.Crm),
@@ -452,16 +472,17 @@ public sealed class DoctorService(
         var items = await ordered
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .Select(x => new DoctorResponse(x.Id, x.Name, x.Specialty, x.Crm, x.Phone, x.Email, x.IsActive))
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<DoctorResponse>(items, query.Page, query.PageSize, total);
+        var response = items.Select(d => ToResponse(d)).ToList();
+        return new PagedResult<DoctorResponse>(response, query.Page, query.PageSize, total);
     }
 
     public async Task DeleteAsync(Guid doctorId, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var doctor = await dbContext.Doctors
+            .Include(x => x.DoctorSpecialties)
             .FirstOrDefaultAsync(x => x.Id == doctorId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Medico nao encontrado.");
 
@@ -475,7 +496,7 @@ public sealed class DoctorService(
             Action = "doctor.deleted",
             EntityName = nameof(Doctor),
             EntityId = doctor.Id,
-            PayloadJson = JsonSerializer.Serialize(new { doctor.Name, doctor.Specialty })
+            PayloadJson = JsonSerializer.Serialize(new { doctor.Name })
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -489,11 +510,27 @@ public sealed class DoctorService(
         {
             ClinicId = clinicId,
             Name = request.Name,
-            Specialty = request.Specialty,
             Crm = request.Crm,
             Phone = request.Phone,
             Email = request.Email
         };
+
+        if (request.SpecialtyIds?.Count > 0)
+        {
+            var specialties = await dbContext.Specialties
+                .Where(x => request.SpecialtyIds.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null)
+                .ToListAsync(cancellationToken);
+
+            foreach (var s in specialties)
+            {
+                doctor.DoctorSpecialties.Add(new DoctorSpecialty
+                {
+                    ClinicId = clinicId,
+                    Doctor = doctor,
+                    SpecialtyId = s.Id
+                });
+            }
+        }
 
         dbContext.Doctors.Add(doctor);
 
@@ -514,24 +551,53 @@ public sealed class DoctorService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new DoctorResponse(doctor.Id, doctor.Name, doctor.Specialty, doctor.Crm, doctor.Phone, doctor.Email, doctor.IsActive);
+        return ToResponse(doctor);
     }
 
     public async Task<DoctorResponse> UpdateAsync(Guid doctorId, UpdateDoctorRequest request, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
-        var doctor = await dbContext.Doctors.FirstOrDefaultAsync(x => x.Id == doctorId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+        var doctor = await dbContext.Doctors
+            .Include(x => x.DoctorSpecialties)
+            .FirstOrDefaultAsync(x => x.Id == doctorId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Medico nao encontrado.");
 
         doctor.Name = request.Name;
-        doctor.Specialty = request.Specialty;
         doctor.Phone = request.Phone;
         doctor.Email = request.Email;
         doctor.IsActive = request.IsActive;
         doctor.UpdatedAt = DateTimeOffset.UtcNow;
 
+        if (request.SpecialtyIds is not null)
+        {
+            dbContext.DoctorSpecialties.RemoveRange(doctor.DoctorSpecialties);
+            var specialties = await dbContext.Specialties
+                .Where(x => request.SpecialtyIds.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null)
+                .ToListAsync(cancellationToken);
+
+            foreach (var s in specialties)
+            {
+                doctor.DoctorSpecialties.Add(new DoctorSpecialty
+                {
+                    ClinicId = clinicId,
+                    DoctorId = doctor.Id,
+                    SpecialtyId = s.Id
+                });
+            }
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new DoctorResponse(doctor.Id, doctor.Name, doctor.Specialty, doctor.Crm, doctor.Phone, doctor.Email, doctor.IsActive);
+        return ToResponse(doctor);
+    }
+
+    private static DoctorResponse ToResponse(Doctor doctor)
+    {
+        var specialties = doctor.DoctorSpecialties?
+            .Where(ds => ds.Specialty != null)
+            .Select(ds => new SpecialtyItem(ds.Specialty.Id, ds.Specialty.Name))
+            .ToList() ?? [];
+
+        return new DoctorResponse(doctor.Id, doctor.Name, doctor.Crm, doctor.Phone, doctor.Email, doctor.IsActive, specialties);
     }
 }
 
@@ -577,6 +643,8 @@ public sealed class AppointmentService(
         var appointments = await appointmentsQuery
             .Include(x => x.Patient)
             .Include(x => x.Doctor)
+            .ThenInclude(x => x.DoctorSpecialties)
+            .ThenInclude(x => x.Specialty)
             .OrderBy(x => x.StartAt)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
@@ -665,6 +733,8 @@ public sealed class AppointmentService(
         var appointment = await dbContext.Appointments
             .Include(x => x.Patient)
             .Include(x => x.Doctor)
+            .ThenInclude(x => x.DoctorSpecialties)
+            .ThenInclude(x => x.Specialty)
             .FirstOrDefaultAsync(x => x.Id == appointmentId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Consulta nao encontrada.");
 
@@ -821,6 +891,8 @@ public sealed class AppointmentService(
         var appointment = await dbContext.Appointments
             .Include(x => x.Patient)
             .Include(x => x.Doctor)
+            .ThenInclude(x => x.DoctorSpecialties)
+            .ThenInclude(x => x.Specialty)
             .FirstOrDefaultAsync(x => x.Id == appointmentId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Consulta nao encontrada.");
         return (appointment, appointment.Patient, appointment.Doctor);
@@ -855,8 +927,14 @@ public sealed class AppointmentService(
         }
     }
 
-    private static AppointmentResponse ToResponse(Appointment appointment, Patient? patient = null, Doctor? doctor = null) =>
-        new(
+    private static AppointmentResponse ToResponse(Appointment appointment, Patient? patient = null, Doctor? doctor = null)
+    {
+        var specialties = doctor?.DoctorSpecialties?
+            .Where(ds => ds.Specialty != null)
+            .Select(ds => new SpecialtyItem(ds.Specialty.Id, ds.Specialty.Name))
+            .ToList();
+
+        return new(
             appointment.Id,
             appointment.PatientId,
             appointment.DoctorId,
@@ -870,7 +948,8 @@ public sealed class AppointmentService(
             patient?.Name,
             patient?.Phone,
             doctor?.Name,
-            doctor?.Specialty);
+            specialties);
+    }
 
     private sealed record BusinessHoursWindow(string? Start, string? End);
 }
@@ -1292,13 +1371,15 @@ public sealed class PatientPortalService(
         var patientId = RequirePatientId();
         return await dbContext.Appointments
             .AsNoTracking()
-            .Include(x => x.Doctor)
+            .Include(x => x.Doctor).ThenInclude(x => x.DoctorSpecialties).ThenInclude(x => x.Specialty)
             .Where(x => x.PatientId == patientId && x.DeletedAt == null)
             .OrderByDescending(x => x.StartAt)
             .Select(x => new PatientPortalAppointmentResponse(
                 x.Id,
                 x.Doctor != null ? x.Doctor.Name : "Medico",
-                x.Doctor != null ? x.Doctor.Specialty : "",
+                x.Doctor != null && x.Doctor.DoctorSpecialties.Any()
+                    ? x.Doctor.DoctorSpecialties.First().Specialty.Name
+                    : "",
                 x.StartAt,
                 x.EndAt,
                 x.Status,
@@ -1358,9 +1439,283 @@ public sealed class PatientPortalService(
         new(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance);
 }
 
+// ── HealthInsurance ──
+
+public sealed class HealthInsuranceService(
+    IApplicationDbContext dbContext,
+    ITenantProvider tenantProvider)
+{
+    public async Task<PagedResult<HealthInsuranceResponse>> ListAsync(HealthInsuranceQuery query, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var queryable = dbContext.HealthInsurances.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
+
+        var search = query.Search?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(search))
+            queryable = queryable.Where(x => x.Name.ToLower().Contains(search));
+
+        var total = await queryable.CountAsync(cancellationToken);
+        var items = await queryable
+            .OrderBy(x => x.Name)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(x => new HealthInsuranceResponse(x.Id, x.Name, x.Phone, x.ContactName))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<HealthInsuranceResponse>(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<HealthInsuranceResponse> CreateAsync(CreateHealthInsuranceRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+
+        var exists = await dbContext.HealthInsurances.AnyAsync(
+            x => x.ClinicId == clinicId && x.Name == request.Name && x.DeletedAt == null, cancellationToken);
+        if (exists) throw new InvalidOperationException("Convenio ja cadastrado.");
+
+        var hi = new HealthInsurance
+        {
+            ClinicId = clinicId,
+            Name = request.Name,
+            Phone = request.Phone,
+            ContactName = request.ContactName
+        };
+        dbContext.HealthInsurances.Add(hi);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new HealthInsuranceResponse(hi.Id, hi.Name, hi.Phone, hi.ContactName);
+    }
+
+    public async Task<HealthInsuranceResponse> UpdateAsync(Guid id, UpdateHealthInsuranceRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var hi = await dbContext.HealthInsurances
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Convenio nao encontrado.");
+
+        hi.Name = request.Name;
+        hi.Phone = request.Phone;
+        hi.ContactName = request.ContactName;
+        hi.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new HealthInsuranceResponse(hi.Id, hi.Name, hi.Phone, hi.ContactName);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var hi = await dbContext.HealthInsurances
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Convenio nao encontrado.");
+
+        hi.DeletedAt = DateTimeOffset.UtcNow;
+        hi.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// ── Specialty ──
+
+public sealed class SpecialtyService(
+    IApplicationDbContext dbContext,
+    ITenantProvider tenantProvider)
+{
+    public async Task<PagedResult<SpecialtyResponse>> ListAsync(SpecialtyQuery query, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var queryable = dbContext.Specialties.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
+
+        var search = query.Search?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(search))
+            queryable = queryable.Where(x => x.Name.ToLower().Contains(search));
+
+        var total = await queryable.CountAsync(cancellationToken);
+        var items = await queryable
+            .OrderBy(x => x.Name)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(s => new SpecialtyResponse(
+                s.Id, s.Name,
+                s.DoctorSpecialties
+                    .Where(ds => ds.Doctor != null)
+                    .Select(ds => new SpecialtyDoctorItem(ds.Doctor.Id, ds.Doctor.Name, ds.Doctor.Crm))
+                    .ToList()))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<SpecialtyResponse>(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<SpecialtyResponse> CreateAsync(CreateSpecialtyRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+
+        var exists = await dbContext.Specialties.AnyAsync(
+            x => x.ClinicId == clinicId && x.Name == request.Name && x.DeletedAt == null, cancellationToken);
+        if (exists) throw new InvalidOperationException("Especialidade ja cadastrada.");
+
+        var specialty = new Specialty { ClinicId = clinicId, Name = request.Name };
+        dbContext.Specialties.Add(specialty);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new SpecialtyResponse(specialty.Id, specialty.Name, []);
+    }
+
+    public async Task<SpecialtyResponse> UpdateAsync(Guid id, UpdateSpecialtyRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var specialty = await dbContext.Specialties
+            .Include(x => x.DoctorSpecialties).ThenInclude(x => x.Doctor)
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Especialidade nao encontrada.");
+
+        specialty.Name = request.Name;
+        specialty.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var doctors = specialty.DoctorSpecialties?
+            .Where(ds => ds.Doctor != null)
+            .Select(ds => new SpecialtyDoctorItem(ds.Doctor.Id, ds.Doctor.Name, ds.Doctor.Crm))
+            .ToList() ?? [];
+
+        return new SpecialtyResponse(specialty.Id, specialty.Name, doctors);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var specialty = await dbContext.Specialties
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Especialidade nao encontrada.");
+
+        specialty.DeletedAt = DateTimeOffset.UtcNow;
+        specialty.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// ── DoctorAvailability ──
+
+public sealed class DoctorAvailabilityService(
+    IApplicationDbContext dbContext,
+    ITenantProvider tenantProvider)
+{
+    public async Task<PagedResult<DoctorAvailabilityResponse>> ListAsync(AvailabilityQuery query, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var queryable = dbContext.DoctorAvailabilities.AsNoTracking()
+            .Include(x => x.Doctor)
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
+
+        if (query.DoctorId.HasValue)
+            queryable = queryable.Where(x => x.DoctorId == query.DoctorId.Value);
+
+        var total = await queryable.CountAsync(cancellationToken);
+        var items = await queryable
+            .OrderBy(x => x.Doctor.Name).ThenBy(x => x.DayOfWeek).ThenBy(x => x.StartTime)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(x => new DoctorAvailabilityResponse(
+                x.Id, x.DoctorId, x.Doctor.Name,
+                (int)x.DayOfWeek,
+                x.StartTime.ToString(@"hh\:mm"),
+                x.EndTime.ToString(@"hh\:mm"),
+                x.IsAvailable))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<DoctorAvailabilityResponse>(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<DoctorAvailabilityResponse> CreateAsync(CreateAvailabilityRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+
+        var doctor = await dbContext.Doctors
+            .FirstOrDefaultAsync(x => x.Id == request.DoctorId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Medico nao encontrado.");
+
+        var start = TimeSpan.Parse(request.StartTime);
+        var end = TimeSpan.Parse(request.EndTime);
+
+        var overlap = await dbContext.DoctorAvailabilities.AnyAsync(
+            x => x.DoctorId == request.DoctorId && x.DayOfWeek == (DayOfWeek)request.DayOfWeek
+              && x.DeletedAt == null && x.StartTime < end && x.EndTime > start, cancellationToken);
+        if (overlap)
+            throw new InvalidOperationException("Horario conflitante com outro periodo ja cadastrado.");
+
+        var av = new DoctorAvailability
+        {
+            ClinicId = clinicId,
+            DoctorId = request.DoctorId,
+            DayOfWeek = (DayOfWeek)request.DayOfWeek,
+            StartTime = start,
+            EndTime = end,
+            IsAvailable = request.IsAvailable
+        };
+
+        dbContext.DoctorAvailabilities.Add(av);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new DoctorAvailabilityResponse(av.Id, av.DoctorId, doctor.Name, request.DayOfWeek, request.StartTime, request.EndTime, av.IsAvailable);
+    }
+
+    public async Task<DoctorAvailabilityResponse> UpdateAsync(Guid id, UpdateAvailabilityRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var av = await dbContext.DoctorAvailabilities
+            .Include(x => x.Doctor)
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Disponibilidade nao encontrada.");
+
+        var start = TimeSpan.Parse(request.StartTime);
+        var end = TimeSpan.Parse(request.EndTime);
+
+        av.DayOfWeek = (DayOfWeek)request.DayOfWeek;
+        av.StartTime = start;
+        av.EndTime = end;
+        av.IsAvailable = request.IsAvailable;
+        av.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new DoctorAvailabilityResponse(av.Id, av.DoctorId, av.Doctor.Name, request.DayOfWeek, request.StartTime, request.EndTime, av.IsAvailable);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var av = await dbContext.DoctorAvailabilities
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Disponibilidade nao encontrada.");
+
+        av.DeletedAt = DateTimeOffset.UtcNow;
+        av.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+
 internal static class AppHelpers
 {
     internal static string NormalizeDigits(string value) => new(value.Where(char.IsDigit).ToArray());
+
+    internal static bool ValidateCpf(string cpf)
+    {
+        var digits = NormalizeDigits(cpf);
+        if (digits.Length != 11) return false;
+        if (digits.All(c => c == digits[0])) return false;
+
+        var sum1 = 0;
+        for (var i = 0; i < 9; i++)
+            sum1 += (digits[i] - '0') * (10 - i);
+        var rest1 = sum1 % 11;
+        var dig1 = rest1 < 2 ? 0 : 11 - rest1;
+        if (digits[9] - '0' != dig1) return false;
+
+        var sum2 = 0;
+        for (var i = 0; i < 10; i++)
+            sum2 += (digits[i] - '0') * (11 - i);
+        var rest2 = sum2 % 11;
+        var dig2 = rest2 < 2 ? 0 : 11 - rest2;
+        return digits[10] - '0' == dig2;
+    }
 
     internal static TimeZoneInfo ResolveTimeZone(string timezone)
     {

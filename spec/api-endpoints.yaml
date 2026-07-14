@@ -1,0 +1,82 @@
+# Canonical API endpoints — source of truth.
+# Full contract: docs/openapi.json
+# Auth header: Bearer {accessToken} (except /auth/login, /auth/refresh, /patient-portal/login)
+
+Auth:
+  POST /auth/login: "{ email, password } -> AuthResponse"
+  POST /auth/refresh: "{ refreshToken } -> AuthResponse"
+  POST /auth/logout: "{ refreshToken } -> 204"
+  POST /auth/change-password: "{ currentPassword, newPassword } -> 204 [Auth required]"
+
+Patients:
+  GET /patients: "?page,pageSize,search,sortBy,sortDirection,email,healthInsurance -> PagedResult<PatientResponse> [ClinicAdminOrSecretary]"
+  POST /patients: "{ name, cpf, birthDate?, phone, email?, healthInsurance?, notes? } -> 201 PatientResponse [ClinicAdminOrSecretary]"
+  PUT /patients/{id}: "{ name, phone, email?, healthInsurance?, notes? } -> PatientResponse [ClinicAdminOrSecretary]"
+  DELETE /patients/{id}: "-> 204 (soft delete, audit logged) [ClinicAdminOrSecretary]"
+  POST /patients/{id}/access-token/regenerate: "-> new Guid (regenerates patientAccessToken) [ClinicAdminOrSecretary]"
+  # Documents:
+  GET /patients/{id}/documents: "-> PatientDocumentResponse[] [ClinicStaff]"
+  POST /patients/{id}/documents/upload: "multipart -> 201 PatientDocumentResponse [ClinicStaff]"
+  GET /patients/{id}/documents/{docId}/download: "-> file stream [ClinicStaff]"
+  DELETE /patients/{id}/documents/{docId}: "-> 204 (soft delete, audit logged) [ClinicStaff]"
+
+Doctors:
+  GET /doctors: "?page,pageSize,search,sortBy,sortDirection -> PagedResult<DoctorResponse> (includes Specialties list) [ClinicAdminOrSecretary]"
+  POST /doctors: "{ name, crm, phone?, email?, specialtyIds } -> 201 DoctorResponse [ClinicAdminOrSecretary]"
+  PUT /doctors/{id}: "{ name, phone?, email?, isActive, specialtyIds } -> DoctorResponse [ClinicAdminOrSecretary]"
+  DELETE /doctors/{id}: "-> 204 (soft delete, audit logged) [ClinicAdminOrSecretary]"
+
+Appointments:
+  GET /appointments: "?page,pageSize,date,dateFrom,dateTo,doctorId,status -> PagedResult<AppointmentResponse> [ClinicStaff]"
+  POST /appointments: "{ patientId, doctorId, startAt, durationMinutes, notes?, type, amount } -> 201 AppointmentResponse [ClinicStaff]"
+  PUT /appointments/{id}: "{ doctorId?, startAt?, durationMinutes?, notes?, type?, amount? } -> AppointmentResponse [ClinicStaff]"
+  POST /appointments/{id}/confirm: "-> AppointmentResponse [ClinicStaff]"
+  POST /appointments/{id}/cancel: "-> AppointmentResponse (also cancels receivable if not Paid) [ClinicStaff]"
+  POST /appointments/{id}/in-progress: "-> AppointmentResponse [ClinicStaff]"
+  POST /appointments/{id}/complete: "-> AppointmentResponse [ClinicStaff]"
+  POST /appointments/{id}/no-show: "-> AppointmentResponse [ClinicStaff]"
+
+Financial:
+  GET /receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> [ClinicStaff]"
+  GET /payments: "?page,pageSize,receivableId,dateFrom,dateTo -> PagedResult<PaymentResponse> [ClinicStaff]"
+  POST /payments: "{ receivableId, amount, paymentMethod, paidAt?, notes? } -> 201 PaymentResponse [ClinicStaff]"
+
+  # Custom wrappers (not in openapi.json, available via src/services/api.ts):
+  GET /financial/expenses: "?page,pageSize,category,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [ClinicStaff]"
+  POST /financial/expenses: "{ description, amount, category, paymentMethod, paidAt?, status?, notes? } -> 201 ExpenseResponse [ClinicStaff]"
+  PUT /financial/expenses/{id}: "{ ... } -> ExpenseResponse [ClinicStaff]"
+  DELETE /financial/expenses/{id}: "-> 204 [ClinicAdminOrSecretary]"
+  GET /financial/summary: "-> { totalReceived, totalExpenses, balance } [ClinicStaff]"
+
+Dashboard:
+  GET /dashboard/summary: "?doctorId? -> DashboardSummaryResponse [ClinicStaff]"
+
+WhatsApp:
+  POST /whatsapp/webhook: "{ clinicId?, appointmentId?, phone, message, providerMessageId? } [No auth]"
+
+PatientPortal:
+  POST /patient-portal/login: "{ cpf, accessToken } -> PatientPortalAuthResponse [No auth]"
+  GET /patient-portal/appointments: "-> PatientPortalAppointmentResponse[] [PatientPortal]"
+  GET /patient-portal/receivables: "-> PatientPortalReceivableResponse[] [PatientPortal]"
+
+HealthInsurances:
+  GET /health-insurances: "?page,pageSize,search -> PagedResult<HealthInsuranceResponse> [ClinicAdminOrSecretary]"
+  POST /health-insurances: "{ name, phone?, contactName? } -> 201 HealthInsuranceResponse [ClinicAdminOrSecretary]"
+  PUT /health-insurances/{id}: "{ name, phone?, contactName? } -> HealthInsuranceResponse [ClinicAdminOrSecretary]"
+  DELETE /health-insurances/{id}: "-> 204 (soft delete) [ClinicAdminOrSecretary]"
+
+Specialties:
+  GET /specialties: "?page,pageSize,search -> PagedResult<SpecialtyResponse> (includes doctors list) [ClinicAdminOrSecretary]"
+  POST /specialties: "{ name } -> 201 SpecialtyResponse [ClinicAdminOrSecretary]"
+  PUT /specialties/{id}: "{ name } -> SpecialtyResponse [ClinicAdminOrSecretary]"
+  DELETE /specialties/{id}: "-> 204 (soft delete) [ClinicAdminOrSecretary]"
+
+DoctorAvailabilities:
+  GET /doctor-availabilities: "?page,pageSize,doctorId -> PagedResult<DoctorAvailabilityResponse> [ClinicStaff]"
+  POST /doctor-availabilities: "{ doctorId, dayOfWeek, startTime, endTime, isAvailable } -> 201 DoctorAvailabilityResponse [ClinicStaff]"
+  PUT /doctor-availabilities/{id}: "{ dayOfWeek, startTime, endTime, isAvailable } -> DoctorAvailabilityResponse [ClinicStaff]"
+  DELETE /doctor-availabilities/{id}: "-> 204 (soft delete) [ClinicStaff]"
+
+Internal:
+  POST /internal/clinics: "{ name, slug, timezone, businessHoursJson, cnpj?, email?, phone?, address?, adminName, adminEmail, adminPassword } -> ClinicProvisioningResponse [PlatformAdminOnly]"
+  POST /internal/clinics/{id}/users: "{ name, email, password, role } -> UserResponse [PlatformAdminOnly]"

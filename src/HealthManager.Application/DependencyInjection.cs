@@ -16,6 +16,9 @@ public static class DependencyInjection
         services.AddScoped<DashboardService>();
         services.AddScoped<WhatsAppWebhookService>();
         services.AddScoped<PatientPortalService>();
+        services.AddScoped<HealthInsuranceService>();
+        services.AddScoped<SpecialtyService>();
+        services.AddScoped<DoctorAvailabilityService>();
         return services;
     }
 }

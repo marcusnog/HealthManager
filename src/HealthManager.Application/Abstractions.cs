@@ -51,5 +51,9 @@ public interface IApplicationDbContext
     DbSet<PatientDocument> PatientDocuments { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<WebhookEvent> WebhookEvents { get; }
+    DbSet<HealthInsurance> HealthInsurances { get; }
+    DbSet<Specialty> Specialties { get; }
+    DbSet<DoctorSpecialty> DoctorSpecialties { get; }
+    DbSet<DoctorAvailability> DoctorAvailabilities { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -51,6 +51,8 @@ public sealed class Patient : TenantEntity
     public string Phone { get; set; } = string.Empty;
     public string? Email { get; set; }
     public string? HealthInsurance { get; set; }
+    public Guid? HealthInsuranceId { get; set; }
+    public HealthInsurance? HealthInsuranceRef { get; set; }
     public string? Notes { get; set; }
     public Guid PatientAccessToken { get; set; } = Guid.NewGuid();
     public ICollection<PatientDocument> Documents { get; set; } = new List<PatientDocument>();
@@ -60,11 +62,11 @@ public sealed class Patient : TenantEntity
 public sealed class Doctor : TenantEntity
 {
     public string Name { get; set; } = string.Empty;
-    public string Specialty { get; set; } = string.Empty;
     public string Crm { get; set; } = string.Empty;
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public bool IsActive { get; set; } = true;
+    public ICollection<DoctorSpecialty> DoctorSpecialties { get; set; } = new List<DoctorSpecialty>();
 }
 
 public sealed class Appointment : TenantEntity
@@ -104,6 +106,37 @@ public sealed class Payment : TenantEntity
     public DateTimeOffset PaidAt { get; set; } = DateTimeOffset.UtcNow;
     public string? Notes { get; set; }
     public Receivable? Receivable { get; set; }
+}
+
+public sealed class HealthInsurance : TenantEntity
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Phone { get; set; }
+    public string? ContactName { get; set; }
+}
+
+public sealed class Specialty : TenantEntity
+{
+    public string Name { get; set; } = string.Empty;
+    public ICollection<DoctorSpecialty> DoctorSpecialties { get; set; } = new List<DoctorSpecialty>();
+}
+
+public sealed class DoctorSpecialty : TenantEntity
+{
+    public Guid DoctorId { get; set; }
+    public Doctor Doctor { get; set; } = null!;
+    public Guid SpecialtyId { get; set; }
+    public Specialty Specialty { get; set; } = null!;
+}
+
+public sealed class DoctorAvailability : TenantEntity
+{
+    public Guid DoctorId { get; set; }
+    public Doctor Doctor { get; set; } = null!;
+    public DayOfWeek DayOfWeek { get; set; }
+    public TimeSpan StartTime { get; set; }
+    public TimeSpan EndTime { get; set; }
+    public bool IsAvailable { get; set; } = true;
 }
 
 public sealed class Expense : TenantEntity

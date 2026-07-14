@@ -1,0 +1,58 @@
+# Canonical state machines — source of truth.
+# Changes here must be reflected in backend domain enums + frontend generated models.
+
+AppointmentStatus:
+  initial: Scheduled
+  states:
+    Scheduled:
+      transitions: [Confirmed, Cancelled, InProgress]
+    Confirmed:
+      transitions: [Cancelled, InProgress]
+    InProgress:
+      transitions: [Completed, NoShow]
+    Completed:
+      transitions: []
+    Cancelled:
+      transitions: []
+    NoShow:
+      transitions: []
+  invariant:
+    - Cancelled appointments cannot be edited (update API rejects)
+    - Same doctor cannot have overlapping non-cancelled appointments (conflict validation on create/update)
+  api_endpoints:
+    POST /appointments/{id}/confirm: Scheduled -> Confirmed
+    POST /appointments/{id}/cancel:  any -> Cancelled (also cancels linked receivable if not Paid)
+    POST /appointments/{id}/in-progress: Scheduled|Confirmed -> InProgress
+    POST /appointments/{id}/complete: InProgress -> Completed
+    POST /appointments/{id}/no-show: InProgress -> NoShow
+
+ReceivableStatus:
+  initial: Pending
+  states:
+    Pending:
+      transitions: [Partial, Paid, Cancelled]
+    Partial:
+      transitions: [Paid, Cancelled]
+    Paid:
+      transitions: []
+    Cancelled:
+      transitions: []
+  invariant:
+    - Paid when receivedAmount == originalAmount
+    - Partial when 0 < receivedAmount < originalAmount
+    - Payment that would exceed outstanding balance is rejected
+    - Auto-created when appointment.created with amount > 0
+    - Auto-cancelled when appointment cancelled (unless already Paid)
+
+ConfirmationStatus:
+  initial: Pending
+  states:
+    Pending:
+      transitions: [Confirmed, Declined]
+    Confirmed:
+      transitions: []
+    Declined:
+      transitions: []
+  invariant:
+    - Separate from AppointmentStatus (tracks patient confirmation via WhatsApp)
+    - Confirmed -> AppointmentStatus.Confirmed

@@ -22,10 +22,10 @@ public sealed class PatientServiceTests
             new FakeStorageService());
 
         var response = await service.CreateAsync(
-            new CreatePatientRequest("Maria", "123.456.789-00", new DateOnly(1990, 1, 1), "11999999999", "maria@example.com", "Unimed", null),
+            new CreatePatientRequest("Maria", "935.411.347-80", new DateOnly(1990, 1, 1), "11999999999", "maria@example.com", "Unimed", null, null),
             CancellationToken.None);
 
-        response.Cpf.Should().Be("12345678900");
+        response.Cpf.Should().Be("93541134780");
         dbContext.Patients.Should().ContainSingle(x => x.Id == response.Id);
     }
 

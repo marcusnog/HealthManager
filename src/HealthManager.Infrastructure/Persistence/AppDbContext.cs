@@ -25,6 +25,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
+    public DbSet<HealthInsurance> HealthInsurances => Set<HealthInsurance>();
+    public DbSet<Specialty> Specialties => Set<Specialty>();
+    public DbSet<DoctorSpecialty> DoctorSpecialties => Set<DoctorSpecialty>();
+    public DbSet<DoctorAvailability> DoctorAvailabilities => Set<DoctorAvailability>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -77,6 +81,35 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<HealthInsurance>().HasIndex(x => new { x.ClinicId, x.Name }).IsUnique();
+
+        modelBuilder.Entity<Specialty>().HasIndex(x => new { x.ClinicId, x.Name }).IsUnique();
+
+        modelBuilder.Entity<DoctorSpecialty>()
+            .HasIndex(x => new { x.DoctorId, x.SpecialtyId }).IsUnique();
+        modelBuilder.Entity<DoctorSpecialty>()
+            .HasOne(x => x.Doctor)
+            .WithMany(x => x.DoctorSpecialties)
+            .HasForeignKey(x => x.DoctorId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<DoctorSpecialty>()
+            .HasOne(x => x.Specialty)
+            .WithMany(x => x.DoctorSpecialties)
+            .HasForeignKey(x => x.SpecialtyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<DoctorAvailability>()
+            .HasOne(x => x.Doctor)
+            .WithMany()
+            .HasForeignKey(x => x.DoctorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Patient>()
+            .HasOne(x => x.HealthInsuranceRef)
+            .WithMany()
+            .HasForeignKey(x => x.HealthInsuranceId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<Clinic>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.Id == TenantClinicId));
         modelBuilder.Entity<User>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<Patient>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
@@ -90,6 +123,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<Expense>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<WebhookEvent>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<HealthInsurance>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<Specialty>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<DoctorSpecialty>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<DoctorAvailability>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<OutboxEvent>().HasQueryFilter(x => x.DeletedAt == null);
     }
 

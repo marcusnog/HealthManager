@@ -20,7 +20,7 @@ public sealed class DoctorsController(DoctorService doctorService) : ControllerB
         return CreatedAtAction(nameof(Create), new { id = response.Id }, response);
     }
 
-    [HttpPatch("{id:guid}")]
+    [HttpPut("{id:guid}")]
     public async Task<ActionResult<DoctorResponse>> Update(Guid id, [FromBody] UpdateDoctorRequest request, CancellationToken cancellationToken)
         => Ok(await doctorService.UpdateAsync(id, request, cancellationToken));
 
@@ -31,4 +31,3 @@ public sealed class DoctorsController(DoctorService doctorService) : ControllerB
         return NoContent();
     }
 }
-

@@ -92,18 +92,35 @@ public static class AppDbInitializer
             UpdatedAt = now
         };
 
+        var cardiologia = new Specialty
+        {
+            Id = Guid.Parse("d1d2d3d4-d1d2-d1d2-d1d2-d1d2d3d4d5d6"),
+            ClinicId = clinicId,
+            Name = "Cardiologia",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
         var doctor = new Doctor
         {
             Id = doctorId,
             ClinicId = clinicId,
             Name = "Dr. Henrique Lima",
-            Specialty = "Cardiologia",
             Crm = "CRM-SP-123456",
             Phone = "11998887766",
             Email = "henrique.lima@clinicaaurora.com",
             CreatedAt = now,
             UpdatedAt = now
         };
+
+        doctor.DoctorSpecialties.Add(new DoctorSpecialty
+        {
+            ClinicId = clinicId,
+            DoctorId = doctorId,
+            SpecialtyId = cardiologia.Id,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
 
         var patient = new Patient
         {
@@ -207,7 +224,7 @@ public static class AppDbInitializer
             UpdatedAt = now
         };
 
-        dbContext.AddRange(clinic, platformAdmin, clinicAdmin, doctorUser, doctor, patient, appointment, receivable, expense1, expense2, expense3, outbox);
+        dbContext.AddRange(clinic, platformAdmin, clinicAdmin, doctorUser, doctor, cardiologia, patient, appointment, receivable, expense1, expense2, expense3, outbox);
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Seed completed. Demo clinic and users created.");
     }

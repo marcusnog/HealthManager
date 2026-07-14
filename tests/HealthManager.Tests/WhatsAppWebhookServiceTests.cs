@@ -30,7 +30,6 @@ public sealed class WhatsAppWebhookServiceTests
             Id = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
             ClinicId = clinicId,
             Name = "Dr. Demo",
-            Specialty = "Cardio",
             Crm = "123456"
         });
         dbContext.Appointments.Add(new Appointment
@@ -89,7 +88,6 @@ public sealed class WhatsAppWebhookServiceTests
             Id = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
             ClinicId = clinicId,
             Name = "Dr. Demo",
-            Specialty = "Cardio",
             Crm = "123456"
         });
         dbContext.Appointments.Add(new Appointment

@@ -1,0 +1,157 @@
+# Canonical entity definitions — source of truth.
+# Backend: HealthManager.Domain/Model.cs.
+# Frontend: src/generated/models/ (regenerated from openapi.json).
+
+- Clinic:
+  id: Guid (auto)
+  slug: string, unique index
+  name: string
+  timezone: string (default America/Sao_Paulo)
+  businessHoursJson: string (JSON `{start, end}`)
+  cnpj: string?
+  email: string?
+  phone: string?
+  address: string?
+  status: ClinicStatus (Active|Suspended)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- User:
+  id: Guid (auto)
+  clinicId: Guid? (null for PlatformAdmin)
+  name: string
+  email: string, unique index (filter: DeletedAt IS NULL)
+  passwordHash: string (BCrypt)
+  role: UserRole (PlatformAdmin|Admin|Secretary|Doctor|Patient)
+  isActive: bool (default true)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- Patient:
+  id: Guid (auto)
+  clinicId: Guid
+  name: string
+  cpf: string (unique per clinic: clinicId+cpf index, validated with check digits)
+  birthDate: DateOnly?
+  phone: string
+  email: string?
+  healthInsurance: string? (free-text, legacy field)
+  healthInsuranceId: Guid? (FK HealthInsurance)
+  notes: string?
+  patientAccessToken: Guid (auto, used for portal auth)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- Doctor:
+  id: Guid (auto)
+  clinicId: Guid
+  name: string
+  crm: string (unique per clinic: clinicId+crm index)
+  phone: string?
+  email: string?
+  isActive: bool (default true)
+  doctorSpecialties: [DoctorSpecialty] (many-to-many via Specialty)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- Appointment:
+  id: Guid (auto)
+  clinicId: Guid
+  patientId: Guid (FK Patient)
+  doctorId: Guid (FK Doctor)
+  startAt: DateTimeOffset (UTC)
+  endAt: DateTimeOffset (UTC)
+  status: AppointmentStatus (Scheduled|Confirmed|Cancelled|Completed|NoShow|InProgress)
+  confirmationStatus: ConfirmationStatus (Pending|Confirmed|Declined)
+  source: AppointmentSource (Internal|WhatsApp)
+  type: string (e.g. "Primeira consulta")
+  notes: string?
+  amount: decimal (0 = no charge)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- Receivable:
+  id: Guid (auto)
+  clinicId: Guid
+  appointmentId: Guid? (FK Appointment, nullable for manual receivable)
+  originalAmount: decimal
+  receivedAmount: decimal (sum of payments)
+  status: ReceivableStatus (Pending|Partial|Paid|Cancelled)
+  dueDate: DateTimeOffset (UTC)
+  description: string?
+  outstandingAmount: decimal = originalAmount - receivedAmount (computed)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- Payment:
+  id: Guid (auto)
+  clinicId: Guid
+  receivableId: Guid (FK Receivable)
+  amount: decimal
+  paymentMethod: PaymentMethod (Cash|Pix|CreditCard|DebitCard|Insurance)
+  status: PaymentStatus (Paid|Refunded)
+  paidAt: DateTimeOffset (UTC)
+  notes: string?
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- Expense:
+  id: Guid (auto)
+  clinicId: Guid
+  description: string
+  amount: decimal
+  category: ExpenseCategory (Supplies|Equipment|Salary|Marketing|Utilities|Rent|Other)
+  paymentMethod: PaymentMethod
+  paidAt: DateTimeOffset (UTC)
+  status: ExpenseStatus (Paid|Pending|Cancelled)
+  notes: string?
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- PatientDocument:
+  id: Guid (auto)
+  clinicId: Guid
+  patientId: Guid (FK Patient)
+  fileName: string
+  contentType: string
+  sizeInBytes: long (max 10MB per upload validation)
+  storagePath: string (format: "clinics/{clinicId}/patients/{patientId}/{fileName}")
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+  # Note: actual storage is S3 or local filesystem fallback
+
+- HealthInsurance:
+  id: Guid (auto)
+  clinicId: Guid
+  name: string (unique per clinic: clinicId+name index)
+  phone: string?
+  contactName: string?
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- Specialty:
+  id: Guid (auto)
+  clinicId: Guid
+  name: string (unique per clinic: clinicId+name index)
+  doctorSpecialties: [DoctorSpecialty] (many-to-many via Doctor)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- DoctorSpecialty:
+  id: Guid (auto)
+  clinicId: Guid
+  doctorId: Guid (FK Doctor)
+  specialtyId: Guid (FK Specialty)
+  # Unique index: (doctorId, specialtyId)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- DoctorAvailability:
+  id: Guid (auto)
+  clinicId: Guid
+  doctorId: Guid (FK Doctor)
+  dayOfWeek: int (0=Sunday..6=Saturday)
+  startTime: TimeSpan
+  endTime: TimeSpan
+  isAvailable: bool (default true)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- OutboxEvent:
+  id: Guid (auto)
+  clinicId: Guid?
+  eventType: string (e.g. "appointment.created")
+  payloadJson: string
+  status: OutboxStatus (Pending|Processed|Failed)
+  attempts: int
+  processedAt: DateTimeOffset?
+  lastError: string?
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+  # Note: no tenant filter (ClinicId is nullable)

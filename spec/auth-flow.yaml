@@ -1,0 +1,50 @@
+# Canonical auth flow — source of truth.
+
+clinic_auth:
+  login:
+    request: POST /auth/login { email, password }
+    lookup: "User by email where DeletedAt IS NULL and IsActive = true"
+    verify: "BCrypt.Verify(password, user.PasswordHash)"
+    response: { accessToken, refreshToken, expiresAt, user: { id, clinicId, name, email, role } }
+    side_effect: "RefreshToken record created with BCrypt-hashed token, UserAgent from request"
+    error: "InvalidOperationException('Credenciais invalidas.') for wrong email or wrong password"
+
+  refresh:
+    request: POST /auth/refresh { refreshToken }
+    lookup: "All non-revoked, non-expired RefreshTokens. Match by BCrypt.Verify(tokenHash, request.refreshToken)."
+    rotation: "Old refresh token revoked (RevokedAt = now). New refresh token issued."
+    error: "InvalidOperationException('Refresh token invalido.') if not found"
+
+  logout:
+    request: POST /auth/logout { refreshToken }
+    action: "Revoke matching refresh token. Idempotent — silent if no match."
+
+  change_password:
+    request: POST /auth/change-password { currentPassword, newPassword }
+    requires: "Authenticated user (userId from JWT claim)"
+    verify: "BCrypt.Verify(currentPassword, user.PasswordHash)"
+    action: "Update PasswordHash with BCrypt.Hash(newPassword)"
+    error: "KeyNotFoundException if user not found; InvalidOperationException if current password wrong"
+
+patient_portal_auth:
+  login:
+    request: POST /patient-portal/login { cpf, accessToken }
+    lookup: "Patient by cpf (normalized via AppHelpers.NormalizeDigits) AND patientAccessToken (Guid)"
+    response: { accessToken, expiresAt (7 days), patient: { id, name, cpf, birthDate, phone, email, healthInsurance } }
+    token: "Separate JWT with role = Patient, clinic_id claim, 7 day lifetime. No refresh token issued."
+    error: "InvalidOperationException('Credenciais invalidas.') if patient not found"
+    note: "Frontend stores in localStorage healthmanager.portal. No refresh — re-login on expiry."
+
+jwt:
+  issuer: "JWT_ISSUER env (default: healthmanager)"
+  audience: "JWT_AUDIENCE env (default: healthmanager-web)"
+  secret: "JWT_SECRET env (required in production, default: change-me-super-secret-key-32-bytes)"
+  access_token_ttl: "JWT_ACCESS_TOKEN_MINUTES env (default: 30)"
+  refresh_token_ttl: "JWT_REFRESH_TOKEN_DAYS env (default: 30)"
+  algorithm: "HMAC-SHA256"
+  claims:
+    - sub: userId (also ClaimTypes.NameIdentifier)
+    - clinic_id: Guid? (absent for PlatformAdmin)
+    - name: user name
+    - email: user email
+    - role: UserRole string

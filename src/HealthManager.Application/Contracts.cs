@@ -38,6 +38,7 @@ public sealed record CreatePatientRequest(
     [Required][StringLength(20)] string Phone,
     string? Email,
     string? HealthInsurance,
+    Guid? HealthInsuranceId,
     string? Notes);
 
 public sealed record UpdatePatientRequest(
@@ -45,6 +46,7 @@ public sealed record UpdatePatientRequest(
     [Required] string Phone,
     string? Email,
     string? HealthInsurance,
+    Guid? HealthInsuranceId,
     string? Notes);
 
 public sealed record CreatePatientDocumentRequest(
@@ -55,12 +57,13 @@ public sealed record CreatePatientDocumentRequest(
 
 public sealed record DownloadPatientDocumentResult(Stream Content, string ContentType, string FileName);
 public sealed record PatientDocumentResponse(Guid Id, string FileName, string ContentType, long SizeInBytes, string StoragePath);
-public sealed record PatientResponse(Guid Id, string Name, string Cpf, DateOnly? BirthDate, string Phone, string? Email, string? HealthInsurance, string? Notes, Guid PatientAccessToken);
+public sealed record PatientResponse(Guid Id, string Name, string Cpf, DateOnly? BirthDate, string Phone, string? Email, string? HealthInsurance, Guid? HealthInsuranceId, string? HealthInsuranceName, string? Notes, Guid PatientAccessToken);
 
 public sealed record DoctorQuery(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null);
-public sealed record CreateDoctorRequest([Required] string Name, [Required] string Specialty, [Required] string Crm, string? Phone, string? Email);
-public sealed record UpdateDoctorRequest([Required] string Name, [Required] string Specialty, string? Phone, string? Email, bool IsActive);
-public sealed record DoctorResponse(Guid Id, string Name, string Specialty, string Crm, string? Phone, string? Email, bool IsActive);
+public sealed record CreateDoctorRequest([Required] string Name, [Required] string Crm, string? Phone, string? Email, List<Guid>? SpecialtyIds);
+public sealed record UpdateDoctorRequest([Required] string Name, string? Phone, string? Email, bool IsActive, List<Guid>? SpecialtyIds);
+public sealed record DoctorResponse(Guid Id, string Name, string Crm, string? Phone, string? Email, bool IsActive, List<SpecialtyItem> Specialties);
+public sealed record SpecialtyItem(Guid Id, string Name);
 
 public sealed record CreateAppointmentRequest(
     [Required] Guid PatientId,
@@ -93,7 +96,7 @@ public sealed record AppointmentResponse(
     string? PatientName = null,
     string? PatientPhone = null,
     string? DoctorName = null,
-    string? DoctorSpecialty = null);
+    List<SpecialtyItem>? DoctorSpecialties = null);
 
 public sealed record ReceivableResponse(
     Guid Id,
@@ -141,3 +144,22 @@ public sealed record PatientPortalReceivableResponse(
     decimal OutstandingAmount,
     ReceivableStatus Status,
     DateTimeOffset DueDate);
+
+// ── HealthInsurance ──
+public sealed record HealthInsuranceQuery(int Page = 1, int PageSize = 20, string? Search = null);
+public sealed record CreateHealthInsuranceRequest([Required][StringLength(160)] string Name, string? Phone, string? ContactName);
+public sealed record UpdateHealthInsuranceRequest([Required][StringLength(160)] string Name, string? Phone, string? ContactName);
+public sealed record HealthInsuranceResponse(Guid Id, string Name, string? Phone, string? ContactName);
+
+// ── Specialty ──
+public sealed record SpecialtyQuery(int Page = 1, int PageSize = 20, string? Search = null);
+public sealed record CreateSpecialtyRequest([Required][StringLength(100)] string Name);
+public sealed record UpdateSpecialtyRequest([Required][StringLength(100)] string Name);
+public sealed record SpecialtyResponse(Guid Id, string Name, List<SpecialtyDoctorItem> Doctors);
+public sealed record SpecialtyDoctorItem(Guid Id, string Name, string Crm);
+
+// ── DoctorAvailability ──
+public sealed record AvailabilityQuery(int Page = 1, int PageSize = 50, Guid? DoctorId = null);
+public sealed record CreateAvailabilityRequest([Required] Guid DoctorId, [Required] int DayOfWeek, [Required] string StartTime, [Required] string EndTime, bool IsAvailable = true);
+public sealed record UpdateAvailabilityRequest([Required] int DayOfWeek, [Required] string StartTime, [Required] string EndTime, bool IsAvailable);
+public sealed record DoctorAvailabilityResponse(Guid Id, Guid DoctorId, string DoctorName, int DayOfWeek, string StartTime, string EndTime, bool IsAvailable);

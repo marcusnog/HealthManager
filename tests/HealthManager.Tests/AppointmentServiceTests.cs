@@ -20,7 +20,7 @@ public sealed class AppointmentServiceTests
 
         await using var dbContext = CreateDbContext();
         dbContext.Clinics.Add(new Clinic { Id = clinicId, Name = "Clinica A", Slug = "clinica-a", Timezone = "America/Sao_Paulo" });
-        dbContext.Doctors.Add(new Doctor { Id = doctorId, ClinicId = clinicId, Name = "Dr. A", Specialty = "Cardio", Crm = "123" });
+        dbContext.Doctors.Add(new Doctor { Id = doctorId, ClinicId = clinicId, Name = "Dr. A", Crm = "123" });
         dbContext.Patients.AddRange(
             new Patient { Id = patientA, ClinicId = clinicId, Name = "Paciente A", Cpf = "11111111111", Phone = "11999999999" },
             new Patient { Id = patientB, ClinicId = clinicId, Name = "Paciente B", Cpf = "22222222222", Phone = "11888888888" });

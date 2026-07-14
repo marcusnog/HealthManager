@@ -1,0 +1,76 @@
+# Canonical business rules — source of truth.
+# Code must match these. Deviations are bugs.
+
+tenant:
+  isolation: "Every clinic entity has clinicId. Global query filters on all TenantEntity tables enforce isolation by declaring principal's clinicId."
+  bypass: "PlatformAdmin role bypasses tenant filter entirely (can see all clinics)."
+  resolution_order: "1) X-Clinic-Id header (if present) -> 2) JWT claim clinic_id"
+  cross_tenant: "No data leak between clinics. Second clinic seed ID: 22222222-2222-2222-2222-222222222222."
+
+auth:
+  login: "Email + password. Password hashed via BCrypt. Returns accessToken + refreshToken."
+  refresh: "Refresh token hashed in DB. Token rotation: old refresh token revoked on refresh."
+  logout: "Revokes the specific refresh token. Idempotent (silent if already revoked)."
+  change_password: "Requires current password verification. Updates hash directly."
+  patient_portal: "CPF + PatientAccessToken (Guid). Separate JWT, 7 day expiry. No refresh tokens."
+  token_format: "JWT payload includes: sub (userId), clinic_id, email, name, role claims."
+
+authorization:
+  roles:
+    PlatformAdmin: "All access, bypasses tenant filter. No clinicId in JWT."
+    Admin: "Full clinic access. Manages users, patients, doctors, appointments, finances."
+    Secretary: "Operational: patients, appointments. No doctor/expense management."
+    Doctor: "Own clinic data. Can view schedule, mark appointment statuses."
+    Patient: "Portal only. Scoped to own data via PatientAccessToken."
+
+policies:
+  PlatformAdminOnly: "Requires PlatformAdmin role. Used for /internal/* routes."
+  ClinicAdminOrSecretary: "Requires Admin or Secretary. Used for patient management."
+  ClinicStaff: "Requires Admin, Secretary, or Doctor. Used for appointments/scheduling."
+  PatientPortal: "Requires Patient role. Used for /patient-portal/* routes."
+
+finance:
+  partial_payment: "Payments can be partial. receivedAmount tracks running total. Receivable status auto-computed: Pending(0) -> Partial(>0 && <original) -> Paid(==original)."
+  payment_exceeds: "Rejected if new receivedAmount would exceed originalAmount."
+  cancellation: "Appointment cancellation cancels linked receivable unless already Paid."
+  manual_receivable: "POST /payments supports creating a standalone receivable+payment in one call (no appointment link)."
+
+scheduling:
+  conflict: "Same doctor cannot have overlapping non-cancelled appointments. Validated on create and update."
+  business_hours: "Appointment start-end must fall within clinic BusinessHoursJson window. Clinic timezone applied."
+  default_duration: "30 minutes if durationMinutes is 0."
+  amount_auto: "Appointment with amount > 0 auto-creates a Receivable."
+
+documents:
+  storage_fallback: "AWS_S3_BUCKET set -> S3. Not set -> local filesystem (LOCAL_STORAGE_ROOT or temp dir)."
+  soft_delete: "Documents are soft-deleted via DeletedAt, not physically removed from storage."
+  size_limit: "CreatePatientDocumentRequest validates SizeInBytes up to 10MB."
+
+audit:
+  deletes: "Patient and doctor soft deletes generate AuditLog entries with action = 'patient.deleted' / 'doctor.deleted'."
+  document_deletes: "Patient document deletes generate 'patient_document.deleted' audit entry."
+
+outbox:
+  events: "appointment.created, appointment.updated, appointment.cancelled"
+  batch: "OutboxProcessor takes 25 pending events per iteration."
+  worker_poll: "OutboxWorker polls every 15 seconds."
+  lambda: "Lambda function (custom runtime, AssemblyName=bootstrap) processes outbox for AWS deployment."
+
+seed:
+  clinicId: "11111111-1111-1111-1111-111111111111"
+  users:
+    - email: "platform@healthmanager.local"
+      role: PlatformAdmin
+      password: ChangeMe123!
+      clinicId: null
+    - email: "admin@clinicaaurora.com"
+      role: Admin
+      password: ChangeMe123!
+      clinicId: 11111111-1111-1111-1111-111111111111
+  demo_data:
+    - doctor: "Dr. Henrique Lima" (CRM-SP-123456, Cardiologia)
+    - patient: "Ana Martins" (CPF: 12345678900)
+    - appointment: 2026-05-07T12:00:00Z, R$ 250
+    - receivable: R$ 250 pending
+    - expenses: Rent R$ 5000, Supplies R$ 350, Utilities R$ 890
+    - outbox_event: appointment.created for demo appointment
