@@ -496,24 +496,31 @@ public sealed class DoctorService(
             Email = request.Email
         };
 
-        dbContext.Doctors.Add(doctor);
-
         if (request.SpecialtyIds?.Count > 0)
         {
+            var requestedIds = request.SpecialtyIds.Distinct().ToList();
             var specialties = await dbContext.Specialties
-                .Where(x => request.SpecialtyIds.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null)
+                .Where(x => requestedIds.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null)
                 .ToListAsync(cancellationToken);
+
+            if (specialties.Count != requestedIds.Count)
+                throw new InvalidOperationException("Uma ou mais especialidades nao foram encontradas para esta clinica.");
 
             foreach (var s in specialties)
             {
-                doctor.DoctorSpecialties.Add(new DoctorSpecialty
+                var doctorSpecialty = new DoctorSpecialty
                 {
                     ClinicId = clinicId,
                     DoctorId = doctor.Id,
-                    SpecialtyId = s.Id
-                });
+                    SpecialtyId = s.Id,
+                    Doctor = doctor,
+                    Specialty = s
+                };
+                doctor.DoctorSpecialties.Add(doctorSpecialty);
             }
         }
+
+        dbContext.Doctors.Add(doctor);
 
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
@@ -539,7 +546,7 @@ public sealed class DoctorService(
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var doctor = await dbContext.Doctors
-            .Include(x => x.DoctorSpecialties)
+            .Include(x => x.DoctorSpecialties).ThenInclude(x => x.Specialty)
             .FirstOrDefaultAsync(x => x.Id == doctorId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Medico nao encontrado.");
 
@@ -551,27 +558,48 @@ public sealed class DoctorService(
 
         if (request.SpecialtyIds is not null)
         {
-            var existingIds = doctor.DoctorSpecialties.Select(x => x.SpecialtyId).ToHashSet();
             var requested = request.SpecialtyIds.ToHashSet();
+
+            var specialties = await dbContext.Specialties
+                .Where(x => requested.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null)
+                .ToListAsync(cancellationToken);
+
+            if (specialties.Count != requested.Count)
+                throw new InvalidOperationException("Uma ou mais especialidades nao foram encontradas para esta clinica.");
 
             var toRemove = doctor.DoctorSpecialties.Where(x => !requested.Contains(x.SpecialtyId)).ToList();
             foreach (var r in toRemove)
-                dbContext.DoctorSpecialties.Remove(r);
+            {
+                r.DeletedAt = DateTimeOffset.UtcNow;
+            }
 
+            var existingIds = doctor.DoctorSpecialties
+                .Where(x => x.DeletedAt == null)
+                .Select(x => x.SpecialtyId)
+                .ToHashSet();
             var toAdd = requested.Where(id => !existingIds.Contains(id)).ToList();
             if (toAdd.Count > 0)
             {
-                var specialties = await dbContext.Specialties
-                    .Where(x => toAdd.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null)
+                var deletedLinks = await dbContext.DoctorSpecialties.IgnoreQueryFilters()
+                    .Where(x => x.DoctorId == doctor.Id && toAdd.Contains(x.SpecialtyId) && x.DeletedAt != null)
                     .ToListAsync(cancellationToken);
 
-                foreach (var s in specialties)
+                foreach (var specialtyId in toAdd)
                 {
+                    var deletedLink = deletedLinks.FirstOrDefault(x => x.SpecialtyId == specialtyId);
+                    if (deletedLink is not null)
+                    {
+                        deletedLink.DeletedAt = null;
+                        deletedLink.Specialty = specialties.Single(x => x.Id == specialtyId);
+                        continue;
+                    }
+
                     doctor.DoctorSpecialties.Add(new DoctorSpecialty
                     {
                         ClinicId = clinicId,
                         DoctorId = doctor.Id,
-                        SpecialtyId = s.Id
+                        SpecialtyId = specialtyId,
+                        Specialty = specialties.Single(x => x.Id == specialtyId)
                     });
                 }
             }
@@ -584,7 +612,7 @@ public sealed class DoctorService(
     private static DoctorResponse ToResponse(Doctor doctor)
     {
         var specialties = doctor.DoctorSpecialties?
-            .Where(ds => ds.Specialty != null)
+            .Where(ds => ds.DeletedAt == null && ds.Specialty != null)
             .Select(ds => new SpecialtyItem(ds.Specialty.Id, ds.Specialty.Name))
             .ToList() ?? [];
 

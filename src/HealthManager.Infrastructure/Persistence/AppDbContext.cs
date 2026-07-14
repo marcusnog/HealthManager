@@ -47,7 +47,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
         modelBuilder.Entity<Appointment>()
             .HasOne(x => x.Patient)
-            .WithMany()
+            .WithMany(x => x.Appointments)
             .HasForeignKey(x => x.PatientId)
             .OnDelete(DeleteBehavior.Restrict);
 

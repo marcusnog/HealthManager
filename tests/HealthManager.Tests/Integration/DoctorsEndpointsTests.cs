@@ -7,6 +7,27 @@ namespace HealthManager.Tests.Integration;
 public sealed class DoctorsEndpointsTests
 {
     [Fact]
+    public async Task CreateDoctor_WithSpecialty_ShouldPersistDoctorAndLink()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var specialtyId = Guid.Parse("d1d2d3d4-d1d2-d1d2-d1d2-d1d2d3d4d5d6");
+
+        var response = await client.PostAsJsonAsync("/doctors", new
+        {
+            name = "Dra. Maria Silva",
+            crm = "CRM-SP-654321",
+            phone = "11988887777",
+            specialtyIds = new[] { specialtyId }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var payload = await response.Content.ReadFromJsonAsync<DoctorHttpResponse>();
+        payload.Should().NotBeNull();
+        payload!.Specialties.Should().ContainSingle(x => x.Id == specialtyId);
+    }
+
+    [Fact]
     public async Task UpdateDoctor_ShouldPersistChangesForCurrentClinicDoctor()
     {
         await using var factory = new ApiTestFactory();
@@ -30,6 +51,39 @@ public sealed class DoctorsEndpointsTests
         payload.Phone.Should().Be("11994443322");
         payload.Email.Should().Be("carlos.eduardo@clinicaaurora.com");
         payload.IsActive.Should().BeTrue();
+        payload.Specialties.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task UpdateDoctor_ShouldRemoveAndRestoreSpecialtyWithoutDeletingLink()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var doctorId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var specialtyId = Guid.Parse("d1d2d3d4-d1d2-d1d2-d1d2-d1d2d3d4d5d6");
+
+        var withoutSpecialty = await client.PutAsJsonAsync($"/doctors/{doctorId}", new
+        {
+            name = "Dr. Henrique Lima",
+            phone = "11998887766",
+            email = "henrique.lima@clinicaaurora.com",
+            isActive = true,
+            specialtyIds = Array.Empty<Guid>()
+        });
+        withoutSpecialty.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var restored = await client.PutAsJsonAsync($"/doctors/{doctorId}", new
+        {
+            name = "Dr. Henrique Lima",
+            phone = "11998887766",
+            email = "henrique.lima@clinicaaurora.com",
+            isActive = true,
+            specialtyIds = new[] { specialtyId }
+        });
+
+        restored.StatusCode.Should().Be(HttpStatusCode.OK);
+        var payload = await restored.Content.ReadFromJsonAsync<DoctorHttpResponse>();
+        payload!.Specialties.Should().ContainSingle(x => x.Id == specialtyId);
     }
 
     private sealed record DoctorHttpResponse(
@@ -38,5 +92,8 @@ public sealed class DoctorsEndpointsTests
         string Crm,
         string? Phone,
         string? Email,
-        bool IsActive);
+        bool IsActive,
+        List<SpecialtyHttpResponse> Specialties);
+
+    private sealed record SpecialtyHttpResponse(Guid Id, string Name);
 }

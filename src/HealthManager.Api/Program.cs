@@ -3,6 +3,7 @@ using HealthManager.Application;
 using HealthManager.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +49,8 @@ app.UseExceptionHandler(exceptionHandlerApp =>
             InvalidOperationException => StatusCodes.Status400BadRequest,
             UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
             KeyNotFoundException => StatusCodes.Status404NotFound,
+            DbUpdateConcurrencyException => StatusCodes.Status409Conflict,
+            DbUpdateException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
         context.Response.StatusCode = statusCode;
