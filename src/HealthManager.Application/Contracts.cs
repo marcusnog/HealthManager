@@ -39,7 +39,8 @@ public sealed record CreatePatientRequest(
     string? Email,
     string? HealthInsurance,
     Guid? HealthInsuranceId,
-    string? Notes);
+    string? Notes,
+    PatientDetails? Details = null);
 
 public sealed record UpdatePatientRequest(
     [Required] string Name,
@@ -47,7 +48,22 @@ public sealed record UpdatePatientRequest(
     string? Email,
     string? HealthInsurance,
     Guid? HealthInsuranceId,
-    string? Notes);
+    string? Notes,
+    PatientDetails? Details = null);
+
+public sealed record PatientDetails(
+    string? SocialName = null, string? Rg = null, string? Sex = null,
+    string? SecondaryPhone = null, string? CommercialPhone = null, string? ContactName = null,
+    string? MedicalRecordNumber = null, string? HealthInsuranceNumber = null, string? Cns = null,
+    bool IsVip = false, bool ExcludeFromMarketing = false, bool ReceiveDirectMail = false, string? Tags = null,
+    string? ZipCode = null, string? Street = null, string? Complement = null, string? Neighborhood = null,
+    string? City = null, string? State = null, string? Region = null,
+    string? Company = null, string? Reference = null, string? AcquisitionSource = null, string? ReferredBy = null,
+    string? MaritalStatus = null, string? Education = null, string? Profession = null, string? Religion = null,
+    string? FatherName = null, string? MotherName = null, string? CompanionName = null,
+    int? ChildrenCount = null, string? SpouseName = null);
+
+public sealed record CepAddressResponse(string ZipCode, string? Street, string? Complement, string? Neighborhood, string? City, string? State);
 
 public sealed record CreatePatientDocumentRequest(
     [Required] string FileName,
@@ -57,7 +73,7 @@ public sealed record CreatePatientDocumentRequest(
 
 public sealed record DownloadPatientDocumentResult(Stream Content, string ContentType, string FileName);
 public sealed record PatientDocumentResponse(Guid Id, string FileName, string ContentType, long SizeInBytes, string StoragePath);
-public sealed record PatientResponse(Guid Id, string Name, string Cpf, DateOnly? BirthDate, string Phone, string? Email, string? HealthInsurance, Guid? HealthInsuranceId, string? HealthInsuranceName, string? Notes, Guid PatientAccessToken);
+public sealed record PatientResponse(Guid Id, string Name, string Cpf, DateOnly? BirthDate, string Phone, string? Email, string? HealthInsurance, Guid? HealthInsuranceId, string? HealthInsuranceName, string? Notes, Guid PatientAccessToken, PatientDetails? Details = null);
 
 public sealed record DoctorQuery(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null);
 public sealed record CreateDoctorRequest([Required] string Name, [Required] string Crm, string? Phone, string? Email, List<Guid>? SpecialtyIds);

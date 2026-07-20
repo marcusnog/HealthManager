@@ -46,6 +46,13 @@ documents:
   soft_delete: "Documents are soft-deleted via DeletedAt, not physically removed from storage."
   size_limit: "CreatePatientDocumentRequest validates SizeInBytes up to 10MB."
 
+address_lookup:
+  provider: "ViaCEP, called only by the backend through GET https://viacep.com.br/ws/{cep}/json/."
+  credentials: "No token or commercial contract is required."
+  validation: "CEP is normalized to exactly 8 digits before lookup."
+  not_found: "A ViaCEP response containing erro=true is mapped to HTTP 404."
+  resilience: "Provider failures are mapped to HTTP 502 and never prevent manual address entry."
+
 audit:
   deletes: "Patient and doctor soft deletes generate AuditLog entries with action = 'patient.deleted' / 'doctor.deleted'."
   document_deletes: "Patient document deletes generate 'patient_document.deleted' audit entry."
