@@ -29,12 +29,45 @@
   id: Guid (auto)
   clinicId: Guid
   name: string
+  socialName: string?
   cpf: string (unique per clinic: clinicId+cpf index, validated with check digits)
+  rg: string?
   birthDate: DateOnly?
+  sex: string?
   phone: string
+  secondaryPhone: string?
+  commercialPhone: string?
+  contactName: string?
   email: string?
   healthInsurance: string? (free-text, legacy field)
   healthInsuranceId: Guid? (FK HealthInsurance)
+  medicalRecordNumber: string?
+  healthInsuranceNumber: string?
+  cns: string?
+  isVip: bool
+  excludeFromMarketing: bool
+  receiveDirectMail: bool
+  tags: string?
+  zipCode: string?
+  street: string?
+  complement: string?
+  neighborhood: string?
+  city: string?
+  state: string?
+  region: string?
+  company: string?
+  reference: string?
+  acquisitionSource: string?
+  referredBy: string?
+  maritalStatus: string?
+  education: string?
+  profession: string?
+  religion: string?
+  fatherName: string?
+  motherName: string?
+  companionName: string?
+  childrenCount: int?
+  spouseName: string?
   notes: string?
   patientAccessToken: Guid (auto, used for portal auth)
   # Inherited: CreatedAt, UpdatedAt, DeletedAt

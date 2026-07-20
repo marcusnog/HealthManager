@@ -104,6 +104,20 @@
         }
       }
     },
+    "/address/cep/{cep}": {
+      "get": {
+        "operationId": "address_findByCep",
+        "parameters": [
+          { "name": "cep", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Endereco encontrado via ViaCEP",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CepAddressResponse" } } }
+          }
+        }
+      }
+    },
     "/patients": {
       "get": {
         "operationId": "patients_list",
@@ -1201,7 +1215,9 @@
           "phone": { "type": "string" },
           "email": { "type": "string" },
           "healthInsurance": { "type": "string" },
-          "notes": { "type": "string" }
+          "healthInsuranceId": { "type": "string", "format": "uuid" },
+          "notes": { "type": "string" },
+          "details": { "$ref": "#/components/schemas/PatientDetails" }
         }
       },
       "CreatePatientDocumentRequest": {
@@ -1240,8 +1256,11 @@
           "phone": { "type": "string" },
           "email": { "type": "string" },
           "healthInsurance": { "type": "string" },
+          "healthInsuranceId": { "type": "string", "format": "uuid" },
+          "healthInsuranceName": { "type": "string" },
           "notes": { "type": "string" },
-          "patientAccessToken": { "type": "string", "format": "uuid" }
+          "patientAccessToken": { "type": "string", "format": "uuid" },
+          "details": { "$ref": "#/components/schemas/PatientDetails" }
         }
       },
       "UpdatePatientRequest": {
@@ -1252,7 +1271,31 @@
           "phone": { "type": "string" },
           "email": { "type": "string" },
           "healthInsurance": { "type": "string" },
-          "notes": { "type": "string" }
+          "healthInsuranceId": { "type": "string", "format": "uuid" },
+          "notes": { "type": "string" },
+          "details": { "$ref": "#/components/schemas/PatientDetails" }
+        }
+      },
+      "PatientDetails": {
+        "type": "object",
+        "properties": {
+          "socialName": { "type": "string" }, "rg": { "type": "string" }, "sex": { "type": "string" },
+          "secondaryPhone": { "type": "string" }, "commercialPhone": { "type": "string" }, "contactName": { "type": "string" },
+          "medicalRecordNumber": { "type": "string" }, "healthInsuranceNumber": { "type": "string" }, "cns": { "type": "string" },
+          "isVip": { "type": "boolean" }, "excludeFromMarketing": { "type": "boolean" }, "receiveDirectMail": { "type": "boolean" }, "tags": { "type": "string" },
+          "zipCode": { "type": "string" }, "street": { "type": "string" }, "complement": { "type": "string" },
+          "neighborhood": { "type": "string" }, "city": { "type": "string" }, "state": { "type": "string" }, "region": { "type": "string" },
+          "company": { "type": "string" }, "reference": { "type": "string" }, "acquisitionSource": { "type": "string" }, "referredBy": { "type": "string" },
+          "maritalStatus": { "type": "string" }, "education": { "type": "string" }, "profession": { "type": "string" }, "religion": { "type": "string" },
+          "fatherName": { "type": "string" }, "motherName": { "type": "string" }, "companionName": { "type": "string" },
+          "childrenCount": { "type": "integer" }, "spouseName": { "type": "string" }
+        }
+      },
+      "CepAddressResponse": {
+        "type": "object",
+        "properties": {
+          "zipCode": { "type": "string" }, "street": { "type": "string" }, "complement": { "type": "string" },
+          "neighborhood": { "type": "string" }, "city": { "type": "string" }, "state": { "type": "string" }
         }
       },
       "PagedPatientResponse": {
@@ -1328,13 +1371,13 @@
       },
       "CreateDoctorRequest": {
         "type": "object",
-        "required": ["name", "crm", "specialty"],
+        "required": ["name", "crm"],
         "properties": {
           "name": { "type": "string" },
           "crm": { "type": "string" },
-          "specialty": { "type": "string" },
           "phone": { "type": "string" },
-          "email": { "type": "string" }
+          "email": { "type": "string" },
+          "specialtyIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
         }
       },
       "DoctorResponse": {
@@ -1343,21 +1386,28 @@
           "id": { "type": "string", "format": "uuid" },
           "name": { "type": "string" },
           "crm": { "type": "string" },
-          "specialty": { "type": "string" },
           "phone": { "type": "string" },
           "email": { "type": "string" },
-          "isActive": { "type": "boolean" }
+          "isActive": { "type": "boolean" },
+          "specialties": { "type": "array", "items": { "$ref": "#/components/schemas/SpecialtyItem" } }
         }
       },
       "UpdateDoctorRequest": {
         "type": "object",
-        "required": ["name", "specialty", "isActive"],
+        "required": ["name", "isActive"],
         "properties": {
           "name": { "type": "string" },
-          "specialty": { "type": "string" },
           "phone": { "type": "string" },
           "email": { "type": "string" },
-          "isActive": { "type": "boolean" }
+          "isActive": { "type": "boolean" },
+          "specialtyIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+        }
+      },
+      "SpecialtyItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" }
         }
       },
       "CreateAppointmentRequest": {

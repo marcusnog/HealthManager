@@ -10,10 +10,11 @@ Auth:
 
 Patients:
   GET /patients: "?page,pageSize,search,sortBy,sortDirection,email,healthInsurance -> PagedResult<PatientResponse> [ClinicAdminOrSecretary]"
-  POST /patients: "{ name, cpf, birthDate?, phone, email?, healthInsurance?, notes? } -> 201 PatientResponse [ClinicAdminOrSecretary]"
-  PUT /patients/{id}: "{ name, phone, email?, healthInsurance?, notes? } -> PatientResponse [ClinicAdminOrSecretary]"
+  POST /patients: "{ identification, insurance/marketing, contacts, address, complementary data, notes } -> 201 PatientResponse [ClinicAdminOrSecretary]"
+  PATCH /patients/{id}: "{ all editable patient fields; cpf remains immutable } -> PatientResponse [ClinicAdminOrSecretary]"
   DELETE /patients/{id}: "-> 204 (soft delete, audit logged) [ClinicAdminOrSecretary]"
   POST /patients/{id}/access-token/regenerate: "-> new Guid (regenerates patientAccessToken) [ClinicAdminOrSecretary]"
+  GET /address/cep/{cep}: "-> CepAddressResponse via ViaCEP [ClinicAdminOrSecretary]"
   # Documents:
   GET /patients/{id}/documents: "-> PatientDocumentResponse[] [ClinicStaff]"
   POST /patients/{id}/documents/upload: "multipart -> 201 PatientDocumentResponse [ClinicStaff]"

@@ -208,15 +208,18 @@ public sealed class PatientService(
             _ => AppHelpers.OrderByKey(patientsQuery, sortDesc, x => x.Name),
         };
 
-        var items = await ordered
+        var patients = await ordered
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
+            .ToListAsync(cancellationToken);
+
+        var items = patients
             .Select(x => new PatientResponse(
                 x.Id, x.Name, x.Cpf, x.BirthDate, x.Phone, x.Email,
                 x.HealthInsurance, x.HealthInsuranceId,
                 x.HealthInsuranceRef != null ? x.HealthInsuranceRef.Name : null,
-                x.Notes, x.PatientAccessToken))
-            .ToListAsync(cancellationToken);
+                x.Notes, x.PatientAccessToken, ToDetails(x)))
+            .ToList();
 
         return new PagedResult<PatientResponse>(items, query.Page, query.PageSize, total);
     }
@@ -245,6 +248,7 @@ public sealed class PatientService(
             HealthInsuranceId = request.HealthInsuranceId,
             Notes = request.Notes
         };
+        ApplyDetails(patient, request.Details);
 
         dbContext.Patients.Add(patient);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -255,7 +259,7 @@ public sealed class PatientService(
                 .Select(x => x.Name).FirstOrDefaultAsync(cancellationToken)
             : null;
 
-        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.HealthInsuranceId, hiName, patient.Notes, patient.PatientAccessToken);
+        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.HealthInsuranceId, hiName, patient.Notes, patient.PatientAccessToken, ToDetails(patient));
     }
 
     public async Task DeleteAsync(Guid patientId, CancellationToken cancellationToken)
@@ -294,6 +298,7 @@ public sealed class PatientService(
         patient.HealthInsurance = request.HealthInsurance;
         patient.HealthInsuranceId = request.HealthInsuranceId;
         patient.Notes = request.Notes;
+        ApplyDetails(patient, request.Details);
         patient.UpdatedAt = DateTimeOffset.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -304,8 +309,33 @@ public sealed class PatientService(
                 .Select(x => x.Name).FirstOrDefaultAsync(cancellationToken)
             : null;
 
-        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.HealthInsuranceId, hiName, patient.Notes, patient.PatientAccessToken);
+        return new PatientResponse(patient.Id, patient.Name, patient.Cpf, patient.BirthDate, patient.Phone, patient.Email, patient.HealthInsurance, patient.HealthInsuranceId, hiName, patient.Notes, patient.PatientAccessToken, ToDetails(patient));
     }
+
+    private static void ApplyDetails(Patient patient, PatientDetails? details)
+    {
+        if (details is null) return;
+        patient.SocialName = details.SocialName; patient.Rg = details.Rg; patient.Sex = details.Sex;
+        patient.SecondaryPhone = details.SecondaryPhone; patient.CommercialPhone = details.CommercialPhone; patient.ContactName = details.ContactName;
+        patient.MedicalRecordNumber = details.MedicalRecordNumber; patient.HealthInsuranceNumber = details.HealthInsuranceNumber; patient.Cns = details.Cns;
+        patient.IsVip = details.IsVip; patient.ExcludeFromMarketing = details.ExcludeFromMarketing; patient.ReceiveDirectMail = details.ReceiveDirectMail; patient.Tags = details.Tags;
+        patient.ZipCode = details.ZipCode; patient.Street = details.Street; patient.Complement = details.Complement; patient.Neighborhood = details.Neighborhood;
+        patient.City = details.City; patient.State = details.State; patient.Region = details.Region;
+        patient.Company = details.Company; patient.Reference = details.Reference; patient.AcquisitionSource = details.AcquisitionSource; patient.ReferredBy = details.ReferredBy;
+        patient.MaritalStatus = details.MaritalStatus; patient.Education = details.Education; patient.Profession = details.Profession; patient.Religion = details.Religion;
+        patient.FatherName = details.FatherName; patient.MotherName = details.MotherName; patient.CompanionName = details.CompanionName;
+        patient.ChildrenCount = details.ChildrenCount; patient.SpouseName = details.SpouseName;
+    }
+
+    private static PatientDetails ToDetails(Patient patient) => new(
+        patient.SocialName, patient.Rg, patient.Sex,
+        patient.SecondaryPhone, patient.CommercialPhone, patient.ContactName,
+        patient.MedicalRecordNumber, patient.HealthInsuranceNumber, patient.Cns,
+        patient.IsVip, patient.ExcludeFromMarketing, patient.ReceiveDirectMail, patient.Tags,
+        patient.ZipCode, patient.Street, patient.Complement, patient.Neighborhood, patient.City, patient.State, patient.Region,
+        patient.Company, patient.Reference, patient.AcquisitionSource, patient.ReferredBy,
+        patient.MaritalStatus, patient.Education, patient.Profession, patient.Religion,
+        patient.FatherName, patient.MotherName, patient.CompanionName, patient.ChildrenCount, patient.SpouseName);
 
     public async Task<IReadOnlyList<PatientDocumentResponse>> ListDocumentsAsync(Guid patientId, CancellationToken cancellationToken)
     {

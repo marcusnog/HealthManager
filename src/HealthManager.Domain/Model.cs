@@ -46,13 +46,46 @@ public sealed class User : TenantEntity
 public sealed class Patient : TenantEntity
 {
     public string Name { get; set; } = string.Empty;
+    public string? SocialName { get; set; }
     public string Cpf { get; set; } = string.Empty;
+    public string? Rg { get; set; }
     public DateOnly? BirthDate { get; set; }
+    public string? Sex { get; set; }
     public string Phone { get; set; } = string.Empty;
+    public string? SecondaryPhone { get; set; }
+    public string? CommercialPhone { get; set; }
+    public string? ContactName { get; set; }
     public string? Email { get; set; }
     public string? HealthInsurance { get; set; }
     public Guid? HealthInsuranceId { get; set; }
     public HealthInsurance? HealthInsuranceRef { get; set; }
+    public string? MedicalRecordNumber { get; set; }
+    public string? HealthInsuranceNumber { get; set; }
+    public string? Cns { get; set; }
+    public bool IsVip { get; set; }
+    public bool ExcludeFromMarketing { get; set; }
+    public bool ReceiveDirectMail { get; set; }
+    public string? Tags { get; set; }
+    public string? ZipCode { get; set; }
+    public string? Street { get; set; }
+    public string? Complement { get; set; }
+    public string? Neighborhood { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Region { get; set; }
+    public string? Company { get; set; }
+    public string? Reference { get; set; }
+    public string? AcquisitionSource { get; set; }
+    public string? ReferredBy { get; set; }
+    public string? MaritalStatus { get; set; }
+    public string? Education { get; set; }
+    public string? Profession { get; set; }
+    public string? Religion { get; set; }
+    public string? FatherName { get; set; }
+    public string? MotherName { get; set; }
+    public string? CompanionName { get; set; }
+    public int? ChildrenCount { get; set; }
+    public string? SpouseName { get; set; }
     public string? Notes { get; set; }
     public Guid PatientAccessToken { get; set; } = Guid.NewGuid();
     public ICollection<PatientDocument> Documents { get; set; } = new List<PatientDocument>();
