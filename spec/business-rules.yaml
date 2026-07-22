@@ -30,12 +30,16 @@ policies:
   PatientPortal: "Requires Patient role. Used for /patient-portal/* routes."
 
 finance:
+  expense_category: "Expenses reference a clinic-managed category. Category names are unique per clinic and categories in use cannot be deleted."
   partial_payment: "Payments can be partial. receivedAmount tracks running total. Receivable status auto-computed: Pending(0) -> Partial(>0 && <original) -> Paid(==original)."
   payment_exceeds: "Rejected if new receivedAmount would exceed originalAmount."
+  payment_cancelled: "Payments against a Cancelled receivable are rejected."
   cancellation: "Appointment cancellation cancels linked receivable unless already Paid."
+  appointment_sync: "Appointment receivable stays synchronized with schedule date, amount, type/description and appointment details. Changing amount from 0 to >0 creates it; changing to 0 cancels it when no amount was received; amount changes recompute receivable status and cannot go below receivedAmount."
   manual_receivable: "POST /payments supports creating a standalone receivable+payment in one call (no appointment link)."
 
 scheduling:
+  appointment_type: "Appointments reference a clinic-managed type. Type names are unique per clinic and types in use cannot be deleted."
   conflict: "Same doctor cannot have overlapping non-cancelled appointments. Validated on create and update."
   business_hours: "Appointment start-end must fall within clinic BusinessHoursJson window. Clinic timezone applied."
   default_duration: "30 minutes if durationMinutes is 0."

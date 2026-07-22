@@ -139,6 +139,12 @@ public static class AppDbInitializer
         };
 
         var appointmentStart = new DateTimeOffset(2026, 5, 7, 12, 0, 0, TimeSpan.Zero);
+        var firstAppointmentType = new AppointmentType
+        {
+            Id = Guid.Parse("a7000001-0000-0000-0000-000000000001"),
+            ClinicId = clinicId,
+            Name = "Primeira consulta"
+        };
         var appointment = new Appointment
         {
             Id = appointmentId,
@@ -149,7 +155,7 @@ public static class AppDbInitializer
             EndAt = appointmentStart.AddMinutes(30),
             Status = AppointmentStatus.Scheduled,
             ConfirmationStatus = ConfirmationStatus.Pending,
-            Type = "Primeira consulta",
+            AppointmentType = firstAppointmentType,
             Amount = 250m,
             Notes = "Criado automaticamente pelo seed local.",
             CreatedAt = now,
@@ -170,13 +176,17 @@ public static class AppDbInitializer
             UpdatedAt = now
         };
 
+        var rentCategory = new ExpenseCategory { Id = Guid.Parse("ca000001-0000-0000-0000-000000000001"), ClinicId = clinicId, Name = "Aluguel" };
+        var suppliesCategory = new ExpenseCategory { Id = Guid.Parse("ca000002-0000-0000-0000-000000000002"), ClinicId = clinicId, Name = "Materiais" };
+        var utilitiesCategory = new ExpenseCategory { Id = Guid.Parse("ca000003-0000-0000-0000-000000000003"), ClinicId = clinicId, Name = "Servicos publicos" };
+
         var expense1 = new Expense
         {
             Id = Guid.Parse("eeeeeeee-1111-1111-1111-eeeeeeeeeeee"),
             ClinicId = clinicId,
             Description = "Aluguel da sala - Maio/2026",
             Amount = 5000m,
-            Category = ExpenseCategory.Rent,
+            Category = rentCategory,
             PaymentMethod = PaymentMethod.Pix,
             PaidAt = new DateTimeOffset(2026, 5, 5, 0, 0, 0, TimeSpan.Zero),
             Status = ExpenseStatus.Paid,
@@ -190,7 +200,7 @@ public static class AppDbInitializer
             ClinicId = clinicId,
             Description = "Material de escritorio",
             Amount = 350m,
-            Category = ExpenseCategory.Supplies,
+            Category = suppliesCategory,
             PaymentMethod = PaymentMethod.CreditCard,
             PaidAt = new DateTimeOffset(2026, 5, 3, 0, 0, 0, TimeSpan.Zero),
             Status = ExpenseStatus.Paid,
@@ -204,7 +214,7 @@ public static class AppDbInitializer
             ClinicId = clinicId,
             Description = "Conta de energia",
             Amount = 890m,
-            Category = ExpenseCategory.Utilities,
+            Category = utilitiesCategory,
             PaymentMethod = PaymentMethod.DebitCard,
             PaidAt = new DateTimeOffset(2026, 5, 10, 0, 0, 0, TimeSpan.Zero),
             Status = ExpenseStatus.Pending,
@@ -223,7 +233,7 @@ public static class AppDbInitializer
             UpdatedAt = now
         };
 
-        dbContext.AddRange(clinic, platformAdmin, clinicAdmin, doctorUser, doctor, cardiologia, patient, appointment, receivable, expense1, expense2, expense3, outbox);
+        dbContext.AddRange(clinic, platformAdmin, clinicAdmin, doctorUser, doctor, cardiologia, patient, firstAppointmentType, appointment, receivable, rentCategory, suppliesCategory, utilitiesCategory, expense1, expense2, expense3, outbox);
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Seed completed. Demo clinic and users created.");
     }

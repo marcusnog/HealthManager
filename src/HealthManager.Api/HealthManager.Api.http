@@ -183,7 +183,7 @@ Content-Type: application/json
   "startAt": "2026-05-08T15:00:00Z",
   "durationMinutes": 30,
   "notes": "Consulta criada manualmente para smoke test.",
-  "type": "Retorno",
+  "appointmentTypeId": "a7000001-0000-0000-0000-000000000001",
   "amount": 180
 }
 

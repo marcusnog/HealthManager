@@ -37,5 +37,30 @@ public sealed class FinancialServiceTests
         dbContext.Receivables.Single().ReceivedAmount.Should().Be(50);
     }
 
+    [Fact]
+    public async Task CreatePaymentAsync_ShouldRejectCancelledReceivable()
+    {
+        var clinicId = Guid.NewGuid();
+        var receivableId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        dbContext.Receivables.Add(new Receivable
+        {
+            Id = receivableId,
+            ClinicId = clinicId,
+            OriginalAmount = 100,
+            Status = ReceivableStatus.Cancelled,
+            DueDate = DateTimeOffset.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = new FinancialService(dbContext, new FakeTenantProvider(clinicId));
+        var action = () => service.CreatePaymentAsync(
+            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, null, null),
+            CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*cancelada*");
+    }
+
     private static AppDbContext CreateDbContext() => TestHelpers.CreateDbContext();
 }

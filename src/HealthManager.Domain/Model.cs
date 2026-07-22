@@ -110,7 +110,8 @@ public sealed class Appointment : TenantEntity
     public DateTimeOffset EndAt { get; set; }
     public AppointmentStatus Status { get; set; } = AppointmentStatus.Scheduled;
     public ConfirmationStatus ConfirmationStatus { get; set; } = ConfirmationStatus.Pending;
-    public string Type { get; set; } = "Consulta";
+    public Guid AppointmentTypeId { get; set; }
+    public AppointmentType AppointmentType { get; set; } = null!;
     public string? Notes { get; set; }
     public decimal Amount { get; set; }
     public Patient? Patient { get; set; }
@@ -175,11 +176,22 @@ public sealed class Expense : TenantEntity
 {
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
-    public ExpenseCategory Category { get; set; } = ExpenseCategory.Other;
+    public Guid CategoryId { get; set; }
+    public ExpenseCategory Category { get; set; } = null!;
     public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Pix;
     public DateTimeOffset PaidAt { get; set; } = DateTimeOffset.UtcNow;
     public ExpenseStatus Status { get; set; } = ExpenseStatus.Paid;
     public string? Notes { get; set; }
+}
+
+public sealed class AppointmentType : TenantEntity
+{
+    public string Name { get; set; } = string.Empty;
+}
+
+public sealed class ExpenseCategory : TenantEntity
+{
+    public string Name { get; set; } = string.Empty;
 }
 
 public sealed class PatientDocument : TenantEntity
@@ -315,17 +327,6 @@ public enum OutboxStatus
     Pending = 1,
     Processed = 2,
     Failed = 3
-}
-
-public enum ExpenseCategory
-{
-    Supplies = 1,
-    Equipment = 2,
-    Salary = 3,
-    Marketing = 4,
-    Utilities = 5,
-    Rent = 6,
-    Other = 7
 }
 
 public enum ExpenseStatus

@@ -52,7 +52,8 @@ public sealed record UpdatePatientRequest(
     PatientDetails? Details = null);
 
 public sealed record PatientDetails(
-    string? SocialName = null, string? Rg = null, string? Sex = null,
+    string? SocialName = null, string? Rg = null,
+    [RegularExpression("^(Masculino|Feminino|Prefiro não informar)$")] string? Sex = null,
     string? SecondaryPhone = null, string? CommercialPhone = null, string? ContactName = null,
     string? MedicalRecordNumber = null, string? HealthInsuranceNumber = null, string? Cns = null,
     bool IsVip = false, bool ExcludeFromMarketing = false, bool ReceiveDirectMail = false, string? Tags = null,
@@ -87,7 +88,7 @@ public sealed record CreateAppointmentRequest(
     [Required] DateTimeOffset StartAt,
     [Range(15, 240)] int DurationMinutes,
     string? Notes,
-    [Required] string Type,
+    [Required] Guid AppointmentTypeId,
     [Range(0, double.MaxValue)] decimal Amount);
 
 public sealed record UpdateAppointmentRequest(
@@ -95,8 +96,8 @@ public sealed record UpdateAppointmentRequest(
     DateTimeOffset? StartAt,
     int? DurationMinutes,
     string? Notes,
-    string? Type,
-    decimal? Amount);
+    Guid? AppointmentTypeId,
+    [Range(0, double.MaxValue)] decimal? Amount);
 
 public sealed record AppointmentResponse(
     Guid Id,
@@ -106,6 +107,7 @@ public sealed record AppointmentResponse(
     DateTimeOffset EndAt,
     AppointmentStatus Status,
     ConfirmationStatus ConfirmationStatus,
+    Guid AppointmentTypeId,
     string Type,
     decimal Amount,
     string? Notes,
@@ -113,6 +115,10 @@ public sealed record AppointmentResponse(
     string? PatientPhone = null,
     string? DoctorName = null,
     List<SpecialtyItem>? DoctorSpecialties = null);
+
+public sealed record AppointmentTypeQuery(int Page = 1, int PageSize = 20, string? Search = null);
+public sealed record AppointmentTypeRequest([Required][StringLength(100)] string Name);
+public sealed record AppointmentTypeResponse(Guid Id, string Name);
 
 public sealed record ReceivableResponse(
     Guid Id,
@@ -123,16 +129,25 @@ public sealed record ReceivableResponse(
     ReceivableStatus Status,
     DateTimeOffset DueDate,
     Guid? PatientId = null,
-    string? PatientName = null);
+    string? PatientName = null,
+    string? Description = null,
+    DateTimeOffset? AppointmentStartAt = null,
+    string? AppointmentType = null,
+    AppointmentStatus? AppointmentStatus = null,
+    Guid? DoctorId = null,
+    string? DoctorName = null);
 
 public sealed record PaymentQuery(int Page = 1, int PageSize = 20, Guid? ReceivableId = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
 public sealed record CreatePaymentRequest([Required] Guid ReceivableId, [Range(0.01, double.MaxValue)] decimal Amount, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
 public sealed record CreateManualReceivableRequest([Range(0.01, double.MaxValue)] decimal Amount, string? Description, DateTimeOffset? DueDate, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
 public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status, string? PatientName = null);
 
-public sealed record ExpenseQuery(int Page = 1, int PageSize = 20, string? Category = null, string? Status = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
-public sealed record ExpenseRequest([Required][StringLength(300)] string Description, [Range(0.01, double.MaxValue)] decimal Amount, ExpenseCategory Category, PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, ExpenseStatus? Status, string? Notes);
-public sealed record ExpenseResponse(Guid Id, string Description, decimal Amount, ExpenseCategory Category, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, ExpenseStatus Status, string? Notes);
+public sealed record ExpenseQuery(int Page = 1, int PageSize = 20, Guid? CategoryId = null, string? Status = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
+public sealed record ExpenseRequest([Required][StringLength(300)] string Description, [Range(0.01, double.MaxValue)] decimal Amount, [Required] Guid CategoryId, PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, ExpenseStatus? Status, string? Notes);
+public sealed record ExpenseResponse(Guid Id, string Description, decimal Amount, Guid CategoryId, string CategoryName, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, ExpenseStatus Status, string? Notes);
+public sealed record ExpenseCategoryQuery(int Page = 1, int PageSize = 20, string? Search = null);
+public sealed record ExpenseCategoryRequest([Required][StringLength(100)] string Name);
+public sealed record ExpenseCategoryResponse(Guid Id, string Name);
 
 public sealed record FinancialSummaryResponse(decimal TotalReceived, decimal TotalExpenses, decimal Balance);
 

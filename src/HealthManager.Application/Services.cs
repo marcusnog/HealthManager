@@ -698,6 +698,7 @@ public sealed class AppointmentService(
 
         var total = await appointmentsQuery.CountAsync(cancellationToken);
         var appointments = await appointmentsQuery
+            .Include(x => x.AppointmentType)
             .Include(x => x.Patient)
             .Include(x => x.Doctor)
             .ThenInclude(x => x.DoctorSpecialties)
@@ -721,8 +722,9 @@ public sealed class AppointmentService(
 
         var patient = await dbContext.Patients.FirstOrDefaultAsync(x => x.Id == request.PatientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken);
         var doctor = await dbContext.Doctors.FirstOrDefaultAsync(x => x.Id == request.DoctorId && x.ClinicId == clinicId && x.DeletedAt == null && x.IsActive, cancellationToken);
+        var appointmentType = await dbContext.AppointmentTypes.FirstOrDefaultAsync(x => x.Id == request.AppointmentTypeId && x.ClinicId == clinicId, cancellationToken);
 
-        if (patient is null || doctor is null)
+        if (patient is null || doctor is null || appointmentType is null)
         {
             throw new InvalidOperationException("Paciente ou medico invalido.");
         }
@@ -751,7 +753,8 @@ public sealed class AppointmentService(
             StartAt = request.StartAt,
             EndAt = endAt,
             Notes = request.Notes,
-            Type = request.Type,
+            AppointmentTypeId = request.AppointmentTypeId,
+            AppointmentType = appointmentType,
             Amount = request.Amount
         };
 
@@ -768,7 +771,7 @@ public sealed class AppointmentService(
                 ReceivedAmount = 0,
                 Status = ReceivableStatus.Pending,
                 DueDate = request.StartAt,
-                Description = $"Consulta {request.Type}"
+                Description = $"Consulta {appointmentType.Name}"
             });
         }
 
@@ -788,6 +791,7 @@ public sealed class AppointmentService(
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var appointment = await dbContext.Appointments
+            .Include(x => x.AppointmentType)
             .Include(x => x.Patient)
             .Include(x => x.Doctor)
             .ThenInclude(x => x.DoctorSpecialties)
@@ -799,6 +803,9 @@ public sealed class AppointmentService(
         {
             throw new InvalidOperationException("Nao e possivel editar uma consulta cancelada.");
         }
+
+        var receivable = await dbContext.Receivables
+            .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.DeletedAt == null, cancellationToken);
 
         if (request.DoctorId.HasValue || request.StartAt.HasValue || request.DurationMinutes.HasValue)
         {
@@ -832,12 +839,10 @@ public sealed class AppointmentService(
                 appointment.StartAt = targetStartAt;
                 appointment.EndAt = targetEndAt;
 
-                var receivableDue = await dbContext.Receivables
-                    .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.DeletedAt == null, cancellationToken);
-                if (receivableDue is not null)
+                if (receivable is not null)
                 {
-                    receivableDue.DueDate = targetStartAt;
-                    receivableDue.UpdatedAt = DateTimeOffset.UtcNow;
+                    receivable.DueDate = targetStartAt;
+                    receivable.UpdatedAt = DateTimeOffset.UtcNow;
                 }
             }
         }
@@ -845,26 +850,50 @@ public sealed class AppointmentService(
         if (request.Notes is not null)
             appointment.Notes = request.Notes;
 
-        if (request.Type is not null)
-            appointment.Type = request.Type;
+        if (request.AppointmentTypeId.HasValue && request.AppointmentTypeId.Value != appointment.AppointmentTypeId)
+        {
+            var appointmentType = await dbContext.AppointmentTypes.FirstOrDefaultAsync(x => x.Id == request.AppointmentTypeId.Value && x.ClinicId == clinicId, cancellationToken)
+                ?? throw new KeyNotFoundException("Tipo de consulta nao encontrado.");
+            appointment.AppointmentTypeId = appointmentType.Id;
+            appointment.AppointmentType = appointmentType;
+            if (receivable is not null)
+            {
+                receivable.Description = $"Consulta {appointmentType.Name}";
+                receivable.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
 
         if (request.Amount.HasValue && request.Amount.Value != appointment.Amount)
         {
-            var receivable = await dbContext.Receivables
-                .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.DeletedAt == null, cancellationToken);
-
-            if (receivable is not null)
+            var amount = request.Amount.Value;
+            if (receivable is null && amount > 0)
             {
-                var diff = request.Amount.Value - appointment.Amount;
-                if (receivable.ReceivedAmount > 0 && receivable.OriginalAmount + diff < receivable.ReceivedAmount)
+                receivable = new Receivable
                 {
+                    ClinicId = clinicId,
+                    AppointmentId = appointment.Id,
+                    OriginalAmount = amount,
+                    Status = ReceivableStatus.Pending,
+                    DueDate = appointment.StartAt,
+                    Description = $"Consulta {appointment.AppointmentType.Name}"
+                };
+                dbContext.Receivables.Add(receivable);
+            }
+            else if (receivable is not null)
+            {
+                if (amount < receivable.ReceivedAmount)
                     throw new InvalidOperationException("Valor nao pode ser reduzido abaixo do valor ja recebido.");
-                }
-                receivable.OriginalAmount += diff;
+
+                receivable.OriginalAmount = amount;
+                receivable.Status = amount == 0
+                    ? ReceivableStatus.Cancelled
+                    : receivable.ReceivedAmount == amount
+                        ? ReceivableStatus.Paid
+                        : receivable.ReceivedAmount > 0 ? ReceivableStatus.Partial : ReceivableStatus.Pending;
                 receivable.UpdatedAt = DateTimeOffset.UtcNow;
             }
 
-            appointment.Amount = request.Amount.Value;
+            appointment.Amount = amount;
         }
 
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
@@ -946,6 +975,7 @@ public sealed class AppointmentService(
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var appointment = await dbContext.Appointments
+            .Include(x => x.AppointmentType)
             .Include(x => x.Patient)
             .Include(x => x.Doctor)
             .ThenInclude(x => x.DoctorSpecialties)
@@ -999,7 +1029,8 @@ public sealed class AppointmentService(
             appointment.EndAt,
             appointment.Status,
             appointment.ConfirmationStatus,
-            appointment.Type,
+            appointment.AppointmentTypeId,
+            appointment.AppointmentType.Name,
             appointment.Amount,
             appointment.Notes,
             patient?.Name,
@@ -1053,7 +1084,13 @@ public sealed class FinancialService(
                 x.Status,
                 x.DueDate,
                 x.Appointment != null ? x.Appointment.PatientId : null,
-                x.Appointment != null && x.Appointment.Patient != null ? x.Appointment.Patient.Name : null))
+                x.Appointment != null && x.Appointment.Patient != null ? x.Appointment.Patient.Name : null,
+                x.Description,
+                x.Appointment != null ? x.Appointment.StartAt : null,
+                x.Appointment != null ? x.Appointment.AppointmentType.Name : null,
+                x.Appointment != null ? x.Appointment.Status : null,
+                x.Appointment != null ? x.Appointment.DoctorId : null,
+                x.Appointment != null && x.Appointment.Doctor != null ? x.Appointment.Doctor.Name : null))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<ReceivableResponse>(items, query.Page, query.PageSize, total);
@@ -1147,6 +1184,9 @@ public sealed class FinancialService(
             .FirstOrDefaultAsync(x => x.Id == request.ReceivableId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Conta a receber nao encontrada.");
 
+        if (receivable.Status == ReceivableStatus.Cancelled)
+            throw new InvalidOperationException("Nao e possivel pagar uma conta a receber cancelada.");
+
         var newReceivedAmount = receivable.ReceivedAmount + request.Amount;
         if (newReceivedAmount > receivable.OriginalAmount)
         {
@@ -1181,12 +1221,11 @@ public sealed class ExpenseService(
     public async Task<PagedResult<ExpenseResponse>> ListAsync(ExpenseQuery query, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
-        var queryable = dbContext.Expenses.AsNoTracking()
+        var queryable = dbContext.Expenses.AsNoTracking().Include(x => x.Category)
             .Where(x => x.ClinicId == clinicId && x.DeletedAt == null);
 
-        if (!string.IsNullOrWhiteSpace(query.Category) &&
-            Enum.TryParse<ExpenseCategory>(query.Category, ignoreCase: true, out var parsedCategory))
-            queryable = queryable.Where(x => x.Category == parsedCategory);
+        if (query.CategoryId.HasValue)
+            queryable = queryable.Where(x => x.CategoryId == query.CategoryId.Value);
 
         if (!string.IsNullOrWhiteSpace(query.Status) &&
             Enum.TryParse<ExpenseStatus>(query.Status, ignoreCase: true, out var parsedStatus))
@@ -1208,7 +1247,7 @@ public sealed class ExpenseService(
             .OrderByDescending(x => x.PaidAt)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .Select(x => new ExpenseResponse(x.Id, x.Description, x.Amount, x.Category, x.PaymentMethod, x.PaidAt, x.Status, x.Notes))
+            .Select(x => new ExpenseResponse(x.Id, x.Description, x.Amount, x.CategoryId, x.Category.Name, x.PaymentMethod, x.PaidAt, x.Status, x.Notes))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<ExpenseResponse>(items, query.Page, query.PageSize, total);
@@ -1217,7 +1256,9 @@ public sealed class ExpenseService(
     public async Task<ExpenseResponse> CreateAsync(ExpenseRequest request, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var category = await GetCategoryAsync(request.CategoryId, clinicId, cancellationToken);
         var expense = Map(request, clinicId);
+        expense.Category = category;
         dbContext.Expenses.Add(expense);
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToResponse(expense);
@@ -1226,11 +1267,14 @@ public sealed class ExpenseService(
     public async Task<ExpenseResponse> UpdateAsync(Guid id, ExpenseRequest request, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var category = await GetCategoryAsync(request.CategoryId, clinicId, cancellationToken);
         var expense = await dbContext.Expenses
+            .Include(x => x.Category)
             .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Despesa nao encontrada.");
 
         Map(request, expense);
+        expense.Category = category;
         expense.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToResponse(expense);
@@ -1270,14 +1314,14 @@ public sealed class ExpenseService(
     }
 
     private static ExpenseResponse ToResponse(Expense e) =>
-        new(e.Id, e.Description, e.Amount, e.Category, e.PaymentMethod, e.PaidAt, e.Status, e.Notes);
+        new(e.Id, e.Description, e.Amount, e.CategoryId, e.Category.Name, e.PaymentMethod, e.PaidAt, e.Status, e.Notes);
 
     private static Expense Map(ExpenseRequest request, Guid clinicId) => new()
     {
         ClinicId = clinicId,
         Description = request.Description,
         Amount = request.Amount,
-        Category = request.Category,
+        CategoryId = request.CategoryId,
         PaymentMethod = request.PaymentMethod,
         PaidAt = request.PaidAt ?? DateTimeOffset.UtcNow,
         Status = request.Status ?? ExpenseStatus.Paid,
@@ -1288,11 +1332,123 @@ public sealed class ExpenseService(
     {
         expense.Description = request.Description;
         expense.Amount = request.Amount;
-        expense.Category = request.Category;
+        expense.CategoryId = request.CategoryId;
         expense.PaymentMethod = request.PaymentMethod;
         expense.PaidAt = request.PaidAt ?? expense.PaidAt;
         expense.Status = request.Status ?? expense.Status;
         expense.Notes = request.Notes;
+    }
+
+    private async Task<ExpenseCategory> GetCategoryAsync(Guid categoryId, Guid clinicId, CancellationToken cancellationToken) =>
+        await dbContext.ExpenseCategories.FirstOrDefaultAsync(x => x.Id == categoryId && x.ClinicId == clinicId, cancellationToken)
+        ?? throw new KeyNotFoundException("Categoria de despesa nao encontrada.");
+}
+
+public sealed class ExpenseCategoryService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    public async Task<PagedResult<ExpenseCategoryResponse>> ListAsync(ExpenseCategoryQuery query, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var categories = dbContext.ExpenseCategories.AsNoTracking().Where(x => x.ClinicId == clinicId);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLowerInvariant();
+            categories = categories.Where(x => x.Name.ToLower().Contains(search));
+        }
+        var total = await categories.CountAsync(cancellationToken);
+        var items = await categories.OrderBy(x => x.Name).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(x => new ExpenseCategoryResponse(x.Id, x.Name)).ToListAsync(cancellationToken);
+        return new(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<ExpenseCategoryResponse> CreateAsync(ExpenseCategoryRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var name = request.Name.Trim();
+        if (await dbContext.ExpenseCategories.AnyAsync(x => x.ClinicId == clinicId && x.Name.ToLower() == name.ToLower(), cancellationToken))
+            throw new InvalidOperationException("Ja existe uma categoria com este nome.");
+        var category = new ExpenseCategory { ClinicId = clinicId, Name = name };
+        dbContext.ExpenseCategories.Add(category);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new(category.Id, category.Name);
+    }
+
+    public async Task<ExpenseCategoryResponse> UpdateAsync(Guid id, ExpenseCategoryRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var category = await dbContext.ExpenseCategories.FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Categoria de despesa nao encontrada.");
+        var name = request.Name.Trim();
+        if (await dbContext.ExpenseCategories.AnyAsync(x => x.ClinicId == clinicId && x.Id != id && x.Name.ToLower() == name.ToLower(), cancellationToken))
+            throw new InvalidOperationException("Ja existe uma categoria com este nome.");
+        category.Name = name;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new(category.Id, category.Name);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var category = await dbContext.ExpenseCategories.FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Categoria de despesa nao encontrada.");
+        if (await dbContext.Expenses.AnyAsync(x => x.CategoryId == id, cancellationToken))
+            throw new InvalidOperationException("Categoria vinculada a despesas nao pode ser excluida.");
+        category.DeletedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+
+public sealed class AppointmentTypeService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    public async Task<PagedResult<AppointmentTypeResponse>> ListAsync(AppointmentTypeQuery query, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var types = dbContext.AppointmentTypes.AsNoTracking().Where(x => x.ClinicId == clinicId);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLowerInvariant();
+            types = types.Where(x => x.Name.ToLower().Contains(search));
+        }
+        var total = await types.CountAsync(cancellationToken);
+        var items = await types.OrderBy(x => x.Name).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(x => new AppointmentTypeResponse(x.Id, x.Name)).ToListAsync(cancellationToken);
+        return new(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<AppointmentTypeResponse> CreateAsync(AppointmentTypeRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var name = request.Name.Trim();
+        if (await dbContext.AppointmentTypes.AnyAsync(x => x.ClinicId == clinicId && x.Name.ToLower() == name.ToLower(), cancellationToken))
+            throw new InvalidOperationException("Ja existe um tipo de consulta com este nome.");
+        var appointmentType = new AppointmentType { ClinicId = clinicId, Name = name };
+        dbContext.AppointmentTypes.Add(appointmentType);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new(appointmentType.Id, appointmentType.Name);
+    }
+
+    public async Task<AppointmentTypeResponse> UpdateAsync(Guid id, AppointmentTypeRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var appointmentType = await dbContext.AppointmentTypes.FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Tipo de consulta nao encontrado.");
+        var name = request.Name.Trim();
+        if (await dbContext.AppointmentTypes.AnyAsync(x => x.ClinicId == clinicId && x.Id != id && x.Name.ToLower() == name.ToLower(), cancellationToken))
+            throw new InvalidOperationException("Ja existe um tipo de consulta com este nome.");
+        appointmentType.Name = name;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new(appointmentType.Id, appointmentType.Name);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var appointmentType = await dbContext.AppointmentTypes.FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Tipo de consulta nao encontrado.");
+        if (await dbContext.Appointments.AnyAsync(x => x.AppointmentTypeId == id, cancellationToken))
+            throw new InvalidOperationException("Tipo vinculado a consultas nao pode ser excluido.");
+        appointmentType.DeletedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }
 
@@ -1428,6 +1584,7 @@ public sealed class PatientPortalService(
         var patientId = RequirePatientId();
         return await dbContext.Appointments
             .AsNoTracking()
+            .Include(x => x.AppointmentType)
             .Include(x => x.Doctor).ThenInclude(x => x.DoctorSpecialties).ThenInclude(x => x.Specialty)
             .Where(x => x.PatientId == patientId && x.DeletedAt == null)
             .OrderByDescending(x => x.StartAt)
@@ -1440,7 +1597,7 @@ public sealed class PatientPortalService(
                 x.StartAt,
                 x.EndAt,
                 x.Status,
-                x.Type,
+                x.AppointmentType.Name,
                 x.Notes,
                 x.Amount))
             .ToListAsync(cancellationToken);
