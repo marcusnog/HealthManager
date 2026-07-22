@@ -41,7 +41,11 @@ ReceivableStatus:
     - Paid when receivedAmount == originalAmount
     - Partial when 0 < receivedAmount < originalAmount
     - Payment that would exceed outstanding balance is rejected
+    - Payment against a Cancelled receivable is rejected
     - Auto-created when appointment.created with amount > 0
+    - Kept synchronized when appointment date, amount or type changes
+    - Created when appointment amount changes from 0 to > 0
+    - Cancelled when appointment amount changes to 0 and nothing was received
     - Auto-cancelled when appointment cancelled (unless already Paid)
 
 ConfirmationStatus:

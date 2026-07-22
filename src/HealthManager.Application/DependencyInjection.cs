@@ -13,6 +13,8 @@ public static class DependencyInjection
         services.AddScoped<AppointmentService>();
         services.AddScoped<FinancialService>();
         services.AddScoped<ExpenseService>();
+        services.AddScoped<ExpenseCategoryService>();
+        services.AddScoped<AppointmentTypeService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<WhatsAppWebhookService>();
         services.AddScoped<PatientPortalService>();

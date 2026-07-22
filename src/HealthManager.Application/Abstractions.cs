@@ -42,11 +42,13 @@ public interface IApplicationDbContext
     DbSet<Patient> Patients { get; }
     DbSet<Doctor> Doctors { get; }
     DbSet<Appointment> Appointments { get; }
+    DbSet<AppointmentType> AppointmentTypes { get; }
     DbSet<Receivable> Receivables { get; }
     DbSet<Payment> Payments { get; }
     DbSet<WhatsAppMessage> WhatsAppMessages { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<Expense> Expenses { get; }
+    DbSet<ExpenseCategory> ExpenseCategories { get; }
     DbSet<OutboxEvent> OutboxEvents { get; }
     DbSet<PatientDocument> PatientDocuments { get; }
     DbSet<RefreshToken> RefreshTokens { get; }

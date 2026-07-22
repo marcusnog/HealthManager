@@ -9,6 +9,31 @@ namespace HealthManager.Tests.Integration;
 public sealed class AppointmentsEndpointsTests
 {
     [Fact]
+    public async Task AppointmentType_ShouldBeCreatedAndUsedByAppointment()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+
+        var typeResponse = await client.PostAsJsonAsync("/appointment-types", new { name = "Teleconsulta" });
+        typeResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var appointmentType = await typeResponse.Content.ReadFromJsonAsync<AppointmentTypeHttpResponse>();
+
+        var appointmentResponse = await client.PostAsJsonAsync("/appointments", new
+        {
+            patientId = "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            doctorId = "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            startAt = "2026-05-08T15:00:00Z",
+            durationMinutes = 30,
+            appointmentTypeId = appointmentType!.Id,
+            amount = 180
+        });
+
+        appointmentResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await appointmentResponse.Content.ReadFromJsonAsync<AppointmentHttpResponse>())!.Type.Should().Be("Teleconsulta");
+        (await client.DeleteAsync($"/appointment-types/{appointmentType.Id}")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task CreateAppointment_ShouldReturnBadRequest_WhenThereIsConflict()
     {
         await using var factory = new ApiTestFactory();
@@ -21,7 +46,7 @@ public sealed class AppointmentsEndpointsTests
             startAt = "2026-05-07T12:10:00Z",
             durationMinutes = 30,
             notes = "Tentativa em horario conflitante",
-            type = "Retorno",
+            appointmentTypeId = "a7000001-0000-0000-0000-000000000001",
             amount = 180
         });
         var body = await response.Content.ReadAsStringAsync();
@@ -84,4 +109,6 @@ public sealed class AppointmentsEndpointsTests
         string Type,
         decimal Amount,
         string? Notes);
+
+    private sealed record AppointmentTypeHttpResponse(Guid Id, string Name);
 }

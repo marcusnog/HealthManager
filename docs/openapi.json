@@ -831,7 +831,7 @@
       }
     },
     "/appointments/{id}": {
-      "patch": {
+      "put": {
         "operationId": "appointments_update",
         "parameters": [
           {
@@ -866,6 +866,35 @@
             }
           }
         }
+      }
+    },
+    "/appointment-types": {
+      "get": {
+        "operationId": "appointmentTypes_list",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedAppointmentTypeResponse" } } } } }
+      },
+      "post": {
+        "operationId": "appointmentTypes_create",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppointmentTypeRequest" } } } },
+        "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppointmentTypeResponse" } } } } }
+      }
+    },
+    "/appointment-types/{id}": {
+      "put": {
+        "operationId": "appointmentTypes_update",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppointmentTypeRequest" } } } },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppointmentTypeResponse" } } } } }
+      },
+      "delete": {
+        "operationId": "appointmentTypes_delete",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
       }
     },
     "/financial/receivables": {
@@ -1279,7 +1308,7 @@
       "PatientDetails": {
         "type": "object",
         "properties": {
-          "socialName": { "type": "string" }, "rg": { "type": "string" }, "sex": { "type": "string" },
+          "socialName": { "type": "string" }, "rg": { "type": "string" }, "sex": { "type": "string", "enum": ["Masculino", "Feminino", "Prefiro não informar"] },
           "secondaryPhone": { "type": "string" }, "commercialPhone": { "type": "string" }, "contactName": { "type": "string" },
           "medicalRecordNumber": { "type": "string" }, "healthInsuranceNumber": { "type": "string" }, "cns": { "type": "string" },
           "isVip": { "type": "boolean" }, "excludeFromMarketing": { "type": "boolean" }, "receiveDirectMail": { "type": "boolean" }, "tags": { "type": "string" },
@@ -1320,6 +1349,27 @@
           "page": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "total": { "type": "integer" }
+        }
+      },
+      "PagedAppointmentTypeResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AppointmentTypeResponse" } },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+      "AppointmentTypeRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string", "maxLength": 100 } }
+      },
+      "AppointmentTypeResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" }
         }
       },
       "PagedReceivableResponse": {
@@ -1365,7 +1415,7 @@
           "startAt": { "type": "string", "format": "date-time" },
           "durationMinutes": { "type": "integer" },
           "notes": { "type": "string" },
-          "type": { "type": "string" },
+          "appointmentTypeId": { "type": "string", "format": "uuid" },
           "amount": { "type": "number", "format": "decimal" }
         }
       },
@@ -1412,14 +1462,14 @@
       },
       "CreateAppointmentRequest": {
         "type": "object",
-        "required": ["patientId", "doctorId", "startAt"],
+        "required": ["patientId", "doctorId", "startAt", "appointmentTypeId"],
         "properties": {
           "patientId": { "type": "string", "format": "uuid" },
           "doctorId": { "type": "string", "format": "uuid" },
           "startAt": { "type": "string", "format": "date-time" },
           "durationMinutes": { "type": "integer", "default": 30 },
           "notes": { "type": "string" },
-          "type": { "type": "string" },
+          "appointmentTypeId": { "type": "string", "format": "uuid" },
           "amount": { "type": "number", "format": "decimal" }
         }
       },
@@ -1433,6 +1483,7 @@
           "endAt": { "type": "string", "format": "date-time" },
           "status": { "type": "string" },
           "confirmationStatus": { "type": "string" },
+          "appointmentTypeId": { "type": "string", "format": "uuid" },
           "type": { "type": "string" },
           "amount": { "type": "number", "format": "decimal" },
           "notes": { "type": "string" },
@@ -1453,7 +1504,13 @@
           "status": { "type": "string" },
           "dueDate": { "type": "string", "format": "date-time" },
           "patientId": { "type": "string", "format": "uuid" },
-          "patientName": { "type": "string" }
+          "patientName": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "appointmentStartAt": { "type": "string", "format": "date-time", "nullable": true },
+          "appointmentType": { "type": "string", "nullable": true },
+          "appointmentStatus": { "type": "string", "nullable": true },
+          "doctorId": { "type": "string", "format": "uuid", "nullable": true },
+          "doctorName": { "type": "string", "nullable": true }
         }
       },
       "CreatePaymentRequest": {

@@ -10,7 +10,7 @@ Auth:
 
 Patients:
   GET /patients: "?page,pageSize,search,sortBy,sortDirection,email,healthInsurance -> PagedResult<PatientResponse> [ClinicAdminOrSecretary]"
-  POST /patients: "{ identification, insurance/marketing, contacts, address, complementary data, notes } -> 201 PatientResponse [ClinicAdminOrSecretary]"
+  POST /patients: "{ identification (sex: Masculino|Feminino|Prefiro não informar), insurance/marketing, contacts, address, complementary data, notes } -> 201 PatientResponse [ClinicAdminOrSecretary]"
   PATCH /patients/{id}: "{ all editable patient fields; cpf remains immutable } -> PatientResponse [ClinicAdminOrSecretary]"
   DELETE /patients/{id}: "-> 204 (soft delete, audit logged) [ClinicAdminOrSecretary]"
   POST /patients/{id}/access-token/regenerate: "-> new Guid (regenerates patientAccessToken) [ClinicAdminOrSecretary]"
@@ -29,25 +29,37 @@ Doctors:
 
 Appointments:
   GET /appointments: "?page,pageSize,date,dateFrom,dateTo,doctorId,status -> PagedResult<AppointmentResponse> [ClinicStaff]"
-  POST /appointments: "{ patientId, doctorId, startAt, durationMinutes, notes?, type, amount } -> 201 AppointmentResponse [ClinicStaff]"
-  PUT /appointments/{id}: "{ doctorId?, startAt?, durationMinutes?, notes?, type?, amount? } -> AppointmentResponse [ClinicStaff]"
+  POST /appointments: "{ patientId, doctorId, startAt, durationMinutes, notes?, appointmentTypeId, amount } -> 201 AppointmentResponse [ClinicStaff]"
+  PUT /appointments/{id}: "{ doctorId?, startAt?, durationMinutes?, notes?, appointmentTypeId?, amount? } -> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/confirm: "-> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/cancel: "-> AppointmentResponse (also cancels receivable if not Paid) [ClinicStaff]"
   POST /appointments/{id}/in-progress: "-> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/complete: "-> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/no-show: "-> AppointmentResponse [ClinicStaff]"
 
+AppointmentTypes:
+  GET /appointment-types: "?page,pageSize,search -> PagedResult<AppointmentTypeResponse> [ClinicStaff]"
+  POST /appointment-types: "{ name } -> 201 AppointmentTypeResponse [ClinicAdminOrSecretary]"
+  PUT /appointment-types/{id}: "{ name } -> AppointmentTypeResponse [ClinicAdminOrSecretary]"
+  DELETE /appointment-types/{id}: "-> 204 (soft delete; rejected while in use) [ClinicAdminOrSecretary]"
+
 Financial:
-  GET /receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> [ClinicStaff]"
+  GET /receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [ClinicStaff]"
   GET /payments: "?page,pageSize,receivableId,dateFrom,dateTo -> PagedResult<PaymentResponse> [ClinicStaff]"
   POST /payments: "{ receivableId, amount, paymentMethod, paidAt?, notes? } -> 201 PaymentResponse [ClinicStaff]"
 
   # Custom wrappers (not in openapi.json, available via src/services/api.ts):
-  GET /financial/expenses: "?page,pageSize,category,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [ClinicStaff]"
-  POST /financial/expenses: "{ description, amount, category, paymentMethod, paidAt?, status?, notes? } -> 201 ExpenseResponse [ClinicStaff]"
+  GET /financial/expenses: "?page,pageSize,categoryId,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [ClinicStaff]"
+  POST /financial/expenses: "{ description, amount, categoryId, paymentMethod, paidAt?, status?, notes? } -> 201 ExpenseResponse [ClinicStaff]"
   PUT /financial/expenses/{id}: "{ ... } -> ExpenseResponse [ClinicStaff]"
   DELETE /financial/expenses/{id}: "-> 204 [ClinicAdminOrSecretary]"
   GET /financial/summary: "-> { totalReceived, totalExpenses, balance } [ClinicStaff]"
+
+ExpenseCategories:
+  GET /expense-categories: "?page,pageSize,search -> PagedResult<ExpenseCategoryResponse> [ClinicStaff]"
+  POST /expense-categories: "{ name } -> 201 ExpenseCategoryResponse [ClinicAdminOrSecretary]"
+  PUT /expense-categories/{id}: "{ name } -> ExpenseCategoryResponse [ClinicAdminOrSecretary]"
+  DELETE /expense-categories/{id}: "-> 204 (soft delete; rejected while in use) [ClinicAdminOrSecretary]"
 
 Dashboard:
   GET /dashboard/summary: "?doctorId? -> DashboardSummaryResponse [ClinicStaff]"

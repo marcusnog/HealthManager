@@ -33,7 +33,7 @@
   cpf: string (unique per clinic: clinicId+cpf index, validated with check digits)
   rg: string?
   birthDate: DateOnly?
-  sex: string?
+  sex: string? (Masculino|Feminino|Prefiro não informar)
   phone: string
   secondaryPhone: string?
   commercialPhone: string?
@@ -93,9 +93,15 @@
   status: AppointmentStatus (Scheduled|Confirmed|Cancelled|Completed|NoShow|InProgress)
   confirmationStatus: ConfirmationStatus (Pending|Confirmed|Declined)
   source: AppointmentSource (Internal|WhatsApp)
-  type: string (e.g. "Primeira consulta")
+  appointmentTypeId: Guid (FK AppointmentType)
   notes: string?
   amount: decimal (0 = no charge)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- AppointmentType:
+  id: Guid (auto)
+  clinicId: Guid
+  name: string (unique per clinic: clinicId+name index)
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
 - Receivable:
@@ -108,6 +114,7 @@
   dueDate: DateTimeOffset (UTC)
   description: string?
   outstandingAmount: decimal = originalAmount - receivedAmount (computed)
+  responseAppointmentDetails: appointment startAt, type, status, doctorId and doctorName when linked
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
 - Payment:
@@ -126,11 +133,17 @@
   clinicId: Guid
   description: string
   amount: decimal
-  category: ExpenseCategory (Supplies|Equipment|Salary|Marketing|Utilities|Rent|Other)
+  categoryId: Guid (FK ExpenseCategory)
   paymentMethod: PaymentMethod
   paidAt: DateTimeOffset (UTC)
   status: ExpenseStatus (Paid|Pending|Cancelled)
   notes: string?
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- ExpenseCategory:
+  id: Guid (auto)
+  clinicId: Guid
+  name: string (unique per clinic: clinicId+name index)
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
 - PatientDocument:

@@ -9,6 +9,26 @@ namespace HealthManager.Tests.Integration;
 public sealed class FinancialEndpointsTests
 {
     [Fact]
+    public async Task ExpenseCategory_ShouldBeListedAndUsedWhenCreatingExpense()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+
+        var created = await client.PostAsJsonAsync("/expense-categories", new { name = "Laboratorio" });
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var category = await created.Content.ReadFromJsonAsync<CategoryDto>();
+
+        var expense = await client.PostAsJsonAsync("/financial/expenses", new
+        {
+            description = "Exames ocupacionais", amount = 100, categoryId = category!.Id,
+            paymentMethod = "Pix", status = "Paid"
+        });
+
+        expense.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await expense.Content.ReadFromJsonAsync<ExpenseDto>())!.CategoryName.Should().Be("Laboratorio");
+    }
+
+    [Fact]
     public async Task CreatePayment_ShouldPersistPaymentAndUpdateReceivable()
     {
         await using var factory = new ApiTestFactory();
@@ -37,5 +57,8 @@ public sealed class FinancialEndpointsTests
             payment.PaymentMethod.Should().Be(PaymentMethod.Pix);
         });
     }
+
+    private sealed record CategoryDto(Guid Id, string Name);
+    private sealed record ExpenseDto(Guid Id, string CategoryName);
 }
 

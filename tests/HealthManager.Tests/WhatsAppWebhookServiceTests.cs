@@ -42,7 +42,7 @@ public sealed class WhatsAppWebhookServiceTests
             EndAt = new DateTimeOffset(2026, 5, 10, 13, 30, 0, TimeSpan.Zero),
             Status = AppointmentStatus.Scheduled,
             ConfirmationStatus = ConfirmationStatus.Pending,
-            Type = "Consulta",
+            AppointmentType = new AppointmentType { ClinicId = clinicId, Name = "Consulta" },
             Amount = 100
         });
         await dbContext.SaveChangesAsync();
@@ -100,7 +100,7 @@ public sealed class WhatsAppWebhookServiceTests
             EndAt = new DateTimeOffset(2026, 5, 10, 13, 30, 0, TimeSpan.Zero),
             Status = AppointmentStatus.Scheduled,
             ConfirmationStatus = ConfirmationStatus.Pending,
-            Type = "Consulta",
+            AppointmentType = new AppointmentType { ClinicId = clinicId, Name = "Consulta" },
             Amount = 100
         });
         await dbContext.SaveChangesAsync();
