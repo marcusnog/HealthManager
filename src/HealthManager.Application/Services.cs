@@ -756,7 +756,8 @@ public sealed class AppointmentService(
             Notes = request.Notes,
             AppointmentTypeId = request.AppointmentTypeId,
             AppointmentType = appointmentType,
-            Amount = request.Amount
+            Amount = request.Amount,
+            Source = request.Source
         };
 
         dbContext.Appointments.Add(appointment);
@@ -914,6 +915,8 @@ public sealed class AppointmentService(
     public async Task<AppointmentResponse> ConfirmAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
         var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        if (appointment.Status != AppointmentStatus.Scheduled)
+            throw new InvalidOperationException($"Nao e possivel confirmar um agendamento no status {appointment.Status}.");
         appointment.ConfirmationStatus = ConfirmationStatus.Confirmed;
         appointment.Status = AppointmentStatus.Confirmed;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
@@ -948,6 +951,8 @@ public sealed class AppointmentService(
     public async Task<AppointmentResponse> MarkInProgressAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
         var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.Confirmed))
+            throw new InvalidOperationException($"Nao e possivel iniciar um agendamento no status {appointment.Status}.");
         appointment.Status = AppointmentStatus.InProgress;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -957,6 +962,8 @@ public sealed class AppointmentService(
     public async Task<AppointmentResponse> CompleteAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
         var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        if (appointment.Status != AppointmentStatus.InProgress)
+            throw new InvalidOperationException($"Nao e possivel finalizar um agendamento no status {appointment.Status}.");
         appointment.Status = AppointmentStatus.Completed;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -966,6 +973,8 @@ public sealed class AppointmentService(
     public async Task<AppointmentResponse> MarkNoShowAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
         var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        if (appointment.Status != AppointmentStatus.InProgress)
+            throw new InvalidOperationException($"Nao e possivel marcar no-show de um agendamento no status {appointment.Status}.");
         appointment.Status = AppointmentStatus.NoShow;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -1030,6 +1039,7 @@ public sealed class AppointmentService(
             appointment.EndAt,
             appointment.Status,
             appointment.ConfirmationStatus,
+            appointment.Source,
             appointment.AppointmentTypeId,
             appointment.AppointmentType.Name,
             appointment.Amount,

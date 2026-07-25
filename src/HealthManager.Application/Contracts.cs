@@ -107,7 +107,8 @@ public sealed record CreateAppointmentRequest(
     [Range(15, 240)] int DurationMinutes,
     string? Notes,
     [Required] Guid AppointmentTypeId,
-    [Range(0, double.MaxValue)] decimal Amount);
+    [Range(0, double.MaxValue)] decimal Amount,
+    AppointmentSource Source = AppointmentSource.Internal);
 
 public sealed record UpdateAppointmentRequest(
     Guid? DoctorId,
@@ -125,6 +126,7 @@ public sealed record AppointmentResponse(
     DateTimeOffset EndAt,
     AppointmentStatus Status,
     ConfirmationStatus ConfirmationStatus,
+    AppointmentSource Source,
     Guid AppointmentTypeId,
     string Type,
     decimal Amount,

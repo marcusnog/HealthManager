@@ -110,6 +110,7 @@ public sealed class Appointment : TenantEntity
     public DateTimeOffset EndAt { get; set; }
     public AppointmentStatus Status { get; set; } = AppointmentStatus.Scheduled;
     public ConfirmationStatus ConfirmationStatus { get; set; } = ConfirmationStatus.Pending;
+    public AppointmentSource Source { get; set; } = AppointmentSource.Internal;
     public Guid AppointmentTypeId { get; set; }
     public AppointmentType AppointmentType { get; set; } = null!;
     public string? Notes { get; set; }
@@ -316,6 +317,12 @@ public enum AppointmentStatus
     Completed = 4,
     NoShow = 5,
     InProgress = 6
+}
+
+public enum AppointmentSource
+{
+    Internal = 1,
+    WhatsApp = 2
 }
 
 public enum ConfirmationStatus

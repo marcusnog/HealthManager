@@ -831,7 +831,7 @@
       }
     },
     "/appointments/{id}": {
-      "put": {
+      "patch": {
         "operationId": "appointments_update",
         "parameters": [
           {

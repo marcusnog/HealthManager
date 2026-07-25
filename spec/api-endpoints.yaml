@@ -1,6 +1,6 @@
 # Canonical API endpoints — source of truth.
 # Full contract: docs/openapi.json
-# Auth header: Bearer {accessToken} (except /auth/login, /auth/refresh, /patient-portal/login)
+# Auth header: Bearer {accessToken} (except /auth/login, /auth/refresh, /portal/auth)
 
 Auth:
   POST /auth/login: "{ email, password } -> AuthResponse"
@@ -30,7 +30,7 @@ Doctors:
 Appointments:
   GET /appointments: "?page,pageSize,date,dateFrom,dateTo,doctorId,status -> PagedResult<AppointmentResponse> [ClinicStaff]"
   POST /appointments: "{ patientId, doctorId, startAt, durationMinutes, notes?, appointmentTypeId, amount } -> 201 AppointmentResponse [ClinicStaff]"
-  PUT /appointments/{id}: "{ doctorId?, startAt?, durationMinutes?, notes?, appointmentTypeId?, amount? } -> AppointmentResponse [ClinicStaff]"
+  PATCH /appointments/{id}: "{ doctorId?, startAt?, durationMinutes?, notes?, appointmentTypeId?, amount? } -> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/confirm: "-> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/cancel: "-> AppointmentResponse (also cancels receivable if not Paid) [ClinicStaff]"
   POST /appointments/{id}/in-progress: "-> AppointmentResponse [ClinicStaff]"
@@ -44,9 +44,9 @@ AppointmentTypes:
   DELETE /appointment-types/{id}: "-> 204 (soft delete; rejected while in use) [ClinicAdminOrSecretary]"
 
 Financial:
-  GET /receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [ClinicStaff]"
-  GET /payments: "?page,pageSize,receivableId,dateFrom,dateTo -> PagedResult<PaymentResponse> [ClinicStaff]"
-  POST /payments: "{ receivableId, amount, paymentMethod, paidAt?, notes? } -> 201 PaymentResponse [ClinicStaff]"
+  GET /financial/receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [ClinicStaff]"
+  GET /financial/payments: "?page,pageSize,receivableId,dateFrom,dateTo -> PagedResult<PaymentResponse> [ClinicStaff]"
+  POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, notes? } -> 201 PaymentResponse [ClinicStaff]"
 
   # Custom wrappers (not in openapi.json, available via src/services/api.ts):
   GET /financial/expenses: "?page,pageSize,categoryId,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [ClinicStaff]"
@@ -68,9 +68,9 @@ WhatsApp:
   POST /whatsapp/webhook: "{ clinicId?, appointmentId?, phone, message, providerMessageId? } [No auth]"
 
 PatientPortal:
-  POST /patient-portal/login: "{ cpf, accessToken } -> PatientPortalAuthResponse [No auth]"
-  GET /patient-portal/appointments: "-> PatientPortalAppointmentResponse[] [PatientPortal]"
-  GET /patient-portal/receivables: "-> PatientPortalReceivableResponse[] [PatientPortal]"
+  POST /portal/auth: "{ cpf, accessToken } -> PatientPortalAuthResponse [No auth]"
+  GET /portal/appointments: "-> PatientPortalAppointmentResponse[] [PatientPortal]"
+  GET /portal/receivables: "-> PatientPortalReceivableResponse[] [PatientPortal]"
 
 HealthInsurances:
   GET /health-insurances: "?page,pageSize,search -> PagedResult<HealthInsuranceResponse> [ClinicAdminOrSecretary]"
