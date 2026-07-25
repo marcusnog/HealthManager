@@ -249,6 +249,7 @@ public sealed class PatientService(
             Notes = request.Notes
         };
         ApplyDetails(patient, request.Details);
+        patient.MedicalRecordNumber = $"P-{patient.Id:N}"[..14].ToUpperInvariant();
 
         dbContext.Patients.Add(patient);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -317,7 +318,7 @@ public sealed class PatientService(
         if (details is null) return;
         patient.SocialName = details.SocialName; patient.Rg = details.Rg; patient.Sex = details.Sex;
         patient.SecondaryPhone = details.SecondaryPhone; patient.CommercialPhone = details.CommercialPhone; patient.ContactName = details.ContactName;
-        patient.MedicalRecordNumber = details.MedicalRecordNumber; patient.HealthInsuranceNumber = details.HealthInsuranceNumber; patient.Cns = details.Cns;
+        patient.HealthInsuranceNumber = details.HealthInsuranceNumber; patient.Cns = details.Cns;
         patient.IsVip = details.IsVip; patient.ExcludeFromMarketing = details.ExcludeFromMarketing; patient.ReceiveDirectMail = details.ReceiveDirectMail; patient.Tags = details.Tags;
         patient.ZipCode = details.ZipCode; patient.Street = details.Street; patient.Complement = details.Complement; patient.Neighborhood = details.Neighborhood;
         patient.City = details.City; patient.State = details.State; patient.Region = details.Region;

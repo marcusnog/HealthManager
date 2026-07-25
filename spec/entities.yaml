@@ -41,7 +41,7 @@
   email: string?
   healthInsurance: string? (free-text, legacy field)
   healthInsuranceId: Guid? (FK HealthInsurance)
-  medicalRecordNumber: string?
+  medicalRecordNumber: string (auto, immutable, format `P-{first 12 uppercase hex digits of id}`)
   healthInsuranceNumber: string?
   cns: string?
   isVip: bool
