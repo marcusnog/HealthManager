@@ -30,6 +30,7 @@ public sealed class PatientServiceTests
 
         response.Cpf.Should().Be("93541134780");
         response.Details!.SocialName.Should().Be("Mari");
+        response.Details.MedicalRecordNumber.Should().Be($"P-{response.Id:N}"[..14].ToUpperInvariant());
         response.Details.ZipCode.Should().Be("01001000");
         dbContext.Patients.Should().ContainSingle(x => x.Id == response.Id);
         dbContext.Patients.Single().Street.Should().Be("Praca da Se");

@@ -23,6 +23,9 @@ authorization:
     Doctor: "Own clinic data. Can view schedule, mark appointment statuses."
     Patient: "Portal only. Scoped to own data via PatientAccessToken."
 
+patients:
+  medical_record_number: "Generated automatically from the patient id on creation as P-{first 12 uppercase hex digits}; clients cannot define or change it."
+
 policies:
   PlatformAdminOnly: "Requires PlatformAdmin role. Used for /internal/* routes."
   ClinicAdminOrSecretary: "Requires Admin or Secretary. Used for patient management."
