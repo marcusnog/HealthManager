@@ -86,8 +86,32 @@ audit:
   deletes: "Patient and doctor soft deletes generate AuditLog entries with action = 'patient.deleted' / 'doctor.deleted'."
   document_deletes: "Patient document deletes generate 'patient_document.deleted' audit entry."
 
+tenant_integration:
+  whatsapp_config: "One WhatsApp config per clinic (unique on clinicId). Stores Meta Cloud API credentials (phoneNumberOfId, accessToken, wABAId). Access token should be encrypted at rest."
+  payment_gateway_config: "One payment gateway config per clinic. Provider enum: Asaas|MercadoPago|Stripe. Environment: Sandbox|Production. Stores API key, secret, webhook secret."
+  notification_config: "One notification config per clinic. Controls reminder timing (hours before), channels (JSON array), quiet hours, and auto-reminder toggle."
+  branding: "One branding config per clinic. Logo URL, primary/secondary hex colors, custom clinic name override."
+  read_write: "All config endpoints require ClinicAdmin policy. GET returns all configs for the authenticated clinic. PUTs are upserts."
+  tenant_isolation: "All config entities have clinicId FK and query filter. Configs are invisible to other clinics."
+
+payment_gateway_processing:
+  webhook_receiver: "POST /webhooks/payments/{provider} — generic receiver for any gateway. No auth required. HMAC signature verified via WebhookSignatureVerifier (provider-specific header)."
+  signature_verification: "Shared WebhookSignatureVerifier handles Asaas (X-Asaas-Signature), MercadoPago (X-Signature), Stripe (X-Hub-Signature-256). All use HMAC-SHA256 with hex comparison."
+  handler_resolver: "PaymentGatewayHandlerResolver resolves IPaymentGatewayHandler by provider enum value. Each handler maps gateway-specific payloads to WebhookPaymentResult."
+  signalr_broadcast: "On successful webhook processing, PaymentHub broadcasts PaymentStatusChanged event to the clinic's SignalR group."
+  hub_auth: "PaymentHub requires JWT auth (ClinicStaff policy). JoinClinicGroup(clinicId) validates JWT clinic_id claim matches the requested clinicId — prevents joining arbitrary groups."
+
+whatsapp_messaging:
+  meta_cloud_api: "Outbound messages sent via Meta Graph API v21.0 (typed HTTP client). Each clinic has its own phoneNumberOfId and accessToken."
+  config_check: "SendAsync verifies ClinicWhatsAppConfig exists and IsEnabled=true for the clinic. Returns error if not configured."
+  phone_normalization: "Brazilian phone numbers normalized to international format: strip non-digits, prepend '55' if 10 or 11 digits."
+  message_persist: "Every outbound message stored as WhatsAppMessage (direction=Outbound, status=Sent|Failed, providerMessageId)."
+  appointment_integration: "SendAppointmentConfirmationAsync and SendAppointmentCancellationAsync are service-level convenience methods. Call them from AppointmentService on status transitions."
+  outbox_events: "Confirmation messages also enqueue 'whatsapp.appointment.confirmed' outbox event for downstream processing."
+  timezone: "Appointment dates displayed in clinic timezone (hardcoded BRT offset for now — upgrade path: resolve from clinic config)."
+
 outbox:
-  events: "appointment.created, appointment.updated, appointment.cancelled"
+  events: "appointment.created, appointment.updated, appointment.cancelled, whatsapp.appointment.confirmed"
   batch: "OutboxProcessor takes 25 pending events per iteration."
   worker_poll: "OutboxWorker polls every 15 seconds."
   lambda: "Lambda function (custom runtime, AssemblyName=bootstrap) processes outbox for AWS deployment."

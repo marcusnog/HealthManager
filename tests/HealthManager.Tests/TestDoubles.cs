@@ -18,6 +18,14 @@ internal sealed class FakeTenantProvider : ITenantProvider
     public bool IsPlatformAdmin { get; }
 }
 
+internal sealed class FakeMetaCloudApiClient : IMetaCloudApiClient
+{
+    public Task<MetaMessageResponse> SendTextAsync(string phoneNumberId, string accessToken, string to, string text, CancellationToken cancellationToken)
+        => Task.FromResult(new MetaMessageResponse { Success = true, MessageId = "fake" });
+    public Task<MetaMessageResponse> SendTemplateAsync(string phoneNumberId, string accessToken, string to, string templateName, string languageCode, Dictionary<string, string>? parameters, CancellationToken cancellationToken)
+        => Task.FromResult(new MetaMessageResponse { Success = true, MessageId = "fake" });
+}
+
 internal sealed class FakeStorageService : IStorageService
 {
     private readonly Dictionary<string, byte[]> _store = [];

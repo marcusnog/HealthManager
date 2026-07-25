@@ -12,6 +12,7 @@
   email: string?
   phone: string?
   address: string?
+  defaultAppointmentMinutes: int (default 30)
   status: ClinicStatus (Active|Suspended)
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
@@ -240,3 +241,42 @@
   lastError: string?
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
   # Note: no tenant filter (ClinicId is nullable)
+
+- ClinicWhatsAppConfig:
+  id: Guid (auto)
+  clinicId: Guid (FK Clinic, unique index)
+  phoneNumberOfId: string
+  accessToken: string (should be encrypted at rest)
+  wABAId: string?
+  isEnabled: bool (default false)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- ClinicPaymentGatewayConfig:
+  id: Guid (auto)
+  clinicId: Guid (FK Clinic, unique index)
+  provider: PaymentGatewayProvider (Asaas|MercadoPago|Stripe)
+  apiKey: string? (should be encrypted at rest)
+  secret: string? (should be encrypted at rest)
+  environment: PaymentGatewayEnvironment (Sandbox|Production)
+  webhookSecret: string?
+  isEnabled: bool (default false)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- ClinicNotificationConfig:
+  id: Guid (auto)
+  clinicId: Guid (FK Clinic, unique index)
+  reminderHoursBefore: int (default 24)
+  channelsJson: string (JSON array, default ["whatsapp"])
+  quietHoursStart: string? (HH:mm)
+  quietHoursEnd: string? (HH:mm)
+  enableAutoReminders: bool (default true)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- ClinicBranding:
+  id: Guid (auto)
+  clinicId: Guid (FK Clinic, unique index)
+  logoUrl: string?
+  primaryColor: string? (hex)
+  secondaryColor: string? (hex)
+  customClinicName: string?
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt

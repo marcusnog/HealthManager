@@ -60,5 +60,9 @@ public interface IApplicationDbContext
     DbSet<ClinicalRecord> ClinicalRecords { get; }
     DbSet<ClinicalRecordAddendum> ClinicalRecordAddendums { get; }
     DbSet<PaymentIntent> PaymentIntents { get; }
+    DbSet<ClinicWhatsAppConfig> ClinicWhatsAppConfigs { get; }
+    DbSet<ClinicPaymentGatewayConfig> ClinicPaymentGatewayConfigs { get; }
+    DbSet<ClinicNotificationConfig> ClinicNotificationConfigs { get; }
+    DbSet<ClinicBranding> ClinicBrandings { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

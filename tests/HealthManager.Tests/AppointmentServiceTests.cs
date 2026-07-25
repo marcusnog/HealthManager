@@ -41,7 +41,8 @@ public sealed class AppointmentServiceTests
         var service = new AppointmentService(
             dbContext,
             new FakeTenantProvider(clinicId),
-            new OutboxService(dbContext));
+            new OutboxService(dbContext),
+            new WhatsAppMessagingService(dbContext, new FakeMetaCloudApiClient(), new OutboxService(dbContext)));
 
         var action = async () => await service.CreateAsync(
             new CreateAppointmentRequest(patientB, doctorId, startAt.AddMinutes(10), 30, null, appointmentTypeId, 150),
@@ -82,7 +83,7 @@ public sealed class AppointmentServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        var service = new AppointmentService(dbContext, new FakeTenantProvider(clinicId), new OutboxService(dbContext));
+        var service = new AppointmentService(dbContext, new FakeTenantProvider(clinicId), new OutboxService(dbContext), new WhatsAppMessagingService(dbContext, new FakeMetaCloudApiClient(), new OutboxService(dbContext)));
         var newStartAt = startAt.AddDays(1);
         await service.UpdateAsync(
             appointmentId,

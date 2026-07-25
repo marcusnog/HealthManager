@@ -28,8 +28,13 @@ public sealed class Clinic : Entity
     public string? Email { get; set; }
     public string? Phone { get; set; }
     public string? Address { get; set; }
+    public int DefaultAppointmentMinutes { get; set; } = 30;
     public ClinicStatus Status { get; set; } = ClinicStatus.Active;
     public ICollection<User> Users { get; set; } = new List<User>();
+    public ClinicWhatsAppConfig? WhatsAppConfig { get; set; }
+    public ClinicPaymentGatewayConfig? PaymentGatewayConfig { get; set; }
+    public ClinicNotificationConfig? NotificationConfig { get; set; }
+    public ClinicBranding? Branding { get; set; }
 }
 
 public sealed class User : TenantEntity
@@ -294,6 +299,49 @@ public sealed class PaymentIntent : TenantEntity
     public Receivable? Receivable { get; set; }
 }
 
+public sealed class ClinicWhatsAppConfig : Entity
+{
+    public Guid ClinicId { get; set; }
+    public string PhoneNumberOfId { get; set; } = string.Empty;
+    public string AccessToken { get; set; } = string.Empty;
+    public string? WABAId { get; set; }
+    public bool IsEnabled { get; set; }
+    public Clinic? Clinic { get; set; }
+}
+
+public sealed class ClinicPaymentGatewayConfig : Entity
+{
+    public Guid ClinicId { get; set; }
+    public PaymentGatewayProvider Provider { get; set; }
+    public string? ApiKey { get; set; }
+    public string? Secret { get; set; }
+    public PaymentGatewayEnvironment Environment { get; set; } = PaymentGatewayEnvironment.Sandbox;
+    public string? WebhookSecret { get; set; }
+    public bool IsEnabled { get; set; }
+    public Clinic? Clinic { get; set; }
+}
+
+public sealed class ClinicNotificationConfig : Entity
+{
+    public Guid ClinicId { get; set; }
+    public int ReminderHoursBefore { get; set; } = 24;
+    public string ChannelsJson { get; set; } = "[\"whatsapp\"]";
+    public string? QuietHoursStart { get; set; }
+    public string? QuietHoursEnd { get; set; }
+    public bool EnableAutoReminders { get; set; } = true;
+    public Clinic? Clinic { get; set; }
+}
+
+public sealed class ClinicBranding : Entity
+{
+    public Guid ClinicId { get; set; }
+    public string? LogoUrl { get; set; }
+    public string? PrimaryColor { get; set; }
+    public string? SecondaryColor { get; set; }
+    public string? CustomClinicName { get; set; }
+    public Clinic? Clinic { get; set; }
+}
+
 public enum ClinicStatus
 {
     Active = 1,
@@ -396,4 +444,17 @@ public enum PaymentIntentStatus
     Confirmed = 3,
     Failed = 4,
     Cancelled = 5
+}
+
+public enum PaymentGatewayProvider
+{
+    Asaas = 1,
+    MercadoPago = 2,
+    Stripe = 3
+}
+
+public enum PaymentGatewayEnvironment
+{
+    Sandbox = 1,
+    Production = 2
 }

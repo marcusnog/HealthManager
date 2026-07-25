@@ -1402,6 +1402,99 @@
           }
         }
       }
+    },
+    "/tenant/integration": {
+      "get": {
+        "operationId": "tenant_integration_get",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TenantIntegrationResponse" } } }
+          }
+        }
+      }
+    },
+    "/tenant/integration/whatsapp": {
+      "put": {
+        "operationId": "tenant_integration_whatsapp_upsert",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WhatsAppConfigRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WhatsAppConfigResponse" } } }
+          }
+        }
+      }
+    },
+    "/tenant/integration/payment-gateway": {
+      "put": {
+        "operationId": "tenant_integration_payment_gateway_upsert",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentGatewayConfigRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentGatewayConfigResponse" } } }
+          }
+        }
+      }
+    },
+    "/tenant/integration/notification": {
+      "put": {
+        "operationId": "tenant_integration_notification_upsert",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationConfigRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationConfigResponse" } } }
+          }
+        }
+      }
+    },
+    "/tenant/integration/branding": {
+      "put": {
+        "operationId": "tenant_integration_branding_upsert",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BrandingRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BrandingResponse" } } }
+          }
+        }
+      }
+    },
+    "/webhooks/payments/{provider}": {
+      "post": {
+        "operationId": "webhook_payment_receive",
+        "parameters": [
+          { "name": "provider", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "X-Clinic-Id", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object" } } }
+        },
+        "responses": {
+          "200": { "description": "OK" },
+          "400": { "description": "Invalid signature or payload" }
+        }
+      }
     }
   },
   "components": {
@@ -1937,6 +2030,97 @@
           "page": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "total": { "type": "integer" }
+        }
+      },
+      "WhatsAppConfigRequest": {
+        "type": "object",
+        "required": ["phoneNumberOfId", "accessToken", "isEnabled"],
+        "properties": {
+          "phoneNumberOfId": { "type": "string" },
+          "accessToken": { "type": "string" },
+          "wABAId": { "type": "string", "nullable": true },
+          "isEnabled": { "type": "boolean" }
+        }
+      },
+      "WhatsAppConfigResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "phoneNumberOfId": { "type": "string" },
+          "wABAId": { "type": "string", "nullable": true },
+          "isEnabled": { "type": "boolean" }
+        }
+      },
+      "PaymentGatewayConfigRequest": {
+        "type": "object",
+        "required": ["provider", "environment", "isEnabled"],
+        "properties": {
+          "provider": { "type": "string", "enum": ["Asaas", "MercadoPago", "Stripe"] },
+          "apiKey": { "type": "string", "nullable": true },
+          "secret": { "type": "string", "nullable": true },
+          "environment": { "type": "string", "enum": ["Sandbox", "Production"] },
+          "webhookSecret": { "type": "string", "nullable": true },
+          "isEnabled": { "type": "boolean" }
+        }
+      },
+      "PaymentGatewayConfigResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "provider": { "type": "string", "enum": ["Asaas", "MercadoPago", "Stripe"] },
+          "environment": { "type": "string", "enum": ["Sandbox", "Production"] },
+          "isEnabled": { "type": "boolean" }
+        }
+      },
+      "NotificationConfigRequest": {
+        "type": "object",
+        "required": ["reminderHoursBefore", "channelsJson", "enableAutoReminders"],
+        "properties": {
+          "reminderHoursBefore": { "type": "integer", "minimum": 1, "maximum": 168 },
+          "channelsJson": { "type": "string" },
+          "quietHoursStart": { "type": "string", "nullable": true },
+          "quietHoursEnd": { "type": "string", "nullable": true },
+          "enableAutoReminders": { "type": "boolean" }
+        }
+      },
+      "NotificationConfigResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "reminderHoursBefore": { "type": "integer" },
+          "channelsJson": { "type": "string" },
+          "quietHoursStart": { "type": "string", "nullable": true },
+          "quietHoursEnd": { "type": "string", "nullable": true },
+          "enableAutoReminders": { "type": "boolean" }
+        }
+      },
+      "BrandingRequest": {
+        "type": "object",
+        "properties": {
+          "logoUrl": { "type": "string", "nullable": true },
+          "primaryColor": { "type": "string", "nullable": true },
+          "secondaryColor": { "type": "string", "nullable": true },
+          "customClinicName": { "type": "string", "nullable": true }
+        }
+      },
+      "BrandingResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "logoUrl": { "type": "string", "nullable": true },
+          "primaryColor": { "type": "string", "nullable": true },
+          "secondaryColor": { "type": "string", "nullable": true },
+          "customClinicName": { "type": "string", "nullable": true }
+        }
+      },
+      "TenantIntegrationResponse": {
+        "type": "object",
+        "properties": {
+          "whatsApp": { "$ref": "#/components/schemas/WhatsAppConfigResponse", "nullable": true },
+          "paymentGateway": { "$ref": "#/components/schemas/PaymentGatewayConfigResponse", "nullable": true },
+          "notification": { "$ref": "#/components/schemas/NotificationConfigResponse", "nullable": true },
+          "branding": { "$ref": "#/components/schemas/BrandingResponse", "nullable": true },
+          "defaultAppointmentMinutes": { "type": "integer" }
         }
       }
     }

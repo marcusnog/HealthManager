@@ -83,7 +83,7 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenera
 - Unit: use `FakeTenantProvider`, `FakeStorageService` from `TestDoubles.cs` + `TestHelpers.CreateDbContext()` (fresh InMemory DB per test).
 - Stack: xUnit + FluentAssertions + `Microsoft.AspNetCore.Mvc.Testing` + EF Core InMemory + `coverlet.collector`
 - `ApiTestFactory` exposes `LoginAsync()`, `LoginWithSessionAsync()`, `CreateAuthenticatedClientAsync()`, `WithDbContextAsync()`, `SeedSecondClinicPatientAsync()`
-- Integration tests: `tests/HealthManager.Tests/Integration/` — 9 endpoint test classes covering all major controllers
+- Integration tests: `tests/HealthManager.Tests/Integration/` — 13 endpoint test classes covering all major controllers
 
 ## Seed data
 

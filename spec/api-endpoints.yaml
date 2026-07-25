@@ -112,3 +112,27 @@ PaymentIntents:
   GET /payment-intents: "?page,pageSize,receivableId,status -> PagedResult<PaymentIntentResponse> [ClinicStaff]"
   POST /payment-intents/{id}/confirm: "-> PaymentIntentResponse [ClinicAdmin]"
   POST /payment-intents/{id}/cancel: "-> PaymentIntentResponse [ClinicAdmin]"
+
+TenantIntegration:
+  GET /tenant/integration: "-> TenantIntegrationResponse (all configs) [ClinicAdmin]"
+  PUT /tenant/integration/whatsapp: "{ phoneNumberOfId, accessToken, wABAId?, isEnabled } -> WhatsAppConfigResponse [ClinicAdmin]"
+  PUT /tenant/integration/payment-gateway: "{ provider, apiKey?, secret?, environment, webhookSecret?, isEnabled } -> PaymentGatewayConfigResponse [ClinicAdmin]"
+  PUT /tenant/integration/notification: "{ reminderHoursBefore, channelsJson, quietHoursStart?, quietHoursEnd?, enableAutoReminders } -> NotificationConfigResponse [ClinicAdmin]"
+  PUT /tenant/integration/branding: "{ logoUrl?, primaryColor?, secondaryColor?, customClinicName? } -> BrandingResponse [ClinicAdmin]"
+
+PaymentWebhooks:
+  POST /webhooks/payments/{provider}: "Generic webhook receiver for any payment gateway. Headers: X-Clinic-Id, X-Hub-Signature-256|X-Signature. Body: gateway-specific JSON. Returns 200 OK on success. [No auth, HMAC verified]"
+
+SignalR:
+  Hub: /hubs/payments (JWT auth, ClinicStaff policy)
+  Client method: JoinClinicGroup(clinicId) / LeaveClinicGroup(clinicId)
+  Server event: PaymentStatusChanged { Id, Status, GatewayReference, Amount }
+
+WhatsAppMessaging:
+  # Outbound via Meta Cloud API (service-level, not exposed as REST endpoints)
+  # WhatsAppMessagingService.SendTextAsync(clinicId, phone, text)
+  # WhatsAppMessagingService.SendTemplateAsync(clinicId, phone, templateName, languageCode, parameters?)
+  # WhatsAppMessagingService.SendAppointmentConfirmationAsync(appointment, patient)
+  # WhatsAppMessagingService.SendAppointmentCancellationAsync(appointment, patient)
+  # Requires ClinicWhatsAppConfig with IsEnabled=true for the clinic
+  # Messages stored as WhatsAppMessage (direction=Outbound) and enqueued via outbox

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using HealthManager.Api.Hubs;
 using HealthManager.Application;
 using HealthManager.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
@@ -25,6 +26,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHealthChecks();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
+builder.Services.AddSignalR().AddJsonProtocol(options =>
+{
+    options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 
@@ -82,6 +87,7 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<PaymentHub>("/hubs/payments");
 app.MapHealthChecks("/health");
 
 app.Run();

@@ -249,3 +249,61 @@ public sealed record PaymentIntentResponse(
     DateTimeOffset? ConfirmedAt,
     string? FailureReason,
     string? PatientName = null);
+
+// ── Tenant Integration Config ──
+public sealed record UpdateWhatsAppConfigRequest(
+    [Required] string PhoneNumberOfId,
+    [Required] string AccessToken,
+    string? WABAId,
+    bool IsEnabled);
+public sealed record WhatsAppConfigResponse(
+    Guid Id,
+    string PhoneNumberOfId,
+    string? WABAId,
+    bool IsEnabled);
+
+public sealed record UpdatePaymentGatewayConfigRequest(
+    [Required] PaymentGatewayProvider Provider,
+    string? ApiKey,
+    string? Secret,
+    PaymentGatewayEnvironment Environment,
+    string? WebhookSecret,
+    bool IsEnabled);
+public sealed record PaymentGatewayConfigResponse(
+    Guid Id,
+    PaymentGatewayProvider Provider,
+    PaymentGatewayEnvironment Environment,
+    bool IsEnabled);
+
+public sealed record UpdateNotificationConfigRequest(
+    [Range(1, 168)] int ReminderHoursBefore,
+    string ChannelsJson,
+    string? QuietHoursStart,
+    string? QuietHoursEnd,
+    bool EnableAutoReminders);
+public sealed record NotificationConfigResponse(
+    Guid Id,
+    int ReminderHoursBefore,
+    string ChannelsJson,
+    string? QuietHoursStart,
+    string? QuietHoursEnd,
+    bool EnableAutoReminders);
+
+public sealed record UpdateBrandingRequest(
+    string? LogoUrl,
+    string? PrimaryColor,
+    string? SecondaryColor,
+    string? CustomClinicName);
+public sealed record BrandingResponse(
+    Guid Id,
+    string? LogoUrl,
+    string? PrimaryColor,
+    string? SecondaryColor,
+    string? CustomClinicName);
+
+public sealed record TenantIntegrationResponse(
+    WhatsAppConfigResponse? WhatsApp,
+    PaymentGatewayConfigResponse? PaymentGateway,
+    NotificationConfigResponse? Notification,
+    BrandingResponse? Branding,
+    int DefaultAppointmentMinutes);

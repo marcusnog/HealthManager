@@ -1,3 +1,4 @@
+using HealthManager.Domain;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HealthManager.Application;
@@ -24,6 +25,16 @@ public static class DependencyInjection
         services.AddScoped<DoctorAvailabilityService>();
         services.AddScoped<ClinicalRecordService>();
         services.AddScoped<PaymentIntentService>();
+        services.AddScoped<TenantIntegrationService>();
+        services.AddScoped<WhatsAppMessagingService>();
+
+        services.AddSingleton<Dictionary<PaymentGatewayProvider, IPaymentGatewayHandler>>(_ => new()
+        {
+            [PaymentGatewayProvider.Asaas] = new AsaasGatewayHandler(),
+            [PaymentGatewayProvider.MercadoPago] = new MercadoPagoGatewayHandler(),
+            [PaymentGatewayProvider.Stripe] = new StripeGatewayHandler()
+        });
+
         return services;
     }
 }

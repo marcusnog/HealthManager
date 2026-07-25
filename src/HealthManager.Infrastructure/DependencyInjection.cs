@@ -1,6 +1,7 @@
 using Amazon.S3;
 using HealthManager.Application;
 using HealthManager.Domain;
+using HealthManager.Infrastructure.Integrations;
 using HealthManager.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +59,9 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppDbContext>());
+
+        services.AddHttpClient("MetaCloudApi");
+        services.AddScoped<IMetaCloudApiClient, MetaCloudApiClient>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>

@@ -662,7 +662,8 @@ public sealed class DoctorService(
 public sealed class AppointmentService(
     IApplicationDbContext dbContext,
     ITenantProvider tenantProvider,
-    IOutboxService outboxService)
+    IOutboxService outboxService,
+    WhatsAppMessagingService whatsapp)
 {
     public async Task<PagedResult<AppointmentResponse>> ListAsync(AppointmentQuery query, CancellationToken cancellationToken)
     {
@@ -921,6 +922,13 @@ public sealed class AppointmentService(
         appointment.Status = AppointmentStatus.Confirmed;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (patient is not null)
+        {
+            try { await whatsapp.SendAppointmentConfirmationAsync(appointment, patient, cancellationToken); }
+            catch (Exception ex) { /* ponytail: log via ILogger when DI available */ _ = ex; }
+        }
+
         return ToResponse(appointment, patient, doctor);
     }
 
@@ -945,6 +953,13 @@ public sealed class AppointmentService(
             appointment.StartAt
         }, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (patient is not null)
+        {
+            try { await whatsapp.SendAppointmentCancellationAsync(appointment, patient, cancellationToken); }
+            catch (Exception ex) { _ = ex; }
+        }
+
         return ToResponse(appointment, patient, doctor);
     }
 
@@ -1710,6 +1725,61 @@ public sealed class PaymentIntentService(IApplicationDbContext dbContext, ITenan
         return ToResponse(intent);
     }
 
+    public async Task<PaymentIntentResponse?> ProcessWebhookAsync(WebhookPaymentResult result, Guid clinicId, CancellationToken cancellationToken)
+    {
+        PaymentIntent? intent = null;
+
+        if (!string.IsNullOrWhiteSpace(result.IdempotencyKey))
+            intent = await dbContext.PaymentIntents
+                .FirstOrDefaultAsync(x => x.IdempotencyKey == result.IdempotencyKey && x.ClinicId == clinicId, cancellationToken);
+
+        if (intent is null && !string.IsNullOrWhiteSpace(result.GatewayReference))
+            intent = await dbContext.PaymentIntents
+                .FirstOrDefaultAsync(x => x.GatewayReference == result.GatewayReference && x.ClinicId == clinicId, cancellationToken);
+
+        if (intent is null)
+            return null;
+
+        if (intent.Status is PaymentIntentStatus.Confirmed or PaymentIntentStatus.Cancelled or PaymentIntentStatus.Failed)
+            return ToResponse(intent);
+
+        intent.Status = result.Status;
+        intent.GatewayReference = result.GatewayReference ?? intent.GatewayReference;
+        intent.FailureReason = result.FailureReason;
+
+        if (result.Status == PaymentIntentStatus.Confirmed)
+        {
+            intent.ConfirmedAt = DateTimeOffset.UtcNow;
+
+            var receivable = await dbContext.Receivables
+                .FirstOrDefaultAsync(x => x.Id == intent.ReceivableId, cancellationToken);
+            if (receivable is not null)
+            {
+                receivable.ReceivedAmount += intent.Amount;
+                receivable.Status = receivable.ReceivedAmount >= receivable.OriginalAmount
+                    ? ReceivableStatus.Paid
+                    : ReceivableStatus.Partial;
+
+                dbContext.Payments.Add(new Payment
+                {
+                    ClinicId = clinicId,
+                    ReceivableId = receivable.Id,
+                    Amount = intent.Amount,
+                    PaymentMethod = PaymentMethod.Pix,
+                    Status = PaymentStatus.Paid,
+                    PaidAt = DateTimeOffset.UtcNow,
+                    Notes = $"Gateway webhook - {intent.IdempotencyKey}"
+                });
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        intent = await dbContext.PaymentIntents.AsNoTracking()
+            .FirstAsync(x => x.Id == intent.Id, cancellationToken);
+        return ToResponse(intent);
+    }
+
     private static PaymentIntentResponse ToResponse(PaymentIntent i) =>
         new(i.Id, i.ReceivableId, i.Amount, i.Status, i.Gateway, i.GatewayReference,
             i.IdempotencyKey, i.ConfirmedAt, i.FailureReason);
@@ -2274,6 +2344,163 @@ public sealed class DoctorAvailabilityService(
         av.DeletedAt = DateTimeOffset.UtcNow;
         av.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+}
+
+public sealed class TenantIntegrationService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    public async Task<TenantIntegrationResponse> GetAllAsync(CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var defaultMinutes = await dbContext.Clinics.AsNoTracking()
+            .Where(x => x.Id == clinicId)
+            .Select(x => x.DefaultAppointmentMinutes)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        var whatsapp = await dbContext.ClinicWhatsAppConfigs.AsNoTracking().SingleOrDefaultAsync(x => x.ClinicId == clinicId, cancellationToken);
+        var payment = await dbContext.ClinicPaymentGatewayConfigs.AsNoTracking().SingleOrDefaultAsync(x => x.ClinicId == clinicId, cancellationToken);
+        var notification = await dbContext.ClinicNotificationConfigs.AsNoTracking().SingleOrDefaultAsync(x => x.ClinicId == clinicId, cancellationToken);
+        var branding = await dbContext.ClinicBrandings.AsNoTracking().SingleOrDefaultAsync(x => x.ClinicId == clinicId, cancellationToken);
+
+        return new TenantIntegrationResponse(
+            whatsapp is null ? null : new WhatsAppConfigResponse(whatsapp.Id, whatsapp.PhoneNumberOfId, whatsapp.WABAId, whatsapp.IsEnabled),
+            payment is null ? null : new PaymentGatewayConfigResponse(payment.Id, payment.Provider, payment.Environment, payment.IsEnabled),
+            notification is null ? null : new NotificationConfigResponse(notification.Id, notification.ReminderHoursBefore, notification.ChannelsJson, notification.QuietHoursStart, notification.QuietHoursEnd, notification.EnableAutoReminders),
+            branding is null ? null : new BrandingResponse(branding.Id, branding.LogoUrl, branding.PrimaryColor, branding.SecondaryColor, branding.CustomClinicName),
+            defaultMinutes);
+    }
+
+    public async Task<WhatsAppConfigResponse> UpsertWhatsAppAsync(UpdateWhatsAppConfigRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var existing = await dbContext.ClinicWhatsAppConfigs.SingleOrDefaultAsync(x => x.ClinicId == clinicId, cancellationToken);
+        if (existing is null) { existing = new ClinicWhatsAppConfig { ClinicId = clinicId }; dbContext.ClinicWhatsAppConfigs.Add(existing); }
+        existing.PhoneNumberOfId = request.PhoneNumberOfId.Trim();
+        existing.AccessToken = request.AccessToken;
+        existing.WABAId = request.WABAId?.Trim();
+        existing.IsEnabled = request.IsEnabled;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new WhatsAppConfigResponse(existing.Id, existing.PhoneNumberOfId, existing.WABAId, existing.IsEnabled);
+    }
+
+    public async Task<PaymentGatewayConfigResponse> UpsertPaymentGatewayAsync(UpdatePaymentGatewayConfigRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var existing = await dbContext.ClinicPaymentGatewayConfigs.SingleOrDefaultAsync(x => x.ClinicId == clinicId, cancellationToken);
+        if (existing is null) { existing = new ClinicPaymentGatewayConfig { ClinicId = clinicId }; dbContext.ClinicPaymentGatewayConfigs.Add(existing); }
+        existing.Provider = request.Provider;
+        existing.ApiKey = request.ApiKey;
+        existing.Secret = request.Secret;
+        existing.Environment = request.Environment;
+        existing.WebhookSecret = request.WebhookSecret;
+        existing.IsEnabled = request.IsEnabled;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new PaymentGatewayConfigResponse(existing.Id, existing.Provider, existing.Environment, existing.IsEnabled);
+    }
+
+    public async Task<NotificationConfigResponse> UpsertNotificationAsync(UpdateNotificationConfigRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var existing = await dbContext.ClinicNotificationConfigs.SingleOrDefaultAsync(x => x.ClinicId == clinicId, cancellationToken);
+        if (existing is null) { existing = new ClinicNotificationConfig { ClinicId = clinicId }; dbContext.ClinicNotificationConfigs.Add(existing); }
+        existing.ReminderHoursBefore = request.ReminderHoursBefore;
+        existing.ChannelsJson = request.ChannelsJson;
+        existing.QuietHoursStart = request.QuietHoursStart?.Trim();
+        existing.QuietHoursEnd = request.QuietHoursEnd?.Trim();
+        existing.EnableAutoReminders = request.EnableAutoReminders;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new NotificationConfigResponse(existing.Id, existing.ReminderHoursBefore, existing.ChannelsJson, existing.QuietHoursStart, existing.QuietHoursEnd, existing.EnableAutoReminders);
+    }
+
+    public async Task<BrandingResponse> UpsertBrandingAsync(UpdateBrandingRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var existing = await dbContext.ClinicBrandings.SingleOrDefaultAsync(x => x.ClinicId == clinicId, cancellationToken);
+        if (existing is null) { existing = new ClinicBranding { ClinicId = clinicId }; dbContext.ClinicBrandings.Add(existing); }
+        existing.LogoUrl = request.LogoUrl?.Trim();
+        existing.PrimaryColor = request.PrimaryColor?.Trim();
+        existing.SecondaryColor = request.SecondaryColor?.Trim();
+        existing.CustomClinicName = request.CustomClinicName?.Trim();
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new BrandingResponse(existing.Id, existing.LogoUrl, existing.PrimaryColor, existing.SecondaryColor, existing.CustomClinicName);
+    }
+}
+
+public sealed class WhatsAppMessagingService(
+    IApplicationDbContext dbContext,
+    IMetaCloudApiClient metaClient,
+    IOutboxService outboxService)
+{
+    public Task<MetaMessageResponse> SendTextAsync(Guid clinicId, string phone, string text, CancellationToken cancellationToken)
+        => SendCoreAsync(clinicId, phone, text, (c, pid, tok, to, msg, ct) => c.SendTextAsync(pid, tok, to, msg, ct), cancellationToken);
+
+    public Task<MetaMessageResponse> SendTemplateAsync(Guid clinicId, string phone, string templateName, string languageCode, Dictionary<string, string>? parameters, CancellationToken cancellationToken)
+        => SendCoreAsync(clinicId, phone, $"[template:{templateName}]", (c, pid, tok, to, _, ct) => c.SendTemplateAsync(pid, tok, to, templateName, languageCode, parameters, ct), cancellationToken);
+
+    public async Task SendAppointmentConfirmationAsync(Appointment appointment, Patient patient, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(patient.Phone) || !appointment.ClinicId.HasValue) return;
+
+        var phone = NormalizePhone(patient.Phone);
+        var date = appointment.StartAt.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm");
+        var text = $"Ola {patient.Name}! Sua consulta foi confirmada para {date}. Para confirmar, responda CONFIRM. Para cancelar, responda CANCEL.";
+
+        await SendTextAsync(appointment.ClinicId.Value, phone, text, cancellationToken);
+
+        await outboxService.EnqueueAsync(appointment.ClinicId, "whatsapp.appointment.confirmed", new
+        {
+            AppointmentId = appointment.Id,
+            PatientId = patient.Id,
+            phone
+        }, cancellationToken);
+    }
+
+    public async Task SendAppointmentCancellationAsync(Appointment appointment, Patient patient, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(patient.Phone) || !appointment.ClinicId.HasValue) return;
+
+        var phone = NormalizePhone(patient.Phone);
+        var date = appointment.StartAt.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm");
+        var text = $"Ola {patient.Name}! Sua consulta do dia {date} foi cancelada. Para reagendar, entre em contato.";
+
+        await SendTextAsync(appointment.ClinicId.Value, phone, text, cancellationToken);
+    }
+
+    private async Task<MetaMessageResponse> SendCoreAsync(
+        Guid clinicId, string phone, string displayMessage,
+        Func<IMetaCloudApiClient, string, string, string, string, CancellationToken, Task<MetaMessageResponse>> send,
+        CancellationToken cancellationToken)
+    {
+        var config = await dbContext.ClinicWhatsAppConfigs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.ClinicId == clinicId && x.IsEnabled, cancellationToken);
+        if (config is null)
+            return new MetaMessageResponse { Success = false, Error = "WhatsApp nao configurado para esta clinica." };
+
+        var result = await send(metaClient, config.PhoneNumberOfId, config.AccessToken, phone, displayMessage, cancellationToken);
+
+        dbContext.WhatsAppMessages.Add(new WhatsAppMessage
+        {
+            ClinicId = clinicId,
+            Phone = phone,
+            Message = displayMessage,
+            Direction = MessageDirection.Outbound,
+            Status = result.Success ? WhatsAppMessageStatus.Sent : WhatsAppMessageStatus.Failed,
+            ProviderMessageId = result.MessageId
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return result;
+    }
+
+    private static string NormalizePhone(string phone)
+    {
+        var digits = AppHelpers.NormalizeDigits(phone);
+        return digits.Length is 10 or 11 && !digits.StartsWith("55") ? "55" + digits : digits;
     }
 }
 

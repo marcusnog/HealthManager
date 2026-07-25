@@ -34,6 +34,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<ClinicalRecord> ClinicalRecords => Set<ClinicalRecord>();
     public DbSet<ClinicalRecordAddendum> ClinicalRecordAddendums => Set<ClinicalRecordAddendum>();
     public DbSet<PaymentIntent> PaymentIntents => Set<PaymentIntent>();
+    public DbSet<ClinicWhatsAppConfig> ClinicWhatsAppConfigs => Set<ClinicWhatsAppConfig>();
+    public DbSet<ClinicPaymentGatewayConfig> ClinicPaymentGatewayConfigs => Set<ClinicPaymentGatewayConfig>();
+    public DbSet<ClinicNotificationConfig> ClinicNotificationConfigs => Set<ClinicNotificationConfig>();
+    public DbSet<ClinicBranding> ClinicBrandings => Set<ClinicBranding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -185,6 +189,35 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         modelBuilder.Entity<ClinicalRecord>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<ClinicalRecordAddendum>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<PaymentIntent>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+
+        modelBuilder.Entity<ClinicWhatsAppConfig>().HasIndex(x => x.ClinicId).IsUnique();
+        modelBuilder.Entity<ClinicWhatsAppConfig>()
+            .HasOne(x => x.Clinic).WithOne(x => x.WhatsAppConfig)
+            .HasForeignKey<ClinicWhatsAppConfig>(x => x.ClinicId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClinicWhatsAppConfig>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+
+        modelBuilder.Entity<ClinicPaymentGatewayConfig>().HasIndex(x => x.ClinicId).IsUnique();
+        modelBuilder.Entity<ClinicPaymentGatewayConfig>()
+            .HasOne(x => x.Clinic).WithOne(x => x.PaymentGatewayConfig)
+            .HasForeignKey<ClinicPaymentGatewayConfig>(x => x.ClinicId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClinicPaymentGatewayConfig>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+
+        modelBuilder.Entity<ClinicNotificationConfig>().HasIndex(x => x.ClinicId).IsUnique();
+        modelBuilder.Entity<ClinicNotificationConfig>()
+            .HasOne(x => x.Clinic).WithOne(x => x.NotificationConfig)
+            .HasForeignKey<ClinicNotificationConfig>(x => x.ClinicId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClinicNotificationConfig>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+
+        modelBuilder.Entity<ClinicBranding>().HasIndex(x => x.ClinicId).IsUnique();
+        modelBuilder.Entity<ClinicBranding>()
+            .HasOne(x => x.Clinic).WithOne(x => x.Branding)
+            .HasForeignKey<ClinicBranding>(x => x.ClinicId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClinicBranding>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+
         modelBuilder.Entity<OutboxEvent>().HasQueryFilter(x => x.DeletedAt == null);
     }
 
