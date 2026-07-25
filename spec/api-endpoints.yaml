@@ -93,3 +93,22 @@ DoctorAvailabilities:
 Internal:
   POST /internal/clinics: "{ name, slug, timezone, businessHoursJson, cnpj?, email?, phone?, address?, adminName, adminEmail, adminPassword } -> ClinicProvisioningResponse [PlatformAdminOnly]"
   POST /internal/clinics/{id}/users: "{ name, email, password, role } -> UserResponse [PlatformAdminOnly]"
+
+TenantSettings:
+  GET /tenant/settings: "-> TenantSettingsResponse [ClinicStaff]"
+  PUT /tenant/settings: "{ name, timezone, businessHoursJson, cnpj?, email?, phone?, address? } -> TenantSettingsResponse [Admin]"
+
+ClinicalRecords:
+  GET /appointments/{appointmentId}/clinical-record: "-> ClinicalRecordResponse [ClinicStaff]"
+  POST /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan? } -> 201 ClinicalRecordResponse [DoctorOnly]"
+  PATCH /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan? } -> ClinicalRecordResponse [DoctorOnly]"
+  POST /appointments/{appointmentId}/clinical-record/finalize: "-> ClinicalRecordResponse [DoctorOnly]"
+  POST /appointments/{appointmentId}/clinical-record/addendum: "{ content } -> 201 ClinicalRecordAddendumResponse [ClinicStaff]"
+  GET /appointments/{appointmentId}/clinical-record/addendums: "-> ClinicalRecordAddendumResponse[] [ClinicStaff]"
+  GET /patients/{patientId}/clinical-records: "-> ClinicalRecordResponse[] [ClinicStaff]"
+
+PaymentIntents:
+  POST /payment-intents: "{ receivableId, amount, idempotencyKey } -> PaymentIntentResponse [ClinicStaff]"
+  GET /payment-intents: "?page,pageSize,receivableId,status -> PagedResult<PaymentIntentResponse> [ClinicStaff]"
+  POST /payment-intents/{id}/confirm: "-> PaymentIntentResponse [ClinicAdmin]"
+  POST /payment-intents/{id}/cancel: "-> PaymentIntentResponse [ClinicAdmin]"

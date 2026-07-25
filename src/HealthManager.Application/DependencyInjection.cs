@@ -8,6 +8,7 @@ public static class DependencyInjection
     {
         services.AddScoped<AuthService>();
         services.AddScoped<ClinicProvisioningService>();
+        services.AddScoped<TenantSettingsService>();
         services.AddScoped<PatientService>();
         services.AddScoped<DoctorService>();
         services.AddScoped<AppointmentService>();
@@ -21,6 +22,8 @@ public static class DependencyInjection
         services.AddScoped<HealthInsuranceService>();
         services.AddScoped<SpecialtyService>();
         services.AddScoped<DoctorAvailabilityService>();
+        services.AddScoped<ClinicalRecordService>();
+        services.AddScoped<PaymentIntentService>();
         return services;
     }
 }

@@ -8,7 +8,7 @@ namespace HealthManager.Api.Controllers;
 [ApiController]
 [Authorize(Policy = "ClinicStaff")]
 [Route("patients")]
-public sealed class PatientsController(PatientService patientService, PatientPortalService portalService) : ControllerBase
+public sealed class PatientsController(PatientService patientService, PatientPortalService portalService, ClinicalRecordService clinicalRecordService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<PatientResponse>>> List([FromQuery] PatientQuery query, CancellationToken cancellationToken)
@@ -72,4 +72,8 @@ public sealed class PatientsController(PatientService patientService, PatientPor
     [Authorize(Policy = "ClinicAdminOrSecretary")]
     public async Task<ActionResult<Guid>> RegenerateAccessToken(Guid id, CancellationToken cancellationToken)
         => Ok(await portalService.RegenerateAccessTokenAsync(id, cancellationToken));
+
+    [HttpGet("{id:guid}/clinical-records")]
+    public async Task<ActionResult<IReadOnlyList<ClinicalRecordResponse>>> ListClinicalRecords(Guid id, CancellationToken cancellationToken)
+        => Ok(await clinicalRecordService.ListByPatientAsync(id, cancellationToken));
 }

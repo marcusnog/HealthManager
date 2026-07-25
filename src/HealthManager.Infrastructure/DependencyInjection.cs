@@ -78,6 +78,7 @@ public static class DependencyInjection
         {
             options.AddPolicy("PlatformAdminOnly", policy => policy.RequireRole(UserRole.PlatformAdmin.ToString()));
             options.AddPolicy("ClinicAdminOrSecretary", policy => policy.RequireRole(UserRole.Admin.ToString(), UserRole.Secretary.ToString()));
+            options.AddPolicy("ClinicAdmin", policy => policy.RequireRole(UserRole.Admin.ToString()));
             options.AddPolicy("ClinicStaff", policy => policy.RequireRole(UserRole.Admin.ToString(), UserRole.Secretary.ToString(), UserRole.Doctor.ToString()));
             options.AddPolicy("PatientPortal", policy => policy.RequireRole(UserRole.Patient.ToString()));
         });

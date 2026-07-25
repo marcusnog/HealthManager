@@ -57,5 +57,8 @@ public interface IApplicationDbContext
     DbSet<Specialty> Specialties { get; }
     DbSet<DoctorSpecialty> DoctorSpecialties { get; }
     DbSet<DoctorAvailability> DoctorAvailabilities { get; }
+    DbSet<ClinicalRecord> ClinicalRecords { get; }
+    DbSet<ClinicalRecordAddendum> ClinicalRecordAddendums { get; }
+    DbSet<PaymentIntent> PaymentIntents { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

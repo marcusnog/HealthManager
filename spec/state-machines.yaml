@@ -60,3 +60,44 @@ ConfirmationStatus:
   invariant:
     - Separate from AppointmentStatus (tracks patient confirmation via WhatsApp)
     - Confirmed -> AppointmentStatus.Confirmed
+
+ClinicalRecordStatus:
+  initial: Draft
+  states:
+    Draft:
+      transitions: [Finalized]
+    Finalized:
+      transitions: []
+  invariant:
+    - One record per appointment (appointmentId unique)
+    - Only the owning doctor can write to Draft
+    - Finalization is irreversible; corrections use addendum
+    - Admin/Secretary can read but not write clinical content
+  api_endpoints:
+    POST /appointments/{id}/clinical-record: create Draft
+    PATCH /appointments/{id}/clinical-record: update Draft fields
+    POST /appointments/{id}/clinical-record/finalize: Draft -> Finalized
+    POST /appointments/{id}/clinical-record/addendum: addendum to Finalized record
+
+PaymentIntentStatus:
+  initial: Created
+  states:
+    Created:
+      transitions: [Processing, Cancelled]
+    Processing:
+      transitions: [Confirmed, Failed, Cancelled]
+    Confirmed:
+      transitions: []
+    Failed:
+      transitions: []
+    Cancelled:
+      transitions: []
+  invariant:
+    - Idempotent via idempotencyKey (unique per clinic)
+    - Confirmed creates Payment and updates Receivable
+    - Manual mode: admin confirms via API
+    - Gateway mode: webhook confirms (future)
+  api_endpoints:
+    POST /payment-intents: create intent
+    POST /payment-intents/{id}/confirm: Created|Processing -> Confirmed
+    POST /payment-intents/{id}/cancel: Created|Processing -> Cancelled

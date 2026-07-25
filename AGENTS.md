@@ -36,11 +36,16 @@ docker compose up --build                                                       
 dotnet test HealthManager.sln --collect:"XPlat Code Coverage" --results-directory ./TestResults
 dotnet tool run reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:"CoverageReport" -reporttypes:"Html;Cobertura;MarkdownSummaryGithub"
 dotnet tool run dotnet-ef migrations add <Nome> --project src/HealthManager.Infrastructure --startup-project src/HealthManager.Api --context HealthManager.Infrastructure.Persistence.AppDbContext --output-dir Persistence/Migrations
+dotnet tool run dotnet-ef migrations has-pending-model-changes --project src/HealthManager.Infrastructure --startup-project src/HealthManager.Api --context HealthManager.Infrastructure.Persistence.AppDbContext --no-build
 ```
 
 `dotnet` may not be in PATH — fallback: `C:\Program Files\dotnet\dotnet.exe`.
 
+Run `dotnet tool restore` before any `dotnet tool run` command (EF, reportgenerator).
+
 Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenerator` (v5.5.10).
+
+**CI migration snapshot check**: CI runs `dotnet-ef migrations has-pending-model-changes` after build. If you change an entity, regenerate the migration AND verify `has-pending-model-changes` passes before pushing.
 
 ## Projects
 

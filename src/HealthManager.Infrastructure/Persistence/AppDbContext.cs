@@ -31,6 +31,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<Specialty> Specialties => Set<Specialty>();
     public DbSet<DoctorSpecialty> DoctorSpecialties => Set<DoctorSpecialty>();
     public DbSet<DoctorAvailability> DoctorAvailabilities => Set<DoctorAvailability>();
+    public DbSet<ClinicalRecord> ClinicalRecords => Set<ClinicalRecord>();
+    public DbSet<ClinicalRecordAddendum> ClinicalRecordAddendums => Set<ClinicalRecordAddendum>();
+    public DbSet<PaymentIntent> PaymentIntents => Set<PaymentIntent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -113,6 +116,41 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             .HasForeignKey(x => x.SpecialtyId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<ClinicalRecord>().HasIndex(x => x.AppointmentId).IsUnique();
+        modelBuilder.Entity<ClinicalRecord>()
+            .HasOne(x => x.Appointment)
+            .WithMany()
+            .HasForeignKey(x => x.AppointmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClinicalRecord>()
+            .HasOne(x => x.Patient)
+            .WithMany()
+            .HasForeignKey(x => x.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClinicalRecord>()
+            .HasOne(x => x.Doctor)
+            .WithMany()
+            .HasForeignKey(x => x.DoctorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ClinicalRecordAddendum>()
+            .HasOne(x => x.ClinicalRecord)
+            .WithMany(x => x.Addendums)
+            .HasForeignKey(x => x.ClinicalRecordId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClinicalRecordAddendum>()
+            .HasOne(x => x.Author)
+            .WithMany()
+            .HasForeignKey(x => x.AuthorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PaymentIntent>().HasIndex(x => new { x.ClinicId, x.IdempotencyKey }).IsUnique();
+        modelBuilder.Entity<PaymentIntent>()
+            .HasOne(x => x.Receivable)
+            .WithMany()
+            .HasForeignKey(x => x.ReceivableId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<DoctorAvailability>()
             .HasOne(x => x.Doctor)
             .WithMany()
@@ -144,6 +182,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         modelBuilder.Entity<Specialty>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<DoctorSpecialty>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<DoctorAvailability>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<ClinicalRecord>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<ClinicalRecordAddendum>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<PaymentIntent>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<OutboxEvent>().HasQueryFilter(x => x.DeletedAt == null);
     }
 

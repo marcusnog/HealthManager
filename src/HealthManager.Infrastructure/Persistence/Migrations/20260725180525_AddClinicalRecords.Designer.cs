@@ -3,6 +3,7 @@ using System;
 using HealthManager.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HealthManager.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260725180525_AddClinicalRecords")]
+    partial class AddClinicalRecords
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -816,59 +819,6 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.ToTable("Payments");
                 });
 
-            modelBuilder.Entity("HealthManager.Domain.PaymentIntent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid?>("ClinicId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("ConfirmedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FailureReason")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Gateway")
-                        .HasColumnType("text");
-
-                    b.Property<string>("GatewayReference")
-                        .HasColumnType("text");
-
-                    b.Property<string>("IdempotencyKey")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("ReceivableId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReceivableId");
-
-                    b.HasIndex("ClinicId", "IdempotencyKey")
-                        .IsUnique();
-
-                    b.ToTable("PaymentIntents");
-                });
-
             modelBuilder.Entity("HealthManager.Domain.Receivable", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1249,17 +1199,6 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("HealthManager.Domain.Receivable", "Receivable")
                         .WithMany("Payments")
-                        .HasForeignKey("ReceivableId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Receivable");
-                });
-
-            modelBuilder.Entity("HealthManager.Domain.PaymentIntent", b =>
-                {
-                    b.HasOne("HealthManager.Domain.Receivable", "Receivable")
-                        .WithMany()
                         .HasForeignKey("ReceivableId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

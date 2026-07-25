@@ -1345,6 +1345,366 @@ public sealed class ExpenseService(
         ?? throw new KeyNotFoundException("Categoria de despesa nao encontrada.");
 }
 
+public sealed class TenantSettingsService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    public async Task<TenantSettingsResponse> GetAsync(CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var clinic = await dbContext.Clinics.AsNoTracking().SingleOrDefaultAsync(x => x.Id == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Clinica nao encontrada.");
+        return ToResponse(clinic);
+    }
+
+    public async Task<TenantSettingsResponse> UpdateAsync(UpdateTenantSettingsRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var clinic = await dbContext.Clinics.SingleOrDefaultAsync(x => x.Id == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Clinica nao encontrada.");
+
+        ValidateTimezone(request.Timezone);
+        ValidateBusinessHours(request.BusinessHoursJson);
+
+        clinic.Name = request.Name.Trim();
+        clinic.Timezone = request.Timezone.Trim();
+        clinic.BusinessHoursJson = request.BusinessHoursJson;
+        clinic.Cnpj = Normalize(request.Cnpj);
+        clinic.Email = Normalize(request.Email);
+        clinic.Phone = Normalize(request.Phone);
+        clinic.Address = Normalize(request.Address);
+        clinic.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(clinic);
+    }
+
+    private static void ValidateTimezone(string timezone)
+    {
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(timezone.Trim());
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            throw new InvalidOperationException("Fuso horario invalido.");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            throw new InvalidOperationException("Fuso horario invalido.");
+        }
+    }
+
+    private static void ValidateBusinessHours(string value)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("start", out var startValue) ||
+                !root.TryGetProperty("end", out var endValue) ||
+                !TimeOnly.TryParseExact(startValue.GetString(), "HH:mm", out var start) ||
+                !TimeOnly.TryParseExact(endValue.GetString(), "HH:mm", out var end) ||
+                start >= end)
+                throw new InvalidOperationException("Expediente invalido.");
+        }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException("Expediente invalido.");
+        }
+    }
+
+    private static TenantSettingsResponse ToResponse(Clinic clinic) =>
+        new(clinic.Id, clinic.Name, clinic.Slug, clinic.Timezone, clinic.BusinessHoursJson,
+            clinic.Cnpj, clinic.Email, clinic.Phone, clinic.Address);
+
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
+
+public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    private async Task<Guid?> ResolveDoctorIdAsync(CancellationToken cancellationToken)
+    {
+        if (tenantProvider.UserId is null || tenantProvider.ClinicId is null) return null;
+        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == tenantProvider.UserId.Value, cancellationToken);
+        if (user is null) return null;
+        var doctor = await dbContext.Doctors.AsNoTracking().FirstOrDefaultAsync(x => x.ClinicId == tenantProvider.ClinicId && x.Email == user.Email, cancellationToken);
+        return doctor?.Id;
+    }
+    public async Task<ClinicalRecordResponse?> GetByAppointmentAsync(Guid appointmentId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var record = await dbContext.ClinicalRecords.AsNoTracking()
+            .Include(x => x.Patient).Include(x => x.Doctor)
+            .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken);
+        return record is null ? null : ToResponse(record);
+    }
+
+    public async Task<ClinicalRecordResponse> CreateAsync(Guid appointmentId, CreateClinicalRecordRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var userId = tenantProvider.UserId;
+
+        var appointment = await dbContext.Appointments.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == appointmentId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Consulta nao encontrada.");
+
+        if (await dbContext.ClinicalRecords.AnyAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken))
+            throw new InvalidOperationException("Atendimento ja existe para esta consulta.");
+
+        var record = new ClinicalRecord
+        {
+            ClinicId = clinicId,
+            AppointmentId = appointmentId,
+            PatientId = appointment.PatientId,
+            DoctorId = appointment.DoctorId,
+            ChiefComplaint = request.ChiefComplaint,
+            History = request.History,
+            PhysicalExam = request.PhysicalExam,
+            Assessment = request.Assessment,
+            Plan = request.Plan
+        };
+
+        dbContext.ClinicalRecords.Add(record);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        record = await dbContext.ClinicalRecords.AsNoTracking()
+            .Include(x => x.Patient).Include(x => x.Doctor)
+            .FirstAsync(x => x.Id == record.Id, cancellationToken);
+        return ToResponse(record);
+    }
+
+    public async Task<ClinicalRecordResponse> UpdateAsync(Guid appointmentId, UpdateClinicalRecordRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var record = await dbContext.ClinicalRecords
+            .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Atendimento nao encontrado.");
+
+        if (record.Status == ClinicalRecordStatus.Finalized)
+            throw new InvalidOperationException("Atendimento finalizado nao pode ser alterado.");
+
+        var doctorId = await ResolveDoctorIdAsync(cancellationToken);
+        if (doctorId is null || record.DoctorId != doctorId)
+            throw new UnauthorizedAccessException("Apenas o medico responsavel pode editar o atendimento.");
+
+        if (request.ChiefComplaint is not null) record.ChiefComplaint = request.ChiefComplaint;
+        if (request.History is not null) record.History = request.History;
+        if (request.PhysicalExam is not null) record.PhysicalExam = request.PhysicalExam;
+        if (request.Assessment is not null) record.Assessment = request.Assessment;
+        if (request.Plan is not null) record.Plan = request.Plan;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        record = await dbContext.ClinicalRecords.AsNoTracking()
+            .Include(x => x.Patient).Include(x => x.Doctor)
+            .FirstAsync(x => x.Id == record.Id, cancellationToken);
+        return ToResponse(record);
+    }
+
+    public async Task<ClinicalRecordResponse> FinalizeAsync(Guid appointmentId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var record = await dbContext.ClinicalRecords
+            .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Atendimento nao encontrado.");
+
+        if (record.Status == ClinicalRecordStatus.Finalized)
+            throw new InvalidOperationException("Atendimento ja finalizado.");
+
+        var doctorId = await ResolveDoctorIdAsync(cancellationToken);
+        if (doctorId is null || record.DoctorId != doctorId)
+            throw new UnauthorizedAccessException("Apenas o medico responsavel pode finalizar o atendimento.");
+
+        record.Status = ClinicalRecordStatus.Finalized;
+        record.FinalizedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        record = await dbContext.ClinicalRecords.AsNoTracking()
+            .Include(x => x.Patient).Include(x => x.Doctor)
+            .FirstAsync(x => x.Id == record.Id, cancellationToken);
+        return ToResponse(record);
+    }
+
+    public async Task<ClinicalRecordAddendumResponse> AddAddendumAsync(Guid appointmentId, CreateAddendumRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var record = await dbContext.ClinicalRecords
+            .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Atendimento nao encontrado.");
+
+        var addendum = new ClinicalRecordAddendum
+        {
+            ClinicId = clinicId,
+            ClinicalRecordId = record.Id,
+            Content = request.Content,
+            AuthorId = tenantProvider.UserId ?? throw new UnauthorizedAccessException("Usuario nao autenticado.")
+        };
+
+        dbContext.ClinicalRecordAddendums.Add(addendum);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        addendum = await dbContext.ClinicalRecordAddendums.AsNoTracking()
+            .Include(x => x.Author)
+            .FirstAsync(x => x.Id == addendum.Id, cancellationToken);
+        return ToAddendumResponse(addendum);
+    }
+
+    public async Task<IReadOnlyList<ClinicalRecordAddendumResponse>> ListAddendumsAsync(Guid appointmentId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var record = await dbContext.ClinicalRecords.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Atendimento nao encontrado.");
+
+        var addendums = await dbContext.ClinicalRecordAddendums.AsNoTracking()
+            .Include(x => x.Author)
+            .Where(x => x.ClinicalRecordId == record.Id && x.ClinicId == clinicId)
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return addendums.Select(ToAddendumResponse).ToList();
+    }
+
+    public async Task<IReadOnlyList<ClinicalRecordResponse>> ListByPatientAsync(Guid patientId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var records = await dbContext.ClinicalRecords.AsNoTracking()
+            .Include(x => x.Patient).Include(x => x.Doctor)
+            .Where(x => x.PatientId == patientId && x.ClinicId == clinicId)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return records.Select(ToResponse).ToList();
+    }
+
+    private static ClinicalRecordResponse ToResponse(ClinicalRecord r) =>
+        new(r.Id, r.AppointmentId, r.PatientId, r.DoctorId, r.Status,
+            r.ChiefComplaint, r.History, r.PhysicalExam, r.Assessment, r.Plan,
+            r.FinalizedAt,
+            r.Patient?.Name, r.Doctor?.Name);
+
+    private static ClinicalRecordAddendumResponse ToAddendumResponse(ClinicalRecordAddendum a) =>
+        new(a.Id, a.Content, a.AuthorId, a.Author?.Name, a.CreatedAt);
+}
+
+public sealed class PaymentIntentService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    public async Task<PaymentIntentResponse> CreateAsync(CreatePaymentIntentRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+
+        var receivable = await dbContext.Receivables.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.ReceivableId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Recebivel nao encontrado.");
+
+        if (receivable.Status == ReceivableStatus.Cancelled)
+            throw new InvalidOperationException("Nao e possivel criar intencao de pagamento para recebivel cancelado.");
+
+        var outstanding = receivable.OriginalAmount - receivable.ReceivedAmount;
+        if (request.Amount > outstanding)
+            throw new InvalidOperationException($"Valor excede o saldo devedor (R$ {outstanding:F2}).");
+
+        var existing = await dbContext.PaymentIntents.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.IdempotencyKey == request.IdempotencyKey && x.ClinicId == clinicId, cancellationToken);
+        if (existing is not null)
+            return ToResponse(existing);
+
+        var intent = new PaymentIntent
+        {
+            ClinicId = clinicId,
+            ReceivableId = request.ReceivableId,
+            Amount = request.Amount,
+            IdempotencyKey = request.IdempotencyKey
+        };
+
+        dbContext.PaymentIntents.Add(intent);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        intent = await dbContext.PaymentIntents.AsNoTracking()
+            .FirstAsync(x => x.Id == intent.Id, cancellationToken);
+        return ToResponse(intent);
+    }
+
+    public async Task<PagedResult<PaymentIntentResponse>> ListAsync(PaymentIntentQuery query, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var q = dbContext.PaymentIntents.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId);
+
+        if (query.ReceivableId.HasValue)
+            q = q.Where(x => x.ReceivableId == query.ReceivableId.Value);
+        if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<PaymentIntentStatus>(query.Status, true, out var status))
+            q = q.Where(x => x.Status == status);
+
+        var total = await q.CountAsync(cancellationToken);
+        var items = await q.OrderByDescending(x => x.CreatedAt)
+            .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<PaymentIntentResponse>(items.Select(ToResponse).ToList(), query.Page, query.PageSize, total);
+    }
+
+    public async Task<PaymentIntentResponse> ConfirmAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var intent = await dbContext.PaymentIntents
+            .Include(x => x.Receivable)
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Intencao de pagamento nao encontrada.");
+
+        if (intent.Status is not (PaymentIntentStatus.Created or PaymentIntentStatus.Processing))
+            throw new InvalidOperationException("Intencao nao pode ser confirmada neste status.");
+
+        intent.Status = PaymentIntentStatus.Confirmed;
+        intent.ConfirmedAt = DateTimeOffset.UtcNow;
+
+        var receivable = intent.Receivable!;
+        receivable.ReceivedAmount += intent.Amount;
+        receivable.Status = receivable.ReceivedAmount >= receivable.OriginalAmount
+            ? ReceivableStatus.Paid
+            : ReceivableStatus.Partial;
+
+        dbContext.Payments.Add(new Payment
+        {
+            ClinicId = clinicId,
+            ReceivableId = receivable.Id,
+            Amount = intent.Amount,
+            PaymentMethod = PaymentMethod.Pix,
+            Status = PaymentStatus.Paid,
+            PaidAt = DateTimeOffset.UtcNow,
+            Notes = $"PaymentIntent {intent.IdempotencyKey}"
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        intent = await dbContext.PaymentIntents.AsNoTracking()
+            .FirstAsync(x => x.Id == intent.Id, cancellationToken);
+        return ToResponse(intent);
+    }
+
+    public async Task<PaymentIntentResponse> CancelAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var intent = await dbContext.PaymentIntents
+            .FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Intencao de pagamento nao encontrada.");
+
+        if (intent.Status is not (PaymentIntentStatus.Created or PaymentIntentStatus.Processing))
+            throw new InvalidOperationException("Intencao nao pode ser cancelada neste status.");
+
+        intent.Status = PaymentIntentStatus.Cancelled;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        intent = await dbContext.PaymentIntents.AsNoTracking()
+            .FirstAsync(x => x.Id == intent.Id, cancellationToken);
+        return ToResponse(intent);
+    }
+
+    private static PaymentIntentResponse ToResponse(PaymentIntent i) =>
+        new(i.Id, i.ReceivableId, i.Amount, i.Status, i.Gateway, i.GatewayReference,
+            i.IdempotencyKey, i.ConfirmedAt, i.FailureReason);
+}
+
 public sealed class ExpenseCategoryService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
 {
     public async Task<PagedResult<ExpenseCategoryResponse>> ListAsync(ExpenseCategoryQuery query, CancellationToken cancellationToken)

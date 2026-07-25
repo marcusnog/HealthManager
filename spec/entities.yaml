@@ -15,6 +15,9 @@
   status: ClinicStatus (Active|Suspended)
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
+  # General tenant settings are stored directly on Clinic. Do not create a
+  # generic key/value settings entity until a setting has no natural owner.
+
 - User:
   id: Guid (auto)
   clinicId: Guid? (null for PlatformAdmin)
@@ -188,6 +191,42 @@
   startTime: TimeSpan
   endTime: TimeSpan
   isAvailable: bool (default true)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- ClinicalRecord:
+  id: Guid (auto)
+  clinicId: Guid
+  appointmentId: Guid (FK Appointment, unique index)
+  patientId: Guid (FK Patient)
+  doctorId: Guid (FK Doctor)
+  status: ClinicalRecordStatus (Draft|Finalized)
+  chiefComplaint: string? (queixa principal)
+  history: string? (história da doença atual)
+  physicalExam: string? (exame físico)
+  assessment: string? (avaliação/diagnóstico)
+  plan: string? (plano de tratamento)
+  finalizedAt: DateTimeOffset?
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- ClinicalRecordAddendum:
+  id: Guid (auto)
+  clinicId: Guid
+  clinicalRecordId: Guid (FK ClinicalRecord)
+  content: string
+  authorId: Guid (FK User)
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- PaymentIntent:
+  id: Guid (auto)
+  clinicId: Guid
+  receivableId: Guid (FK Receivable)
+  amount: decimal
+  status: PaymentIntentStatus (Created|Processing|Confirmed|Failed|Cancelled)
+  gateway: string? (null for manual)
+  gatewayReference: string? (external id)
+  idempotencyKey: string (unique index)
+  confirmedAt: DateTimeOffset?
+  failureReason: string?
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
 - OutboxEvent:

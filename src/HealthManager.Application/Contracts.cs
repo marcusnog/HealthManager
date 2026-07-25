@@ -25,6 +25,24 @@ public sealed record CreateClinicRequest(
 
 public sealed record CreateClinicUserRequest([Required] string Name, [Required][EmailAddress] string Email, [Required][MinLength(8)] string Password, [Required] UserRole Role);
 public sealed record ClinicProvisioningResponse(Guid ClinicId, Guid AdminUserId);
+public sealed record UpdateTenantSettingsRequest(
+    [Required][StringLength(160)] string Name,
+    [Required][StringLength(100)] string Timezone,
+    [Required] string BusinessHoursJson,
+    [StringLength(18)] string? Cnpj,
+    [EmailAddress] string? Email,
+    [StringLength(20)] string? Phone,
+    [StringLength(300)] string? Address);
+public sealed record TenantSettingsResponse(
+    Guid Id,
+    string Name,
+    string Slug,
+    string Timezone,
+    string BusinessHoursJson,
+    string? Cnpj,
+    string? Email,
+    string? Phone,
+    string? Address);
 
 public sealed record PatientQuery(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null, string? Email = null, string? HealthInsurance = null);
 public sealed record AppointmentQuery(int Page = 1, int PageSize = 20, DateOnly? Date = null, DateOnly? DateFrom = null, DateOnly? DateTo = null, Guid? DoctorId = null, string? Status = null);
@@ -194,3 +212,38 @@ public sealed record AvailabilityQuery(int Page = 1, int PageSize = 50, Guid? Do
 public sealed record CreateAvailabilityRequest([Required] Guid DoctorId, [Required] int DayOfWeek, [Required] string StartTime, [Required] string EndTime, bool IsAvailable = true);
 public sealed record UpdateAvailabilityRequest([Required] int DayOfWeek, [Required] string StartTime, [Required] string EndTime, bool IsAvailable);
 public sealed record DoctorAvailabilityResponse(Guid Id, Guid DoctorId, string DoctorName, int DayOfWeek, string StartTime, string EndTime, bool IsAvailable);
+
+// ── ClinicalRecord ──
+public sealed record CreateClinicalRecordRequest(string? ChiefComplaint, string? History, string? PhysicalExam, string? Assessment, string? Plan);
+public sealed record UpdateClinicalRecordRequest(string? ChiefComplaint, string? History, string? PhysicalExam, string? Assessment, string? Plan);
+public sealed record ClinicalRecordResponse(
+    Guid Id,
+    Guid AppointmentId,
+    Guid PatientId,
+    Guid DoctorId,
+    ClinicalRecordStatus Status,
+    string? ChiefComplaint,
+    string? History,
+    string? PhysicalExam,
+    string? Assessment,
+    string? Plan,
+    DateTimeOffset? FinalizedAt,
+    string? PatientName = null,
+    string? DoctorName = null);
+public sealed record CreateAddendumRequest([Required] string Content);
+public sealed record ClinicalRecordAddendumResponse(Guid Id, string Content, Guid AuthorId, string? AuthorName, DateTimeOffset CreatedAt);
+
+// ── PaymentIntent ──
+public sealed record CreatePaymentIntentRequest([Required] Guid ReceivableId, [Range(0.01, double.MaxValue)] decimal Amount, [Required] string IdempotencyKey);
+public sealed record PaymentIntentQuery(int Page = 1, int PageSize = 20, Guid? ReceivableId = null, string? Status = null);
+public sealed record PaymentIntentResponse(
+    Guid Id,
+    Guid ReceivableId,
+    decimal Amount,
+    PaymentIntentStatus Status,
+    string? Gateway,
+    string? GatewayReference,
+    string IdempotencyKey,
+    DateTimeOffset? ConfirmedAt,
+    string? FailureReason,
+    string? PatientName = null);

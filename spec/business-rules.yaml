@@ -6,6 +6,9 @@ tenant:
   bypass: "PlatformAdmin role bypasses tenant filter entirely (can see all clinics)."
   resolution_order: "1) X-Clinic-Id header (if present) -> 2) JWT claim clinic_id"
   cross_tenant: "No data leak between clinics. Second clinic seed ID: 22222222-2222-2222-2222-222222222222."
+  settings_read: "Clinic staff can read settings only for the clinic resolved from the authenticated tenant context."
+  settings_write: "Only Admin can update its own clinic settings. Slug and status are platform-managed and cannot be changed by this endpoint."
+  settings_business_hours: "BusinessHoursJson must be a JSON object with start/end strings in HH:mm format and start earlier than end."
 
 auth:
   login: "Email + password. Password hashed via BCrypt. Returns accessToken + refreshToken."
@@ -30,6 +33,7 @@ policies:
   PlatformAdminOnly: "Requires PlatformAdmin role. Used for /internal/* routes."
   ClinicAdminOrSecretary: "Requires Admin or Secretary. Used for patient management."
   ClinicStaff: "Requires Admin, Secretary, or Doctor. Used for appointments/scheduling."
+  ClinicAdmin: "Requires Admin. Used for tenant-wide configuration."
   PatientPortal: "Requires Patient role. Used for /patient-portal/* routes."
 
 finance:
@@ -52,6 +56,24 @@ documents:
   storage_fallback: "AWS_S3_BUCKET set -> S3. Not set -> local filesystem (LOCAL_STORAGE_ROOT or temp dir)."
   soft_delete: "Documents are soft-deleted via DeletedAt, not physically removed from storage."
   size_limit: "CreatePatientDocumentRequest validates SizeInBytes up to 10MB."
+
+clinical_records:
+  one_per_appointment: "Each appointment has at most one ClinicalRecord (appointmentId unique index)."
+  creation: "Created as Draft when doctor starts consultation. Automatically linked to appointment, patient, and doctor."
+  editing: "Only the owning doctor can edit Draft fields (chiefComplaint, history, physicalExam, assessment, plan)."
+  finalization: "Draft -> Finalized. Sets finalizedAt. Irreversible. Finalized records are read-only."
+  addendum: "After finalization, corrections are made via ClinicalRecordAddendum. Each addendum has content, authorId, and timestamp."
+  access_read: "Admin, Secretary, and the owning Doctor can read clinical records."
+  access_write: "Only the owning Doctor can create/update Draft and add addendums."
+  patient_isolation: "Clinical records respect tenant isolation (clinicId query filter)."
+
+payment_intents:
+  creation: "Create intent linked to a receivable. Idempotency via idempotencyKey."
+  confirmation: "Manual confirmation creates Payment and updates Receivable status (Pending -> Partial -> Paid)."
+  idempotency: "Same idempotencyKey returns existing intent without creating duplicate."
+  amount_validation: "Intent amount must not exceed receivable outstanding amount."
+  cancellation: "Intent can be cancelled if not yet confirmed."
+  gateway_independence: "Internal states are independent of gateway. Gateway adapter added later."
 
 address_lookup:
   provider: "ViaCEP, called only by the backend through GET https://viacep.com.br/ws/{cep}/json/."

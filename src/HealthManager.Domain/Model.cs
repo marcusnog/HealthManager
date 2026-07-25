@@ -253,6 +253,46 @@ public sealed class WebhookEvent : TenantEntity
     public DateTimeOffset? ProcessedAt { get; set; }
 }
 
+public sealed class ClinicalRecord : TenantEntity
+{
+    public Guid AppointmentId { get; set; }
+    public Guid PatientId { get; set; }
+    public Guid DoctorId { get; set; }
+    public ClinicalRecordStatus Status { get; set; } = ClinicalRecordStatus.Draft;
+    public string? ChiefComplaint { get; set; }
+    public string? History { get; set; }
+    public string? PhysicalExam { get; set; }
+    public string? Assessment { get; set; }
+    public string? Plan { get; set; }
+    public DateTimeOffset? FinalizedAt { get; set; }
+    public Appointment? Appointment { get; set; }
+    public Patient? Patient { get; set; }
+    public Doctor? Doctor { get; set; }
+    public ICollection<ClinicalRecordAddendum> Addendums { get; set; } = new List<ClinicalRecordAddendum>();
+}
+
+public sealed class ClinicalRecordAddendum : TenantEntity
+{
+    public Guid ClinicalRecordId { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public Guid AuthorId { get; set; }
+    public ClinicalRecord? ClinicalRecord { get; set; }
+    public User? Author { get; set; }
+}
+
+public sealed class PaymentIntent : TenantEntity
+{
+    public Guid ReceivableId { get; set; }
+    public decimal Amount { get; set; }
+    public PaymentIntentStatus Status { get; set; } = PaymentIntentStatus.Created;
+    public string? Gateway { get; set; }
+    public string? GatewayReference { get; set; }
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public DateTimeOffset? ConfirmedAt { get; set; }
+    public string? FailureReason { get; set; }
+    public Receivable? Receivable { get; set; }
+}
+
 public enum ClinicStatus
 {
     Active = 1,
@@ -334,4 +374,19 @@ public enum ExpenseStatus
     Paid = 1,
     Pending = 2,
     Cancelled = 3
+}
+
+public enum ClinicalRecordStatus
+{
+    Draft = 1,
+    Finalized = 2
+}
+
+public enum PaymentIntentStatus
+{
+    Created = 1,
+    Processing = 2,
+    Confirmed = 3,
+    Failed = 4,
+    Cancelled = 5
 }
