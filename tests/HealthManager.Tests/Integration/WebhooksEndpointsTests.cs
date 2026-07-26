@@ -85,6 +85,37 @@ public sealed class WebhooksEndpointsTests
     }
 
     [Fact]
+    public async Task InvalidPayload_MissingRequiredFields_ShouldReturnBadRequest()
+    {
+        await using var factory = new ApiTestFactory();
+
+        await factory.WithDbContextAsync(async dbContext =>
+        {
+            dbContext.ClinicPaymentGatewayConfigs.Add(new ClinicPaymentGatewayConfig
+            {
+                ClinicId = ClinicId,
+                Provider = PaymentGatewayProvider.Asaas,
+                Environment = PaymentGatewayEnvironment.Sandbox,
+                WebhookSecret = TestWebhookSecret,
+                IsEnabled = true
+            });
+            await dbContext.SaveChangesAsync();
+        });
+
+        using var client = factory.CreateClient();
+        var payload = """{"something":"unexpected"}""";
+        var signature = ComputeHmac(payload);
+        var request = new HttpRequestMessage(HttpMethod.Post, "/webhooks/payments/asaas")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+            Headers = { { "X-Clinic-Id", ClinicId.ToString() }, { "X-Hub-Signature-256", signature } }
+        };
+
+        var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task ValidWebhook_WithMatchingIntent_ShouldConfirmPayment()
     {
         await using var factory = new ApiTestFactory();

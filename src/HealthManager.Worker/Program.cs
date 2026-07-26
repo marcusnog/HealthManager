@@ -8,6 +8,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddHostedService<OutboxWorker>();
+builder.Services.AddHostedService<PaymentStatusWorker>();
 
 builder.Logging.AddConsole();
 

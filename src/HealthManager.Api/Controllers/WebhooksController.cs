@@ -46,6 +46,10 @@ public sealed class WebhooksController(
         if (!handler.VerifySignature(payload, signature, config.WebhookSecret))
             return Unauthorized(new { error = "Assinatura invalida." });
 
+        var validationError = handler.Validate(payload);
+        if (validationError is not null)
+            return BadRequest(new { error = validationError });
+
         var result = await handler.ParseAsync(payload, ct);
         var intent = await paymentIntentService.ProcessWebhookAsync(result, clinicId, ct);
 

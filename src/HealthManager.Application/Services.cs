@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using System.Text.Json;
 using HealthManager.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HealthManager.Application;
 
@@ -1612,7 +1613,7 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
         new(a.Id, a.Content, a.AuthorId, a.Author?.Name, a.CreatedAt);
 }
 
-public sealed class PaymentIntentService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+public sealed class PaymentIntentService(IApplicationDbContext dbContext, ITenantProvider tenantProvider, WhatsAppMessagingService whatsapp, ILogger<PaymentIntentService> logger)
 {
     public async Task<PaymentIntentResponse> CreateAsync(CreatePaymentIntentRequest request, CancellationToken cancellationToken)
     {
@@ -1777,12 +1778,117 @@ public sealed class PaymentIntentService(IApplicationDbContext dbContext, ITenan
 
         intent = await dbContext.PaymentIntents.AsNoTracking()
             .FirstAsync(x => x.Id == intent.Id, cancellationToken);
+
+        if (result.Status == PaymentIntentStatus.Confirmed)
+        {
+            try { await NotifyPatientAsync(intent, clinicId, cancellationToken); }
+            catch (Exception ex) { logger.LogWarning(ex, "Falha ao notificar paciente sobre pagamento {IntentId}", intent.Id); }
+        }
+
         return ToResponse(intent);
+    }
+
+    private async Task NotifyPatientAsync(PaymentIntent intent, Guid clinicId, CancellationToken cancellationToken)
+    {
+        if (intent.ReceivableId == Guid.Empty) return;
+        var receivable = await dbContext.Receivables.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == intent.ReceivableId, cancellationToken);
+        if (receivable?.AppointmentId is null) return;
+
+        var appointment = await dbContext.Appointments.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == receivable.AppointmentId, cancellationToken);
+        if (appointment?.PatientId is null) return;
+
+        var patient = await dbContext.Patients.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == appointment.PatientId, cancellationToken);
+        if (patient is null || string.IsNullOrWhiteSpace(patient.Phone)) return;
+
+        var text = $"Olá {patient.Name}! Seu pagamento de R$ {intent.Amount:F2} foi confirmado. Obrigado!";
+        await whatsapp.SendTextAsync(clinicId, patient.Phone, text, cancellationToken);
     }
 
     private static PaymentIntentResponse ToResponse(PaymentIntent i) =>
         new(i.Id, i.ReceivableId, i.Amount, i.Status, i.Gateway, i.GatewayReference,
             i.IdempotencyKey, i.ConfirmedAt, i.FailureReason);
+}
+
+public sealed class CheckoutService(
+    IApplicationDbContext dbContext,
+    ITenantProvider tenantProvider,
+    IPaymentGatewayClient gatewayClient,
+    PaymentIntentService paymentIntentService)
+{
+    public async Task<CheckoutResponse> CreateForPatientAsync(CheckoutRequest request, CancellationToken cancellationToken)
+    {
+        var patientId = tenantProvider.UserId ?? throw new UnauthorizedAccessException("Sessao de paciente invalida.");
+        var patient = await dbContext.Patients.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == patientId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Paciente nao encontrado.");
+
+        return await CreateAsync(request, patient.Name, patient.Cpf, cancellationToken);
+    }
+
+    public async Task<CheckoutResponse> CreateAsync(CheckoutRequest request, string? patientName, string? patientCpf, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+
+        var outstanding = await GetOutstandingAsync(request.ReceivableId, clinicId, cancellationToken);
+        var amount = request.Amount ?? outstanding;
+
+        var config = await dbContext.ClinicPaymentGatewayConfigs.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.ClinicId == clinicId && x.IsEnabled, cancellationToken)
+            ?? throw new InvalidOperationException("Gateway de pagamento nao configurado para esta clinica.");
+
+        var idempotencyKey = $"chk-{clinicId:N}-{request.ReceivableId:N}-{DateTimeOffset.UtcNow.Ticks}";
+        var intent = await paymentIntentService.CreateAsync(
+            new CreatePaymentIntentRequest(request.ReceivableId, amount, idempotencyKey), cancellationToken);
+
+        var charge = await gatewayClient.CreateChargeAsync(
+            new CreateChargeRequest(idempotencyKey, amount, request.PaymentMethod, $"Pagamento recebivel {request.ReceivableId}", patientName, patientCpf, request.ReturnUrl),
+            config.Provider, clinicId, cancellationToken);
+
+        var intentEntity = await dbContext.PaymentIntents.FirstOrDefaultAsync(x => x.Id == intent.Id, cancellationToken);
+        if (intentEntity is not null)
+        {
+            intentEntity.Status = charge.Status;
+            intentEntity.GatewayReference = charge.GatewayReference;
+            if (charge.Status == PaymentIntentStatus.Failed)
+                intentEntity.FailureReason = "Gateway rejeitou a cobranca.";
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return new CheckoutResponse(
+            intent.Id, request.ReceivableId, amount, request.PaymentMethod,
+            charge.Status, charge.PixQrCode, charge.PixCopyPaste, charge.CheckoutUrl, charge.ExpiresAt);
+    }
+
+    public async Task<CheckoutResponse> GetAsync(Guid paymentIntentId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var intent = await dbContext.PaymentIntents.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == paymentIntentId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Intencao de pagamento nao encontrada.");
+
+        return new CheckoutResponse(
+            intent.Id, intent.ReceivableId, intent.Amount,
+            intent.PaymentMethod, intent.Status);
+    }
+
+    private async Task<decimal> GetOutstandingAsync(Guid receivableId, Guid clinicId, CancellationToken cancellationToken)
+    {
+        var receivable = await dbContext.Receivables.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == receivableId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Recebivel nao encontrado.");
+
+        if (receivable.Status == ReceivableStatus.Cancelled)
+            throw new InvalidOperationException("Nao e possivel iniciar checkout para recebivel cancelado.");
+
+        var outstanding = receivable.OriginalAmount - receivable.ReceivedAmount;
+        if (outstanding <= 0)
+            throw new InvalidOperationException("Recebivel ja foi totalmente pago.");
+
+        return outstanding;
+    }
 }
 
 public sealed class ExpenseCategoryService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)

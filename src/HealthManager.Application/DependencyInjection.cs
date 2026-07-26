@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<DoctorAvailabilityService>();
         services.AddScoped<ClinicalRecordService>();
         services.AddScoped<PaymentIntentService>();
+        services.AddScoped<CheckoutService>();
         services.AddScoped<TenantIntegrationService>();
         services.AddScoped<WhatsAppMessagingService>();
 
@@ -34,6 +35,8 @@ public static class DependencyInjection
             [PaymentGatewayProvider.MercadoPago] = new MercadoPagoGatewayHandler(),
             [PaymentGatewayProvider.Stripe] = new StripeGatewayHandler()
         });
+
+        services.AddSingleton<IPaymentGatewayClient, MockPaymentGatewayClient>();
 
         return services;
     }

@@ -290,6 +290,7 @@ public sealed class PaymentIntent : TenantEntity
 {
     public Guid ReceivableId { get; set; }
     public decimal Amount { get; set; }
+    public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Pix;
     public PaymentIntentStatus Status { get; set; } = PaymentIntentStatus.Created;
     public string? Gateway { get; set; }
     public string? GatewayReference { get; set; }

@@ -307,3 +307,21 @@ public sealed record TenantIntegrationResponse(
     NotificationConfigResponse? Notification,
     BrandingResponse? Branding,
     int DefaultAppointmentMinutes);
+
+// ── Checkout ──
+public sealed record CheckoutRequest(
+    [Required] Guid ReceivableId,
+    [Required] PaymentMethod PaymentMethod,
+    decimal? Amount = null,
+    string? ReturnUrl = null);
+
+public sealed record CheckoutResponse(
+    Guid PaymentIntentId,
+    Guid ReceivableId,
+    decimal Amount,
+    PaymentMethod PaymentMethod,
+    PaymentIntentStatus Status,
+    string? PixQrCode = null,
+    string? PixCopyPaste = null,
+    string? CheckoutUrl = null,
+    DateTimeOffset? ExpiresAt = null);

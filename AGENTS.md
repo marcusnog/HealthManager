@@ -98,10 +98,11 @@ Integration tests reference these GUIDs directly.
 
 ## CI / Deploy
 
-- CI builds `--configuration Release`, runs tests with coverage, uploads artifacts
+- CI triggers on `master`, `main`, and `develop` pushes + all PRs
+- CI builds `--configuration Release`, runs EF snapshot check, tests with coverage, uploads artifacts
 - Deploy (master/main pushes only): builds Lambda `--self-contained --runtime linux-x64`, builds/pushes API Docker image to ECR, deploys to ECS Fargate, updates Lambda function code
 - AWS OIDC auth via `configure-aws-credentials` with `role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}`
-- Terraform in `infra/` targets AWS (ECS Fargate + RDS + CloudFront + Lambda)
+- Terraform in `infra/` targets AWS (ECS Fargate + RDS + CloudFront + Lambda). Modules: `network`, `database`, `storage`, `compute`. State in S3.
 
 ## Other instruction files
 

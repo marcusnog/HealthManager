@@ -19,6 +19,7 @@ public interface IPaymentGatewayHandler
     PaymentGatewayProvider Provider { get; }
     bool VerifySignature(string payload, string? signature, string? webhookSecret) =>
         WebhookSignatureVerifier.VerifyHmacSha256(payload, signature, webhookSecret);
+    string? Validate(string payload);
     Task<WebhookPaymentResult> ParseAsync(string payload, CancellationToken cancellationToken);
 }
 
