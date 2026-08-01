@@ -58,5 +58,20 @@ public sealed class FinancialController(
     [HttpGet("summary")]
     public async Task<ActionResult<FinancialSummaryResponse>> GetSummary([FromQuery] string? destinationBank, CancellationToken cancellationToken)
         => Ok(await expenseService.GetSummaryAsync(destinationBank, cancellationToken));
+
+    [HttpGet("professional-settlements")]
+    [Authorize(Policy = "ClinicAdmin")]
+    public async Task<ActionResult<IReadOnlyList<ProfessionalSettlementResponse>>> ListProfessionalSettlements(CancellationToken cancellationToken)
+        => Ok(await financialService.ListProfessionalSettlementsAsync(cancellationToken));
+
+    [HttpPost("professional-settlements")]
+    [Authorize(Policy = "ClinicAdmin")]
+    public async Task<ActionResult<SettlementResponse>> SettleProfessional([FromBody] ProfessionalSettlementRequest request, CancellationToken cancellationToken)
+        => Ok(await financialService.SettleProfessionalAsync(request, cancellationToken));
+
+    [HttpPost("owner-settlements")]
+    [Authorize(Policy = "ClinicAdmin")]
+    public async Task<ActionResult<SettlementResponse>> SettleOwner([FromBody] OwnerSettlementRequest request, CancellationToken cancellationToken)
+        => Ok(await financialService.SettleOwnerAsync(request, cancellationToken));
 }
 

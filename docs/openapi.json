@@ -1547,10 +1547,21 @@
           "400": { "description": "Invalid signature or payload" }
         }
       }
+    },
+    "/financial/professional-settlements": {
+      "get": { "operationId": "professional_settlements_list", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProfessionalSettlementResponse" } } } } } } },
+      "post": { "operationId": "professional_settlements_create", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProfessionalSettlementRequest" } } } }, "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SettlementResponse" } } } } } }
+    },
+    "/financial/owner-settlements": {
+      "post": { "operationId": "owner_settlements_create", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OwnerSettlementRequest" } } } }, "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SettlementResponse" } } } } } }
     }
   },
   "components": {
     "schemas": {
+      "ProfessionalSettlementRequest": { "type": "object", "required": ["professionalId"], "properties": { "professionalId": { "type": "string", "format": "uuid" }, "throughDate": { "type": "string", "format": "date" }, "paidAt": { "type": "string", "format": "date-time" } } },
+      "OwnerSettlementRequest": { "type": "object", "properties": { "throughDate": { "type": "string", "format": "date" }, "settledAt": { "type": "string", "format": "date-time" } } },
+      "SettlementResponse": { "type": "object", "properties": { "professionalId": { "type": "string", "format": "uuid", "nullable": true }, "professionalName": { "type": "string" }, "amount": { "type": "number", "format": "decimal" }, "paymentCount": { "type": "integer" }, "settledAt": { "type": "string", "format": "date-time" } } },
+      "ProfessionalSettlementResponse": { "type": "object", "properties": { "professionalId": { "type": "string", "format": "uuid" }, "professionalName": { "type": "string" }, "accrued": { "type": "number", "format": "decimal" }, "paid": { "type": "number", "format": "decimal" }, "outstanding": { "type": "number", "format": "decimal" } } },
       "UpdateTenantSettingsRequest": {
         "type": "object",
         "required": ["name", "timezone", "businessHoursJson"],
@@ -1813,6 +1824,7 @@
           "crm": { "type": "string" },
           "phone": { "type": "string" },
           "email": { "type": "string" },
+          "clinicSharePercentage": { "type": "number", "format": "decimal", "minimum": 0, "maximum": 100, "default": 100 },
           "specialtyIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
         }
       },
@@ -1825,6 +1837,7 @@
           "phone": { "type": "string" },
           "email": { "type": "string" },
           "isActive": { "type": "boolean" },
+          "clinicSharePercentage": { "type": "number", "format": "decimal" },
           "specialties": { "type": "array", "items": { "$ref": "#/components/schemas/SpecialtyItem" } }
         }
       },
@@ -1836,6 +1849,7 @@
           "phone": { "type": "string" },
           "email": { "type": "string" },
           "isActive": { "type": "boolean" },
+          "clinicSharePercentage": { "type": "number", "format": "decimal", "minimum": 0, "maximum": 100, "default": 100 },
           "specialtyIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
         }
       },
@@ -1909,6 +1923,7 @@
           "paymentMethod": { "type": "string" },
           "paidAt": { "type": "string", "format": "date-time" },
           "destinationBank": { "type": "string", "maxLength": 100, "nullable": true },
+          "fundsRecipient": { "type": "string", "enum": ["Clinic", "Owner"], "default": "Clinic" },
           "notes": { "type": "string" }
         }
       },
@@ -1922,6 +1937,7 @@
           "paymentMethod": { "type": "string" },
           "paidAt": { "type": "string", "format": "date-time" },
           "destinationBank": { "type": "string", "maxLength": 100, "nullable": true },
+          "fundsRecipient": { "type": "string", "enum": ["Clinic", "Owner"], "default": "Clinic" },
           "notes": { "type": "string" }
         }
       },
@@ -1934,7 +1950,10 @@
           "paymentMethod": { "type": "string" },
           "paidAt": { "type": "string", "format": "date-time" },
           "patientName": { "type": "string" },
-          "destinationBank": { "type": "string", "nullable": true }
+          "destinationBank": { "type": "string", "nullable": true },
+          "fundsRecipient": { "type": "string" },
+          "clinicRevenueAmount": { "type": "number", "format": "decimal" },
+          "professionalPayableAmount": { "type": "number", "format": "decimal" }
         }
       },
       "DashboardSummaryResponse": {
