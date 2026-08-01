@@ -56,7 +56,7 @@ public sealed class FinancialController(
     }
 
     [HttpGet("summary")]
-    public async Task<ActionResult<FinancialSummaryResponse>> GetSummary(CancellationToken cancellationToken)
-        => Ok(await expenseService.GetSummaryAsync(cancellationToken));
+    public async Task<ActionResult<FinancialSummaryResponse>> GetSummary([FromQuery] string? destinationBank, CancellationToken cancellationToken)
+        => Ok(await expenseService.GetSummaryAsync(destinationBank, cancellationToken));
 }
 

@@ -29,7 +29,7 @@ public sealed class FinancialServiceTests
 
         var service = new FinancialService(dbContext, new FakeTenantProvider(clinicId));
         var response = await service.CreatePaymentAsync(
-            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, DateTimeOffset.UtcNow, null),
+            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, DateTimeOffset.UtcNow, "Banco do Dono", null),
             CancellationToken.None);
 
         response.Amount.Should().Be(50);
@@ -55,7 +55,7 @@ public sealed class FinancialServiceTests
 
         var service = new FinancialService(dbContext, new FakeTenantProvider(clinicId));
         var action = () => service.CreatePaymentAsync(
-            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, null, null),
+            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, null, null, null),
             CancellationToken.None);
 
         await action.Should().ThrowAsync<InvalidOperationException>()
