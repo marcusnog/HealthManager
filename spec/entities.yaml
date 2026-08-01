@@ -129,6 +129,7 @@
   paymentMethod: PaymentMethod (Cash|Pix|CreditCard|DebitCard|Insurance)
   status: PaymentStatus (Paid|Refunded)
   paidAt: DateTimeOffset (UTC)
+  destinationBank: string? (max 100; bank/account where the revenue was deposited)
   notes: string?
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 

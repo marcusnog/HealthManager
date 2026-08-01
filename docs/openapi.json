@@ -1027,6 +1027,11 @@
               "type": "string",
               "format": "date-time"
             }
+          },
+          {
+            "name": "DestinationBank",
+            "in": "query",
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
@@ -1903,6 +1908,7 @@
           "amount": { "type": "number", "format": "decimal" },
           "paymentMethod": { "type": "string" },
           "paidAt": { "type": "string", "format": "date-time" },
+          "destinationBank": { "type": "string", "maxLength": 100, "nullable": true },
           "notes": { "type": "string" }
         }
       },
@@ -1915,6 +1921,7 @@
           "dueDate": { "type": "string", "format": "date-time" },
           "paymentMethod": { "type": "string" },
           "paidAt": { "type": "string", "format": "date-time" },
+          "destinationBank": { "type": "string", "maxLength": 100, "nullable": true },
           "notes": { "type": "string" }
         }
       },
@@ -1926,7 +1933,8 @@
           "amount": { "type": "number", "format": "decimal" },
           "paymentMethod": { "type": "string" },
           "paidAt": { "type": "string", "format": "date-time" },
-          "patientName": { "type": "string" }
+          "patientName": { "type": "string" },
+          "destinationBank": { "type": "string", "nullable": true }
         }
       },
       "DashboardSummaryResponse": {

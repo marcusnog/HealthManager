@@ -1134,6 +1134,9 @@ public sealed class FinancialService(
             paymentsQuery = paymentsQuery.Where(x => x.ReceivableId == query.ReceivableId.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(query.DestinationBank))
+            paymentsQuery = paymentsQuery.Where(x => x.DestinationBank == query.DestinationBank.Trim());
+
         if (query.DateFrom.HasValue)
         {
             var from = query.DateFrom.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -1158,7 +1161,8 @@ public sealed class FinancialService(
                 x.PaymentMethod,
                 x.PaidAt,
                 x.Status,
-                x.Receivable != null && x.Receivable.Appointment != null && x.Receivable.Appointment.Patient != null ? x.Receivable.Appointment.Patient.Name : null))
+                x.Receivable != null && x.Receivable.Appointment != null && x.Receivable.Appointment.Patient != null ? x.Receivable.Appointment.Patient.Name : null,
+                x.DestinationBank))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<PaymentResponse>(items, query.Page, query.PageSize, total);
@@ -1188,6 +1192,7 @@ public sealed class FinancialService(
             Amount = request.Amount,
             PaymentMethod = request.PaymentMethod,
             PaidAt = request.PaidAt ?? DateTimeOffset.UtcNow,
+            DestinationBank = request.DestinationBank?.Trim(),
             Notes = request.Notes
         };
 
@@ -1231,13 +1236,14 @@ public sealed class FinancialService(
             Amount = request.Amount,
             PaymentMethod = request.PaymentMethod,
             PaidAt = request.PaidAt ?? DateTimeOffset.UtcNow,
+            DestinationBank = request.DestinationBank?.Trim(),
             Notes = request.Notes
         };
 
         dbContext.Payments.Add(payment);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new PaymentResponse(payment.Id, payment.ReceivableId, payment.Amount, payment.PaymentMethod, payment.PaidAt, payment.Status);
+        return new PaymentResponse(payment.Id, payment.ReceivableId, payment.Amount, payment.PaymentMethod, payment.PaidAt, payment.Status, DestinationBank: payment.DestinationBank);
     }
 }
 
@@ -1320,7 +1326,7 @@ public sealed class ExpenseService(
     }
 
     // ponytail: month-boundary calc duplicates DashboardService; 5 lines, not worth extracting
-    public async Task<FinancialSummaryResponse> GetSummaryAsync(CancellationToken cancellationToken)
+    public async Task<FinancialSummaryResponse> GetSummaryAsync(string? destinationBank, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var clinic = await dbContext.Clinics.FirstAsync(x => x.Id == clinicId, cancellationToken);
@@ -1329,8 +1335,12 @@ public sealed class ExpenseService(
         var monthStart = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(new DateTime(localNow.Year, localNow.Month, 1, 0, 0, 0, DateTimeKind.Unspecified), zone));
         var monthEnd = monthStart.AddMonths(1);
 
-        var totalReceived = await dbContext.Payments
-            .Where(x => x.ClinicId == clinicId && x.PaidAt >= monthStart && x.PaidAt < monthEnd && x.DeletedAt == null)
+        var payments = dbContext.Payments
+            .Where(x => x.ClinicId == clinicId && x.PaidAt >= monthStart && x.PaidAt < monthEnd && x.DeletedAt == null);
+        if (!string.IsNullOrWhiteSpace(destinationBank))
+            payments = payments.Where(x => x.DestinationBank == destinationBank.Trim());
+
+        var totalReceived = await payments
             .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
 
         var totalExpenses = await dbContext.Expenses

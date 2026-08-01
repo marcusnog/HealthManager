@@ -40,6 +40,7 @@ public sealed class FinancialEndpointsTests
             amount = 50,
             paymentMethod = "Pix",
             paidAt = "2026-05-07T13:30:00Z",
+            destinationBank = "Banco do Dono",
             notes = "Pagamento parcial via teste de integracao"
         });
 
@@ -55,10 +56,41 @@ public sealed class FinancialEndpointsTests
             receivable.Status.Should().Be(ReceivableStatus.Partial);
             payment.Amount.Should().Be(50);
             payment.PaymentMethod.Should().Be(PaymentMethod.Pix);
+            payment.DestinationBank.Should().Be("Banco do Dono");
         });
+    }
+
+    [Fact]
+    public async Task Summary_ShouldFilterRevenueByDestinationBank_AndSubtractPaidExpenses()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+
+        await client.PostAsJsonAsync("/financial/payments", new
+        {
+            receivableId = "ffffffff-ffff-ffff-ffff-ffffffffffff",
+            amount = 50,
+            paymentMethod = "Pix",
+            destinationBank = "Banco do Dono"
+        });
+        var categoryResponse = await client.PostAsJsonAsync("/expense-categories", new { name = "Abatimento" });
+        var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
+        await client.PostAsJsonAsync("/financial/expenses", new
+        {
+            description = "Valor devido pela clinica",
+            amount = 10,
+            categoryId = category!.Id,
+            paymentMethod = "Pix",
+            status = "Paid"
+        });
+
+        var summary = await client.GetFromJsonAsync<SummaryDto>("/financial/summary?destinationBank=Banco%20do%20Dono");
+
+        summary.Should().Be(new SummaryDto(50, 10, 40));
     }
 
     private sealed record CategoryDto(Guid Id, string Name);
     private sealed record ExpenseDto(Guid Id, string CategoryName);
+    private sealed record SummaryDto(decimal TotalReceived, decimal TotalExpenses, decimal Balance);
 }
 

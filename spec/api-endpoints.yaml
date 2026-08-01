@@ -45,15 +45,15 @@ AppointmentTypes:
 
 Financial:
   GET /financial/receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [ClinicStaff]"
-  GET /financial/payments: "?page,pageSize,receivableId,dateFrom,dateTo -> PagedResult<PaymentResponse> [ClinicStaff]"
-  POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, notes? } -> 201 PaymentResponse [ClinicStaff]"
+  GET /financial/payments: "?page,pageSize,receivableId,dateFrom,dateTo,destinationBank -> PagedResult<PaymentResponse> [ClinicStaff]"
+  POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, destinationBank?, notes? } -> 201 PaymentResponse [ClinicStaff]"
 
   # Custom wrappers (not in openapi.json, available via src/services/api.ts):
   GET /financial/expenses: "?page,pageSize,categoryId,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [ClinicStaff]"
   POST /financial/expenses: "{ description, amount, categoryId, paymentMethod, paidAt?, status?, notes? } -> 201 ExpenseResponse [ClinicStaff]"
   PUT /financial/expenses/{id}: "{ ... } -> ExpenseResponse [ClinicStaff]"
   DELETE /financial/expenses/{id}: "-> 204 [ClinicAdminOrSecretary]"
-  GET /financial/summary: "-> { totalReceived, totalExpenses, balance } [ClinicStaff]"
+  GET /financial/summary: "?destinationBank -> { totalReceived, totalExpenses, balance } (when bank is informed, only revenue is filtered; paid clinic expenses remain the abatements) [ClinicStaff]"
 
 ExpenseCategories:
   GET /expense-categories: "?page,pageSize,search -> PagedResult<ExpenseCategoryResponse> [ClinicStaff]"

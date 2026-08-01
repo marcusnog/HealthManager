@@ -44,6 +44,7 @@ finance:
   cancellation: "Appointment cancellation cancels linked receivable unless already Paid."
   appointment_sync: "Appointment receivable stays synchronized with schedule date, amount, type/description and appointment details. Changing amount from 0 to >0 creates it; changing to 0 cancels it when no amount was received; amount changes recompute receivable status and cannot go below receivedAmount."
   manual_receivable: "POST /payments supports creating a standalone receivable+payment in one call (no appointment link)."
+  destination_bank: "Payments may identify the destination bank/account. Financial accountability can filter monthly revenue by this field and subtract the clinic's paid expenses to calculate the balance to be transferred."
 
 scheduling:
   appointment_type: "Appointments reference a clinic-managed type. Type names are unique per clinic and types in use cannot be deleted."

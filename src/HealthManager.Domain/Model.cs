@@ -143,6 +143,7 @@ public sealed class Payment : TenantEntity
     public PaymentMethod PaymentMethod { get; set; }
     public PaymentStatus Status { get; set; } = PaymentStatus.Paid;
     public DateTimeOffset PaidAt { get; set; } = DateTimeOffset.UtcNow;
+    public string? DestinationBank { get; set; }
     public string? Notes { get; set; }
     public Receivable? Receivable { get; set; }
 }

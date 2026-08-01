@@ -157,10 +157,10 @@ public sealed record ReceivableResponse(
     Guid? DoctorId = null,
     string? DoctorName = null);
 
-public sealed record PaymentQuery(int Page = 1, int PageSize = 20, Guid? ReceivableId = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
-public sealed record CreatePaymentRequest([Required] Guid ReceivableId, [Range(0.01, double.MaxValue)] decimal Amount, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
-public sealed record CreateManualReceivableRequest([Range(0.01, double.MaxValue)] decimal Amount, string? Description, DateTimeOffset? DueDate, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, string? Notes);
-public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status, string? PatientName = null);
+public sealed record PaymentQuery(int Page = 1, int PageSize = 20, Guid? ReceivableId = null, DateOnly? DateFrom = null, DateOnly? DateTo = null, string? DestinationBank = null);
+public sealed record CreatePaymentRequest([Required] Guid ReceivableId, [Range(0.01, double.MaxValue)] decimal Amount, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, [StringLength(100)] string? DestinationBank, string? Notes);
+public sealed record CreateManualReceivableRequest([Range(0.01, double.MaxValue)] decimal Amount, string? Description, DateTimeOffset? DueDate, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, [StringLength(100)] string? DestinationBank, string? Notes);
+public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status, string? PatientName = null, string? DestinationBank = null);
 
 public sealed record ExpenseQuery(int Page = 1, int PageSize = 20, Guid? CategoryId = null, string? Status = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
 public sealed record ExpenseRequest([Required][StringLength(300)] string Description, [Range(0.01, double.MaxValue)] decimal Amount, [Required] Guid CategoryId, PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, ExpenseStatus? Status, string? Notes);
