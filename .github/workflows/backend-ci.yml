@@ -11,6 +11,7 @@ env:
   ECS_CLUSTER: healthmanager-cluster
   ECS_API_SERVICE: healthmanager-api
   LAMBDA_OUTBOX_FUNCTION: healthmanager-outbox
+  LAMBDA_ARTIFACT_BUCKET: healthmanager-documents-prod
 
 jobs:
   build-test:
@@ -108,9 +109,11 @@ jobs:
 
       - name: Deploy Lambda
         run: |
+          aws s3 cp /tmp/outbox-lambda.zip s3://$LAMBDA_ARTIFACT_BUCKET/lambda-deploy/outbox-lambda.zip
           aws lambda update-function-code \
             --function-name $LAMBDA_OUTBOX_FUNCTION \
-            --zip-file fileb:///tmp/outbox-lambda.zip \
+            --s3-bucket $LAMBDA_ARTIFACT_BUCKET \
+            --s3-key lambda-deploy/outbox-lambda.zip \
             --architectures x86_64
 
       - name: Deploy API to ECS

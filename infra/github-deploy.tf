@@ -76,3 +76,22 @@ resource "aws_iam_role_policy" "github_deploy_lambda" {
     ]
   })
 }
+
+resource "aws_iam_role_policy" "github_deploy_lambda_artifacts" {
+  name = "lambda-artifacts"
+  role = data.aws_iam_role.github_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+        ]
+        Resource = "${module.storage.bucket_arn}/lambda-deploy/*"
+      },
+    ]
+  })
+}
