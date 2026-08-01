@@ -45,6 +45,10 @@ finance:
   appointment_sync: "Appointment receivable stays synchronized with schedule date, amount, type/description and appointment details. Changing amount from 0 to >0 creates it; changing to 0 cancels it when no amount was received; amount changes recompute receivable status and cannot go below receivedAmount."
   manual_receivable: "POST /payments supports creating a standalone receivable+payment in one call (no appointment link)."
   destination_bank: "Payments may identify the destination bank/account. Financial accountability can filter monthly revenue by this field and subtract the clinic's paid expenses to calculate the balance to be transferred."
+  professional_split: "A billed appointment snapshots the doctor's clinicSharePercentage. Each payment recognizes only amount * percentage / 100 as clinic revenue; the remainder is a professional liability, never an expense."
+  professional_payout: "Friday payout marks unpaid professional liabilities through a selected date as settled. It changes cash and liability only, never profit or expenses."
+  owner_cash: "Card receipts may be held by Owner. Owner settlement marks that receivable as transferred to the clinic; it changes cash/receivable only and never recognizes revenue again."
+  financial_result: "Reports distinguish gross patient receipts, clinic recognized revenue, professional liabilities, owner-held receivables, expenses and profit. Profit = clinicRevenue - paidExpenses."
 
 scheduling:
   appointment_type: "Appointments reference a clinic-managed type. Type names are unique per clinic and types in use cannot be deleted."

@@ -84,6 +84,7 @@
   phone: string?
   email: string?
   isActive: bool (default true)
+  clinicSharePercentage: decimal (0..100, default 100; clinic's retained share)
   doctorSpecialties: [DoctorSpecialty] (many-to-many via Specialty)
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
@@ -117,6 +118,8 @@
   status: ReceivableStatus (Pending|Partial|Paid|Cancelled)
   dueDate: DateTimeOffset (UTC)
   description: string?
+  professionalId: Guid? (FK Doctor; snapshot from appointment)
+  clinicSharePercentage: decimal (0..100; snapshot when appointment is billed)
   outstandingAmount: decimal = originalAmount - receivedAmount (computed)
   responseAppointmentDetails: appointment startAt, type, status, doctorId and doctorName when linked
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
@@ -130,6 +133,11 @@
   status: PaymentStatus (Paid|Refunded)
   paidAt: DateTimeOffset (UTC)
   destinationBank: string? (max 100; bank/account where the revenue was deposited)
+  fundsRecipient: FundsRecipient (Clinic|Owner)
+  clinicRevenueAmount: decimal (recognized clinic revenue)
+  professionalPayableAmount: decimal (liability, never expense)
+  professionalPaidAt: DateTimeOffset? (liability settlement)
+  ownerSettledAt: DateTimeOffset? (cash received from CEO; never new revenue)
   notes: string?
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 

@@ -531,7 +531,8 @@ public sealed class DoctorService(
             Name = request.Name,
             Crm = request.Crm,
             Phone = request.Phone,
-            Email = request.Email
+            Email = request.Email,
+            ClinicSharePercentage = request.ClinicSharePercentage
         };
 
         if (request.SpecialtyIds?.Count > 0)
@@ -592,6 +593,7 @@ public sealed class DoctorService(
         doctor.Phone = request.Phone;
         doctor.Email = request.Email;
         doctor.IsActive = request.IsActive;
+        doctor.ClinicSharePercentage = request.ClinicSharePercentage;
         doctor.UpdatedAt = DateTimeOffset.UtcNow;
 
         if (request.SpecialtyIds is not null)
@@ -656,7 +658,7 @@ public sealed class DoctorService(
             .Select(ds => new SpecialtyItem(ds.Specialty.Id, ds.Specialty.Name))
             .ToList() ?? [];
 
-        return new DoctorResponse(doctor.Id, doctor.Name, doctor.Crm, doctor.Phone, doctor.Email, doctor.IsActive, specialties);
+        return new DoctorResponse(doctor.Id, doctor.Name, doctor.Crm, doctor.Phone, doctor.Email, doctor.IsActive, doctor.ClinicSharePercentage, specialties);
     }
 }
 
@@ -775,7 +777,9 @@ public sealed class AppointmentService(
                 ReceivedAmount = 0,
                 Status = ReceivableStatus.Pending,
                 DueDate = request.StartAt,
-                Description = $"Consulta {appointmentType.Name}"
+                Description = $"Consulta {appointmentType.Name}",
+                ProfessionalId = doctor!.Id,
+                ClinicSharePercentage = doctor.ClinicSharePercentage
             });
         }
 
@@ -840,12 +844,15 @@ public sealed class AppointmentService(
                 }
 
                 appointment.DoctorId = targetDoctorId;
+                appointment.Doctor = await dbContext.Doctors.FirstAsync(x => x.Id == targetDoctorId && x.ClinicId == clinicId, cancellationToken);
                 appointment.StartAt = targetStartAt;
                 appointment.EndAt = targetEndAt;
 
                 if (receivable is not null)
                 {
                     receivable.DueDate = targetStartAt;
+                    receivable.ProfessionalId = appointment.Doctor.Id;
+                    receivable.ClinicSharePercentage = appointment.Doctor.ClinicSharePercentage;
                     receivable.UpdatedAt = DateTimeOffset.UtcNow;
                 }
             }
@@ -879,7 +886,9 @@ public sealed class AppointmentService(
                     OriginalAmount = amount,
                     Status = ReceivableStatus.Pending,
                     DueDate = appointment.StartAt,
-                    Description = $"Consulta {appointment.AppointmentType.Name}"
+                    Description = $"Consulta {appointment.AppointmentType.Name}",
+                    ProfessionalId = appointment.DoctorId,
+                    ClinicSharePercentage = appointment.Doctor?.ClinicSharePercentage ?? 100m
                 };
                 dbContext.Receivables.Add(receivable);
             }
@@ -1162,7 +1171,10 @@ public sealed class FinancialService(
                 x.PaidAt,
                 x.Status,
                 x.Receivable != null && x.Receivable.Appointment != null && x.Receivable.Appointment.Patient != null ? x.Receivable.Appointment.Patient.Name : null,
-                x.DestinationBank))
+                x.DestinationBank,
+                x.FundsRecipient,
+                x.ClinicRevenueAmount,
+                x.ProfessionalPayableAmount))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<PaymentResponse>(items, query.Page, query.PageSize, total);
@@ -1193,8 +1205,10 @@ public sealed class FinancialService(
             PaymentMethod = request.PaymentMethod,
             PaidAt = request.PaidAt ?? DateTimeOffset.UtcNow,
             DestinationBank = request.DestinationBank?.Trim(),
+            FundsRecipient = request.PaymentMethod is PaymentMethod.CreditCard or PaymentMethod.DebitCard ? FundsRecipient.Owner : request.FundsRecipient,
             Notes = request.Notes
         };
+        ApplySplit(payment, receivable);
 
         dbContext.Payments.Add(payment);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -1237,13 +1251,62 @@ public sealed class FinancialService(
             PaymentMethod = request.PaymentMethod,
             PaidAt = request.PaidAt ?? DateTimeOffset.UtcNow,
             DestinationBank = request.DestinationBank?.Trim(),
+            FundsRecipient = request.PaymentMethod is PaymentMethod.CreditCard or PaymentMethod.DebitCard ? FundsRecipient.Owner : request.FundsRecipient,
             Notes = request.Notes
         };
+        ApplySplit(payment, receivable);
 
         dbContext.Payments.Add(payment);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new PaymentResponse(payment.Id, payment.ReceivableId, payment.Amount, payment.PaymentMethod, payment.PaidAt, payment.Status, DestinationBank: payment.DestinationBank);
+        return new PaymentResponse(payment.Id, payment.ReceivableId, payment.Amount, payment.PaymentMethod, payment.PaidAt, payment.Status, DestinationBank: payment.DestinationBank, FundsRecipient: payment.FundsRecipient, ClinicRevenueAmount: payment.ClinicRevenueAmount, ProfessionalPayableAmount: payment.ProfessionalPayableAmount);
+    }
+
+    internal static void ApplySplit(Payment payment, Receivable receivable)
+    {
+        payment.ClinicRevenueAmount = Math.Round(payment.Amount * receivable.ClinicSharePercentage / 100m, 2, MidpointRounding.AwayFromZero);
+        payment.ProfessionalPayableAmount = payment.Amount - payment.ClinicRevenueAmount;
+    }
+
+    public async Task<IReadOnlyList<ProfessionalSettlementResponse>> ListProfessionalSettlementsAsync(CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        return await dbContext.Doctors.AsNoTracking()
+            .Where(d => d.ClinicId == clinicId && dbContext.Payments.Any(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId == d.Id && p.ProfessionalPayableAmount > 0))
+            .Select(d => new ProfessionalSettlementResponse(
+                d.Id, d.Name,
+                dbContext.Payments.Where(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId == d.Id).Sum(p => (decimal?)p.ProfessionalPayableAmount) ?? 0,
+                dbContext.Payments.Where(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId == d.Id && p.ProfessionalPaidAt != null).Sum(p => (decimal?)p.ProfessionalPayableAmount) ?? 0,
+                dbContext.Payments.Where(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId == d.Id && p.ProfessionalPaidAt == null).Sum(p => (decimal?)p.ProfessionalPayableAmount) ?? 0))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<SettlementResponse> SettleProfessionalAsync(ProfessionalSettlementRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var doctor = await dbContext.Doctors.FirstOrDefaultAsync(x => x.Id == request.ProfessionalId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Profissional nao encontrado.");
+        var through = (request.ThroughDate ?? DateOnly.FromDateTime(DateTime.UtcNow)).ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+        var payments = await dbContext.Payments.Include(x => x.Receivable)
+            .Where(x => x.ClinicId == clinicId && x.Receivable!.ProfessionalId == request.ProfessionalId && x.ProfessionalPayableAmount > 0 && x.ProfessionalPaidAt == null && x.PaidAt <= through)
+            .ToListAsync(cancellationToken);
+        if (payments.Count == 0) throw new InvalidOperationException("Nao ha valores pendentes para este profissional.");
+        var paidAt = request.PaidAt ?? DateTimeOffset.UtcNow;
+        payments.ForEach(x => x.ProfessionalPaidAt = paidAt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new SettlementResponse(doctor.Id, doctor.Name, payments.Sum(x => x.ProfessionalPayableAmount), payments.Count, paidAt);
+    }
+
+    public async Task<SettlementResponse> SettleOwnerAsync(OwnerSettlementRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var through = (request.ThroughDate ?? DateOnly.FromDateTime(DateTime.UtcNow)).ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+        var payments = await dbContext.Payments.Where(x => x.ClinicId == clinicId && x.FundsRecipient == FundsRecipient.Owner && x.OwnerSettledAt == null && x.PaidAt <= through).ToListAsync(cancellationToken);
+        if (payments.Count == 0) throw new InvalidOperationException("Nao ha valores pendentes com o CEO.");
+        var settledAt = request.SettledAt ?? DateTimeOffset.UtcNow;
+        payments.ForEach(x => x.OwnerSettledAt = settledAt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new SettlementResponse(null, "CEO", payments.Sum(x => x.Amount), payments.Count, settledAt);
     }
 }
 
@@ -1340,14 +1403,16 @@ public sealed class ExpenseService(
         if (!string.IsNullOrWhiteSpace(destinationBank))
             payments = payments.Where(x => x.DestinationBank == destinationBank.Trim());
 
-        var totalReceived = await payments
-            .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+        var grossReceived = await payments.SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+        var totalReceived = await payments.SumAsync(x => (decimal?)x.ClinicRevenueAmount, cancellationToken) ?? 0m;
+        var professionalLiability = await payments.Where(x => x.ProfessionalPaidAt == null).SumAsync(x => (decimal?)x.ProfessionalPayableAmount, cancellationToken) ?? 0m;
+        var ownerReceivable = await payments.Where(x => x.FundsRecipient == FundsRecipient.Owner && x.OwnerSettledAt == null).SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
 
         var totalExpenses = await dbContext.Expenses
             .Where(x => x.ClinicId == clinicId && x.PaidAt >= monthStart && x.PaidAt < monthEnd && x.DeletedAt == null && x.Status == ExpenseStatus.Paid)
             .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
 
-        return new FinancialSummaryResponse(totalReceived, totalExpenses, totalReceived - totalExpenses);
+        return new FinancialSummaryResponse(totalReceived, totalExpenses, totalReceived - totalExpenses, grossReceived, professionalLiability, ownerReceivable);
     }
 
     private static ExpenseResponse ToResponse(Expense e) =>
@@ -1736,16 +1801,19 @@ public sealed class PaymentIntentService(IApplicationDbContext dbContext, ITenan
             ? ReceivableStatus.Paid
             : ReceivableStatus.Partial;
 
-        dbContext.Payments.Add(new Payment
+        var payment = new Payment
         {
             ClinicId = clinicId,
             ReceivableId = receivable.Id,
             Amount = intent.Amount,
-            PaymentMethod = PaymentMethod.Pix,
+            PaymentMethod = intent.PaymentMethod,
+            FundsRecipient = intent.PaymentMethod is PaymentMethod.CreditCard or PaymentMethod.DebitCard ? FundsRecipient.Owner : FundsRecipient.Clinic,
             Status = PaymentStatus.Paid,
             PaidAt = DateTimeOffset.UtcNow,
             Notes = $"PaymentIntent {intent.IdempotencyKey}"
-        });
+        };
+        FinancialService.ApplySplit(payment, receivable);
+        dbContext.Payments.Add(payment);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -1807,16 +1875,19 @@ public sealed class PaymentIntentService(IApplicationDbContext dbContext, ITenan
                     ? ReceivableStatus.Paid
                     : ReceivableStatus.Partial;
 
-                dbContext.Payments.Add(new Payment
+                var payment = new Payment
                 {
                     ClinicId = clinicId,
                     ReceivableId = receivable.Id,
                     Amount = intent.Amount,
-                    PaymentMethod = PaymentMethod.Pix,
+                    PaymentMethod = intent.PaymentMethod,
+                    FundsRecipient = intent.PaymentMethod is PaymentMethod.CreditCard or PaymentMethod.DebitCard ? FundsRecipient.Owner : FundsRecipient.Clinic,
                     Status = PaymentStatus.Paid,
                     PaidAt = DateTimeOffset.UtcNow,
                     Notes = $"Gateway webhook - {intent.IdempotencyKey}"
-                });
+                };
+                FinancialService.ApplySplit(payment, receivable);
+                dbContext.Payments.Add(payment);
             }
         }
 

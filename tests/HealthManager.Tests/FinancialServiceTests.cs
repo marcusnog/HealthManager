@@ -23,16 +23,20 @@ public sealed class FinancialServiceTests
             AppointmentId = Guid.NewGuid(),
             OriginalAmount = 200,
             ReceivedAmount = 0,
+            ProfessionalId = Guid.NewGuid(),
+            ClinicSharePercentage = 30,
             DueDate = DateTimeOffset.UtcNow
         });
         await dbContext.SaveChangesAsync();
 
         var service = new FinancialService(dbContext, new FakeTenantProvider(clinicId));
         var response = await service.CreatePaymentAsync(
-            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, DateTimeOffset.UtcNow, "Banco do Dono", null),
+            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, DateTimeOffset.UtcNow, "Banco do Dono", FundsRecipient.Clinic),
             CancellationToken.None);
 
         response.Amount.Should().Be(50);
+        response.ClinicRevenueAmount.Should().Be(15);
+        response.ProfessionalPayableAmount.Should().Be(35);
         dbContext.Receivables.Single().Status.Should().Be(ReceivableStatus.Partial);
         dbContext.Receivables.Single().ReceivedAmount.Should().Be(50);
     }
@@ -55,7 +59,7 @@ public sealed class FinancialServiceTests
 
         var service = new FinancialService(dbContext, new FakeTenantProvider(clinicId));
         var action = () => service.CreatePaymentAsync(
-            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, null, null, null),
+            new CreatePaymentRequest(receivableId, 50, PaymentMethod.Pix, null, null),
             CancellationToken.None);
 
         await action.Should().ThrowAsync<InvalidOperationException>()

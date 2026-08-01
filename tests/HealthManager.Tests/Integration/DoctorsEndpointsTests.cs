@@ -36,6 +36,7 @@ public sealed class DoctorsEndpointsTests
             name = "Dra. Maria Silva",
             crm = "CRM-SP-654321",
             phone = "11988887777",
+            clinicSharePercentage = 30,
             specialtyIds = new[] { specialtyId }
         });
 
@@ -43,6 +44,7 @@ public sealed class DoctorsEndpointsTests
         var payload = await response.Content.ReadFromJsonAsync<DoctorHttpResponse>();
         payload.Should().NotBeNull();
         payload!.Specialties.Should().ContainSingle(x => x.Id == specialtyId);
+        payload.ClinicSharePercentage.Should().Be(30);
     }
 
     [Fact]
@@ -141,6 +143,7 @@ public sealed class DoctorsEndpointsTests
         string? Phone,
         string? Email,
         bool IsActive,
+        decimal ClinicSharePercentage,
         List<SpecialtyHttpResponse> Specialties);
 
     private sealed record SpecialtyHttpResponse(Guid Id, string Name);

@@ -78,6 +78,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             .HasForeignKey(x => x.ReceivableId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<Receivable>()
+            .HasOne<Doctor>()
+            .WithMany()
+            .HasForeignKey(x => x.ProfessionalId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<PatientDocument>()
             .HasOne(x => x.Patient)
             .WithMany(x => x.Documents)

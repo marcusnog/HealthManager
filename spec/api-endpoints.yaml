@@ -23,8 +23,8 @@ Patients:
 
 Doctors:
   GET /doctors: "?page,pageSize,search,sortBy,sortDirection -> PagedResult<DoctorResponse> (includes Specialties list) [ClinicAdminOrSecretary]"
-  POST /doctors: "{ name, crm, phone?, email?, specialtyIds } -> 201 DoctorResponse [ClinicAdminOrSecretary]"
-  PUT /doctors/{id}: "{ name, phone?, email?, isActive, specialtyIds } -> DoctorResponse [ClinicAdminOrSecretary]"
+  POST /doctors: "{ name, crm, phone?, email?, clinicSharePercentage, specialtyIds } -> 201 DoctorResponse [ClinicAdminOrSecretary]"
+  PUT /doctors/{id}: "{ name, phone?, email?, isActive, clinicSharePercentage, specialtyIds } -> DoctorResponse [ClinicAdminOrSecretary]"
   DELETE /doctors/{id}: "-> 204 (soft delete, audit logged) [ClinicAdminOrSecretary]"
 
 Appointments:
@@ -46,14 +46,17 @@ AppointmentTypes:
 Financial:
   GET /financial/receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [ClinicStaff]"
   GET /financial/payments: "?page,pageSize,receivableId,dateFrom,dateTo,destinationBank -> PagedResult<PaymentResponse> [ClinicStaff]"
-  POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, destinationBank?, notes? } -> 201 PaymentResponse [ClinicStaff]"
+  POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, destinationBank?, fundsRecipient?, notes? } -> 201 PaymentResponse [ClinicStaff]"
 
   # Custom wrappers (not in openapi.json, available via src/services/api.ts):
   GET /financial/expenses: "?page,pageSize,categoryId,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [ClinicStaff]"
   POST /financial/expenses: "{ description, amount, categoryId, paymentMethod, paidAt?, status?, notes? } -> 201 ExpenseResponse [ClinicStaff]"
   PUT /financial/expenses/{id}: "{ ... } -> ExpenseResponse [ClinicStaff]"
   DELETE /financial/expenses/{id}: "-> 204 [ClinicAdminOrSecretary]"
-  GET /financial/summary: "?destinationBank -> { totalReceived, totalExpenses, balance } (when bank is informed, only revenue is filtered; paid clinic expenses remain the abatements) [ClinicStaff]"
+  GET /financial/summary: "?destinationBank -> { grossReceived, totalReceived(recognized clinic revenue), professionalLiability, ownerReceivable, totalExpenses, balance(profit) } [ClinicStaff]"
+  GET /financial/professional-settlements: "-> ProfessionalSettlementResponse[] grouped by professional [ClinicAdmin]"
+  POST /financial/professional-settlements: "{ professionalId, throughDate?, paidAt? } -> settlement summary; marks all eligible liabilities paid [ClinicAdmin]"
+  POST /financial/owner-settlements: "{ throughDate?, settledAt? } -> settlement summary; marks eligible Owner receipts transferred [ClinicAdmin]"
 
 ExpenseCategories:
   GET /expense-categories: "?page,pageSize,search -> PagedResult<ExpenseCategoryResponse> [ClinicStaff]"

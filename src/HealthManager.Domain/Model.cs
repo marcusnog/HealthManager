@@ -104,6 +104,7 @@ public sealed class Doctor : TenantEntity
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public bool IsActive { get; set; } = true;
+    public decimal ClinicSharePercentage { get; set; } = 100m;
     public ICollection<DoctorSpecialty> DoctorSpecialties { get; set; } = new List<DoctorSpecialty>();
 }
 
@@ -132,6 +133,8 @@ public sealed class Receivable : TenantEntity
     public ReceivableStatus Status { get; set; } = ReceivableStatus.Pending;
     public DateTimeOffset DueDate { get; set; } = DateTimeOffset.UtcNow;
     public string? Description { get; set; }
+    public Guid? ProfessionalId { get; set; }
+    public decimal ClinicSharePercentage { get; set; } = 100m;
     public Appointment? Appointment { get; set; }
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }
@@ -144,6 +147,11 @@ public sealed class Payment : TenantEntity
     public PaymentStatus Status { get; set; } = PaymentStatus.Paid;
     public DateTimeOffset PaidAt { get; set; } = DateTimeOffset.UtcNow;
     public string? DestinationBank { get; set; }
+    public FundsRecipient FundsRecipient { get; set; } = FundsRecipient.Clinic;
+    public decimal ClinicRevenueAmount { get; set; }
+    public decimal ProfessionalPayableAmount { get; set; }
+    public DateTimeOffset? ProfessionalPaidAt { get; set; }
+    public DateTimeOffset? OwnerSettledAt { get; set; }
     public string? Notes { get; set; }
     public Receivable? Receivable { get; set; }
 }
@@ -403,6 +411,12 @@ public enum PaymentStatus
 {
     Paid = 1,
     Refunded = 2
+}
+
+public enum FundsRecipient
+{
+    Clinic = 1,
+    Owner = 2
 }
 
 public enum MessageDirection
