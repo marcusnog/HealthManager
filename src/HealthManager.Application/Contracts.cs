@@ -178,6 +178,10 @@ public sealed record ProfessionalSettlementResponse(Guid ProfessionalId, string 
 public sealed record DashboardSummaryResponse(int AppointmentsToday, int ConfirmedToday, int CancelledToday, decimal MonthlyRevenue, double NoShowRate, double ConfirmationRate, decimal MonthlyExpenses, decimal MonthlyBalance);
 
 public sealed record WhatsAppWebhookRequest(Guid? ClinicId, Guid? AppointmentId, [Required] string Phone, [Required] string Message, string? ProviderMessageId);
+public sealed record WhatsAppConversationQuery(int Page = 1, int PageSize = 20, string? Search = null);
+public sealed record WhatsAppConversationResponse(string Phone, string? PatientName, string LastMessage, DateTimeOffset LastMessageAt, MessageDirection LastDirection);
+public sealed record WhatsAppMessageResponse(Guid Id, string Phone, string Message, WhatsAppMessageStatus Status, MessageDirection Direction, DateTimeOffset CreatedAt);
+public sealed record SendWhatsAppMessageRequest([Required][StringLength(4096)] string Message);
 
 public sealed record PatientPortalLoginRequest([Required] string Cpf, [Required] string AccessToken);
 public sealed record PatientPortalAuthResponse(string AccessToken, DateTimeOffset ExpiresAt, PatientPortalProfileResponse Patient);

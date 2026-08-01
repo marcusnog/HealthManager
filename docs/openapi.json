@@ -1455,6 +1455,33 @@
         }
       }
     },
+    "/whatsapp/conversations": {
+      "get": {
+        "operationId": "whatsapp_conversations_list",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "Page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "PageSize", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "Search", "in": "query", "schema": { "type": "string", "nullable": true } }
+        ],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedWhatsAppConversationResponse" } } } } }
+      }
+    },
+    "/whatsapp/conversations/{phone}/messages": {
+      "get": {
+        "operationId": "whatsapp_messages_list",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "phone", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/WhatsAppMessageResponse" } } } } } }
+      },
+      "post": {
+        "operationId": "whatsapp_message_send",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "phone", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SendWhatsAppMessageRequest" } } } },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WhatsAppMessageResponse" } } } } }
+      }
+    },
     "/tenant/integration": {
       "get": {
         "operationId": "tenant_integration_get",
@@ -2149,6 +2176,44 @@
           "wABAId": { "type": "string", "nullable": true },
           "isEnabled": { "type": "boolean" }
         }
+      },
+      "WhatsAppConversationResponse": {
+        "type": "object",
+        "required": ["phone", "lastMessage", "lastMessageAt", "lastDirection"],
+        "properties": {
+          "phone": { "type": "string" },
+          "patientName": { "type": "string", "nullable": true },
+          "lastMessage": { "type": "string" },
+          "lastMessageAt": { "type": "string", "format": "date-time" },
+          "lastDirection": { "type": "string", "enum": ["Inbound", "Outbound"] }
+        }
+      },
+      "PagedWhatsAppConversationResponse": {
+        "type": "object",
+        "required": ["items", "page", "pageSize", "total"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/WhatsAppConversationResponse" } },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+      "WhatsAppMessageResponse": {
+        "type": "object",
+        "required": ["id", "phone", "message", "status", "direction", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "phone": { "type": "string" },
+          "message": { "type": "string" },
+          "status": { "type": "string", "enum": ["Pending", "Sent", "Delivered", "Failed"] },
+          "direction": { "type": "string", "enum": ["Inbound", "Outbound"] },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SendWhatsAppMessageRequest": {
+        "type": "object",
+        "required": ["message"],
+        "properties": { "message": { "type": "string", "maxLength": 4096 } }
       },
       "PaymentGatewayConfigRequest": {
         "type": "object",

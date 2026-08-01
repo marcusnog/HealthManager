@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<CheckoutService>();
         services.AddScoped<TenantIntegrationService>();
         services.AddScoped<WhatsAppMessagingService>();
+        services.AddScoped<WhatsAppAtendimentoService>();
 
         services.AddSingleton<Dictionary<PaymentGatewayProvider, IPaymentGatewayHandler>>(_ => new()
         {
