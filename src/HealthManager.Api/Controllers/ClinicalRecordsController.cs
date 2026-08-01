@@ -18,7 +18,7 @@ public sealed class ClinicalRecordsController(ClinicalRecordService service) : C
     }
 
     [HttpPost]
-    [Authorize(Policy = "ClinicStaff")]
+    [Authorize(Policy = "DoctorOnly")]
     public async Task<ActionResult<ClinicalRecordResponse>> Create(Guid appointmentId, [FromBody] CreateClinicalRecordRequest request, CancellationToken ct)
     {
         var response = await service.CreateAsync(appointmentId, request, ct);
@@ -26,16 +26,17 @@ public sealed class ClinicalRecordsController(ClinicalRecordService service) : C
     }
 
     [HttpPatch]
-    [Authorize(Policy = "ClinicStaff")]
+    [Authorize(Policy = "DoctorOnly")]
     public async Task<ActionResult<ClinicalRecordResponse>> Update(Guid appointmentId, [FromBody] UpdateClinicalRecordRequest request, CancellationToken ct)
         => Ok(await service.UpdateAsync(appointmentId, request, ct));
 
     [HttpPost("finalize")]
-    [Authorize(Policy = "ClinicStaff")]
+    [Authorize(Policy = "DoctorOnly")]
     public async Task<ActionResult<ClinicalRecordResponse>> Finalize(Guid appointmentId, CancellationToken ct)
         => Ok(await service.FinalizeAsync(appointmentId, ct));
 
     [HttpPost("addendum")]
+    [Authorize(Policy = "DoctorOnly")]
     public async Task<ActionResult<ClinicalRecordAddendumResponse>> AddAddendum(Guid appointmentId, [FromBody] CreateAddendumRequest request, CancellationToken ct)
     {
         var response = await service.AddAddendumAsync(appointmentId, request, ct);

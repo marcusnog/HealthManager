@@ -1462,7 +1462,9 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
         var record = await dbContext.ClinicalRecords.AsNoTracking()
             .Include(x => x.Patient).Include(x => x.Doctor)
             .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken);
-        return record is null ? null : ToResponse(record);
+        if (record is null) return null;
+        await EnsureCanReadAsync(record.DoctorId, cancellationToken);
+        return ToResponse(record);
     }
 
     public async Task<ClinicalRecordResponse> CreateAsync(Guid appointmentId, CreateClinicalRecordRequest request, CancellationToken cancellationToken)
@@ -1473,6 +1475,10 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
         var appointment = await dbContext.Appointments.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == appointmentId && x.ClinicId == clinicId, cancellationToken)
             ?? throw new KeyNotFoundException("Consulta nao encontrada.");
+
+        var doctorId = await ResolveDoctorIdAsync(cancellationToken);
+        if (doctorId is null || appointment.DoctorId != doctorId)
+            throw new UnauthorizedAccessException("Apenas o medico responsavel pode criar o atendimento.");
 
         if (await dbContext.ClinicalRecords.AnyAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken))
             throw new InvalidOperationException("Atendimento ja existe para esta consulta.");
@@ -1558,11 +1564,22 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
             .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken)
             ?? throw new KeyNotFoundException("Atendimento nao encontrado.");
 
+        if (record.Status != ClinicalRecordStatus.Finalized)
+            throw new InvalidOperationException("Adendos so podem ser incluidos em atendimentos finalizados.");
+
+        var doctorId = await ResolveDoctorIdAsync(cancellationToken);
+        if (doctorId is null || record.DoctorId != doctorId)
+            throw new UnauthorizedAccessException("Apenas o medico responsavel pode incluir adendos.");
+
+        var content = request.Content.Trim();
+        if (content.Length == 0)
+            throw new InvalidOperationException("Conteudo do adendo e obrigatorio.");
+
         var addendum = new ClinicalRecordAddendum
         {
             ClinicId = clinicId,
             ClinicalRecordId = record.Id,
-            Content = request.Content,
+            Content = content,
             AuthorId = tenantProvider.UserId ?? throw new UnauthorizedAccessException("Usuario nao autenticado.")
         };
 
@@ -1582,6 +1599,8 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
             .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken)
             ?? throw new KeyNotFoundException("Atendimento nao encontrado.");
 
+        await EnsureCanReadAsync(record.DoctorId, cancellationToken);
+
         var addendums = await dbContext.ClinicalRecordAddendums.AsNoTracking()
             .Include(x => x.Author)
             .Where(x => x.ClinicalRecordId == record.Id && x.ClinicId == clinicId)
@@ -1594,13 +1613,30 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
     public async Task<IReadOnlyList<ClinicalRecordResponse>> ListByPatientAsync(Guid patientId, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
-        var records = await dbContext.ClinicalRecords.AsNoTracking()
+        var query = dbContext.ClinicalRecords.AsNoTracking()
             .Include(x => x.Patient).Include(x => x.Doctor)
-            .Where(x => x.PatientId == patientId && x.ClinicId == clinicId)
+            .Where(x => x.PatientId == patientId && x.ClinicId == clinicId);
+
+        if (tenantProvider.Role == UserRole.Doctor)
+        {
+            var doctorId = await ResolveDoctorIdAsync(cancellationToken)
+                ?? throw new UnauthorizedAccessException("Medico nao vinculado.");
+            query = query.Where(x => x.DoctorId == doctorId);
+        }
+
+        var records = await query
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
         return records.Select(ToResponse).ToList();
+    }
+
+    private async Task EnsureCanReadAsync(Guid owningDoctorId, CancellationToken cancellationToken)
+    {
+        if (tenantProvider.Role != UserRole.Doctor) return;
+        var doctorId = await ResolveDoctorIdAsync(cancellationToken);
+        if (doctorId is null || doctorId != owningDoctorId)
+            throw new UnauthorizedAccessException("Apenas o medico responsavel pode acessar o atendimento.");
     }
 
     private static ClinicalRecordResponse ToResponse(ClinicalRecord r) =>

@@ -1403,6 +1403,53 @@
         }
       }
     },
+    "/checkout": {
+      "post": {
+        "operationId": "checkout_create",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CheckoutRequest" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CheckoutResponse" } } }
+          }
+        }
+      }
+    },
+    "/portal/checkout": {
+      "post": {
+        "operationId": "portal_checkout_create",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CheckoutRequest" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CheckoutResponse" } } }
+          }
+        }
+      }
+    },
+    "/checkout/{id}": {
+      "get": {
+        "operationId": "checkout_get",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CheckoutResponse" } } }
+          }
+        }
+      }
+    },
     "/tenant/integration": {
       "get": {
         "operationId": "tenant_integration_get",
@@ -2031,6 +2078,30 @@
           "page": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "total": { "type": "integer" }
+        }
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "required": ["receivableId", "paymentMethod"],
+        "properties": {
+          "receivableId": { "type": "string", "format": "uuid" },
+          "paymentMethod": { "type": "string", "enum": ["Cash", "Pix", "CreditCard", "DebitCard", "Insurance"] },
+          "amount": { "type": "number", "nullable": true },
+          "returnUrl": { "type": "string", "nullable": true }
+        }
+      },
+      "CheckoutResponse": {
+        "type": "object",
+        "properties": {
+          "paymentIntentId": { "type": "string", "format": "uuid" },
+          "receivableId": { "type": "string", "format": "uuid" },
+          "amount": { "type": "number" },
+          "paymentMethod": { "type": "string" },
+          "status": { "type": "string" },
+          "pixQrCode": { "type": "string", "nullable": true },
+          "pixCopyPaste": { "type": "string", "nullable": true },
+          "checkoutUrl": { "type": "string", "nullable": true },
+          "expiresAt": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
       "WhatsAppConfigRequest": {
