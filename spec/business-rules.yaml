@@ -22,7 +22,7 @@ authorization:
   roles:
     PlatformAdmin: "All access, bypasses tenant filter. No clinicId in JWT."
     Admin: "Full clinic access. Manages users, patients, doctors, appointments, finances."
-    Secretary: "Operational: patients, appointments. No doctor/expense management."
+    Secretary: "Displayed as Recepção. Operational access to patients, appointments and WhatsApp atendimento. No doctor/expense management."
     Doctor: "Own clinic data. Can view schedule, mark appointment statuses."
     Patient: "Portal only. Scoped to own data via PatientAccessToken."
 
@@ -114,6 +114,7 @@ whatsapp_messaging:
   appointment_integration: "SendAppointmentConfirmationAsync and SendAppointmentCancellationAsync are service-level convenience methods. Call them from AppointmentService on status transitions."
   outbox_events: "Confirmation messages also enqueue 'whatsapp.appointment.confirmed' outbox event for downstream processing."
   timezone: "Appointment dates displayed in clinic timezone (hardcoded BRT offset for now — upgrade path: resolve from clinic config)."
+  atendimento: "Admin and Secretary (displayed as Recepção) can list conversations, read message history and send text replies. Tenant filters isolate every clinic."
 
 outbox:
   events: "appointment.created, appointment.updated, appointment.cancelled, whatsapp.appointment.confirmed"

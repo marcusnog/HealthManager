@@ -69,6 +69,9 @@ Dashboard:
 
 WhatsApp:
   POST /whatsapp/webhook: "{ clinicId?, appointmentId?, phone, message, providerMessageId? } [No auth]"
+  GET /whatsapp/conversations: "?page,pageSize,search -> PagedResult<WhatsAppConversationResponse> [ClinicAdminOrSecretary]"
+  GET /whatsapp/conversations/{phone}/messages: "-> WhatsAppMessageResponse[] [ClinicAdminOrSecretary]"
+  POST /whatsapp/conversations/{phone}/messages: "{ message } -> WhatsAppMessageResponse [ClinicAdminOrSecretary]"
 
 PatientPortal:
   POST /portal/auth: "{ cpf, accessToken } -> PatientPortalAuthResponse [No auth]"

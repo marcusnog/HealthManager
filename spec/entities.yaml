@@ -25,7 +25,7 @@
   name: string
   email: string, unique index (filter: DeletedAt IS NULL)
   passwordHash: string (BCrypt)
-  role: UserRole (PlatformAdmin|Admin|Secretary|Doctor|Patient)
+  role: UserRole (PlatformAdmin|Admin|Secretary|Doctor|Patient; Secretary is displayed as Recepção)
   isActive: bool (default true)
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
@@ -250,6 +250,17 @@
   lastError: string?
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
   # Note: no tenant filter (ClinicId is nullable)
+
+- WhatsAppMessage:
+  id: Guid (auto)
+  clinicId: Guid
+  patientId: Guid?
+  phone: string
+  message: string
+  status: WhatsAppMessageStatus (Pending|Sent|Delivered|Failed)
+  direction: MessageDirection (Inbound|Outbound)
+  providerMessageId: string?
+  # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
 - ClinicWhatsAppConfig:
   id: Guid (auto)

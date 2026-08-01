@@ -2163,17 +2163,20 @@ public sealed class WhatsAppWebhookService(
 {
     public async Task ProcessAsync(WhatsAppWebhookRequest request, CancellationToken cancellationToken)
     {
+        var phone = AppHelpers.NormalizePhone(request.Phone);
+        var clinicId = request.ClinicId ?? tenantProvider.ClinicId;
+
         dbContext.WebhookEvents.Add(new WebhookEvent
         {
-            ClinicId = request.ClinicId ?? tenantProvider.ClinicId,
+            ClinicId = clinicId,
             PayloadJson = JsonSerializer.Serialize(request),
             Processed = false
         });
 
         dbContext.WhatsAppMessages.Add(new WhatsAppMessage
         {
-            ClinicId = request.ClinicId ?? tenantProvider.ClinicId,
-            Phone = request.Phone,
+            ClinicId = clinicId,
+            Phone = phone,
             Message = request.Message,
             Direction = MessageDirection.Inbound,
             Status = WhatsAppMessageStatus.Delivered,
@@ -2668,7 +2671,7 @@ public sealed class WhatsAppMessagingService(
     {
         if (string.IsNullOrWhiteSpace(patient.Phone) || !appointment.ClinicId.HasValue) return;
 
-        var phone = NormalizePhone(patient.Phone);
+        var phone = AppHelpers.NormalizePhone(patient.Phone);
         var date = appointment.StartAt.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm");
         var text = $"Ola {patient.Name}! Sua consulta foi confirmada para {date}. Para confirmar, responda CONFIRM. Para cancelar, responda CANCEL.";
 
@@ -2686,7 +2689,7 @@ public sealed class WhatsAppMessagingService(
     {
         if (string.IsNullOrWhiteSpace(patient.Phone) || !appointment.ClinicId.HasValue) return;
 
-        var phone = NormalizePhone(patient.Phone);
+        var phone = AppHelpers.NormalizePhone(patient.Phone);
         var date = appointment.StartAt.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm");
         var text = $"Ola {patient.Name}! Sua consulta do dia {date} foi cancelada. Para reagendar, entre em contato.";
 
@@ -2720,16 +2723,79 @@ public sealed class WhatsAppMessagingService(
         return result;
     }
 
-    private static string NormalizePhone(string phone)
+}
+
+public sealed class WhatsAppAtendimentoService(
+    IApplicationDbContext dbContext,
+    ITenantProvider tenantProvider,
+    WhatsAppMessagingService messagingService)
+{
+    public async Task<PagedResult<WhatsAppConversationResponse>> ListAsync(WhatsAppConversationQuery query, CancellationToken cancellationToken)
     {
-        var digits = AppHelpers.NormalizeDigits(phone);
-        return digits.Length is 10 or 11 && !digits.StartsWith("55") ? "55" + digits : digits;
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var patients = await dbContext.Patients.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null)
+            .Select(x => new { x.Name, x.Phone })
+            .ToListAsync(cancellationToken);
+        var names = patients.GroupBy(x => AppHelpers.NormalizePhone(x.Phone)).ToDictionary(x => x.Key, x => x.First().Name);
+
+        // ponytail: in-memory grouping is enough for the current inbox; move to a SQL projection if message volume makes this measurable.
+        var messages = await dbContext.WhatsAppMessages.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+        var conversations = messages.GroupBy(x => AppHelpers.NormalizePhone(x.Phone))
+            .Select(x => x.First())
+            .Select(x => new WhatsAppConversationResponse(x.Phone, names.GetValueOrDefault(AppHelpers.NormalizePhone(x.Phone)), x.Message, x.CreatedAt, x.Direction));
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim();
+            conversations = conversations.Where(x => x.Phone.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || (x.PatientName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        var all = conversations.ToList();
+        return new PagedResult<WhatsAppConversationResponse>(all.Skip((page - 1) * pageSize).Take(pageSize).ToList(), page, pageSize, all.Count);
     }
+
+    public async Task<IReadOnlyList<WhatsAppMessageResponse>> MessagesAsync(string phone, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var normalized = AppHelpers.NormalizePhone(phone);
+        var messages = await dbContext.WhatsAppMessages.AsNoTracking()
+            .Where(x => x.ClinicId == clinicId && x.DeletedAt == null)
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+        return messages.Where(x => AppHelpers.NormalizePhone(x.Phone) == normalized).Select(ToResponse).ToList();
+    }
+
+    public async Task<WhatsAppMessageResponse> SendAsync(string phone, SendWhatsAppMessageRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var normalized = AppHelpers.NormalizePhone(phone);
+        if (normalized.Length < 12) throw new InvalidOperationException("Telefone de WhatsApp invalido.");
+        var result = await messagingService.SendTextAsync(clinicId, normalized, request.Message.Trim(), cancellationToken);
+        if (!result.Success) throw new InvalidOperationException(result.Error ?? "Nao foi possivel enviar a mensagem.");
+        var message = await dbContext.WhatsAppMessages.AsNoTracking().OrderByDescending(x => x.CreatedAt)
+            .FirstAsync(x => x.ClinicId == clinicId && x.Phone == normalized && x.Direction == MessageDirection.Outbound, cancellationToken);
+        return ToResponse(message);
+    }
+
+    private static WhatsAppMessageResponse ToResponse(WhatsAppMessage message) =>
+        new(message.Id, message.Phone, message.Message, message.Status, message.Direction, message.CreatedAt);
 }
 
 internal static class AppHelpers
 {
     internal static string NormalizeDigits(string value) => new(value.Where(char.IsDigit).ToArray());
+    internal static string NormalizePhone(string phone)
+    {
+        var digits = NormalizeDigits(phone);
+        return digits.Length is 10 or 11 && !digits.StartsWith("55") ? "55" + digits : digits;
+    }
 
     internal static bool ValidateCpf(string cpf)
     {
