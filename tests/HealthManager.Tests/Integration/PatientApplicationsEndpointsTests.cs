@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using HealthManager.Domain;
+using Microsoft.EntityFrameworkCore;
 
 namespace HealthManager.Tests.Integration;
 
@@ -59,6 +61,65 @@ public sealed class PatientApplicationsEndpointsTests
 
         var denied = await doctor.PostAsJsonAsync($"/patients/{PatientId}/applications/balance", new { source = "individual", productId });
         denied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ConcurrentApplications_ShouldNeverExceedGrantedBalance()
+    {
+        await using var factory = new ApiTestFactory();
+        using var admin = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        using var doctor = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
+
+        var productResponse = await admin.PostAsJsonAsync("/products", new { name = "Soro facial", price = 120m, applicationCount = 1 });
+        productResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var product = (await productResponse.Content.ReadFromJsonAsync<ProductDto>())!;
+
+        var sale = await admin.PostAsJsonAsync($"/patients/{PatientId}/applications/balance", new { source = "individual", productId = product.Id });
+        sale.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var attempts = Enumerable.Range(0, 5)
+            .Select(_ => doctor.PostAsJsonAsync($"/patients/{PatientId}/applications", new { productId = product.Id, quantity = 1 }))
+            .ToList();
+        var statuses = await Task.WhenAll(attempts.Select(async a => (await a).StatusCode));
+
+        statuses.Count(x => x == HttpStatusCode.Created).Should().Be(1);
+        statuses.Count(x => x == HttpStatusCode.BadRequest).Should().Be(4);
+
+        var balances = await admin.GetFromJsonAsync<List<BalanceDto>>($"/patients/{PatientId}/applications/balance");
+        balances!.Single(x => x.Source == "Individual").RemainingUnits.Should().Be(0);
+
+        var applications = await doctor.GetFromJsonAsync<List<ApplicationDto>>($"/patients/{PatientId}/applications");
+        applications!.Count(x => x.ProductId == product.Id).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SecretaryCannotRegisterApplication()
+    {
+        await using var factory = new ApiTestFactory();
+
+        await factory.WithDbContextAsync(async dbContext =>
+        {
+            var doctor = await dbContext.Users.SingleAsync(x => x.Email == "henrique.lima@clinicaaurora.com");
+            dbContext.Users.Add(new User
+            {
+                ClinicId = doctor.ClinicId,
+                Name = "Secretaria Aurora",
+                Email = "secretaria@clinicaaurora.com",
+                PasswordHash = doctor.PasswordHash,
+                Role = UserRole.Secretary
+            });
+            await dbContext.SaveChangesAsync();
+        });
+
+        using var admin = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        using var secretary = await factory.CreateAuthenticatedClientAsync("secretaria@clinicaaurora.com", "ChangeMe123!");
+
+        var productResponse = await admin.PostAsJsonAsync("/products", new { name = "Alinhador", price = 80m, applicationCount = 1 });
+        var product = (await productResponse.Content.ReadFromJsonAsync<ProductDto>())!;
+        await admin.PostAsJsonAsync($"/patients/{PatientId}/applications/balance", new { source = "individual", productId = product.Id });
+
+        var apply = await secretary.PostAsJsonAsync($"/patients/{PatientId}/applications", new { productId = product.Id, quantity = 1 });
+        apply.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private sealed record ProductDto(Guid Id, string Name, decimal Price, int ApplicationCount, bool IsActive);
