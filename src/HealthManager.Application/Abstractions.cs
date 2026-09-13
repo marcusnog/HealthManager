@@ -49,6 +49,11 @@ public interface IApplicationDbContext
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<Expense> Expenses { get; }
     DbSet<ExpenseCategory> ExpenseCategories { get; }
+DbSet<Product> Products { get; }
+    DbSet<Package> Packages { get; }
+    DbSet<PackageItem> PackageItems { get; }
+    DbSet<PatientProductBalance> PatientProductBalances { get; }
+    DbSet<PatientApplication> PatientApplications { get; }
     DbSet<OutboxEvent> OutboxEvents { get; }
     DbSet<PatientDocument> PatientDocuments { get; }
     DbSet<RefreshToken> RefreshTokens { get; }

@@ -2116,6 +2116,299 @@ public sealed class AppointmentTypeService(IApplicationDbContext dbContext, ITen
     }
 }
 
+public sealed class ProductService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    public async Task<PagedResult<ProductResponse>> ListAsync(ProductQuery query, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var products = dbContext.Products.AsNoTracking().Where(x => x.ClinicId == clinicId);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLowerInvariant();
+            products = products.Where(x => x.Name.ToLower().Contains(search));
+        }
+        var total = await products.CountAsync(ct);
+        var items = await products.OrderBy(x => x.Name).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(x => new ProductResponse(x.Id, x.Name, x.Price, x.ApplicationCount, x.IsActive)).ToListAsync(ct);
+        return new(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<ProductResponse> CreateAsync(ProductRequest request, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var name = request.Name.Trim();
+        await EnsureUniqueName(clinicId, name, null, ct);
+        var product = new Product { ClinicId = clinicId, Name = name, Price = request.Price, ApplicationCount = request.ApplicationCount, IsActive = request.IsActive };
+        dbContext.Products.Add(product);
+        await dbContext.SaveChangesAsync(ct);
+        return Map(product);
+    }
+
+    public async Task<ProductResponse> UpdateAsync(Guid id, ProductRequest request, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, ct)
+            ?? throw new KeyNotFoundException("Produto nao encontrado.");
+        var name = request.Name.Trim();
+        await EnsureUniqueName(clinicId, name, id, ct);
+        product.Name = name;
+        product.Price = request.Price;
+        product.ApplicationCount = request.ApplicationCount;
+        product.IsActive = request.IsActive;
+        await dbContext.SaveChangesAsync(ct);
+        return Map(product);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, ct)
+            ?? throw new KeyNotFoundException("Produto nao encontrado.");
+        if (await dbContext.PackageItems.AnyAsync(x => x.ProductId == id, ct))
+            throw new InvalidOperationException("Produto vinculado a pacote nao pode ser excluido.");
+        product.DeletedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    private async Task EnsureUniqueName(Guid clinicId, string name, Guid? exceptId, CancellationToken ct)
+    {
+        if (await dbContext.Products.AnyAsync(x => x.ClinicId == clinicId && x.Id != exceptId && x.Name.ToLower() == name.ToLower(), ct))
+            throw new InvalidOperationException("Ja existe um produto com este nome.");
+    }
+
+    private static ProductResponse Map(Product product) => new(product.Id, product.Name, product.Price, product.ApplicationCount, product.IsActive);
+}
+
+public sealed class PackageService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    public async Task<PagedResult<PackageResponse>> ListAsync(PackageQuery query, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var packages = dbContext.Packages.AsNoTracking().Where(x => x.ClinicId == clinicId);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLowerInvariant();
+            packages = packages.Where(x => x.Name.ToLower().Contains(search));
+        }
+        var total = await packages.CountAsync(ct);
+        var items = await packages.OrderBy(x => x.Name).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(x => new PackageResponse(x.Id, x.Name, x.Price, x.IsActive,
+                x.Items.OrderBy(i => i.Product.Name).Select(i => new PackageItemResponse(i.ProductId, i.Product.Name, i.ApplicationCount)).ToList()))
+            .ToListAsync(ct);
+        return new(items, query.Page, query.PageSize, total);
+    }
+
+    public async Task<PackageResponse> CreateAsync(PackageRequest request, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var name = request.Name.Trim();
+        await Validate(clinicId, name, request.Items, null, ct);
+        var package = new Package { ClinicId = clinicId, Name = name, Price = request.Price, IsActive = request.IsActive };
+        package.Items = request.Items.Select(x => new PackageItem { ClinicId = clinicId, ProductId = x.ProductId, ApplicationCount = x.ApplicationCount }).ToList();
+        dbContext.Packages.Add(package);
+        await dbContext.SaveChangesAsync(ct);
+        return await GetAsync(package.Id, clinicId, ct);
+    }
+
+    public async Task<PackageResponse> UpdateAsync(Guid id, PackageRequest request, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var package = await dbContext.Packages.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, ct)
+            ?? throw new KeyNotFoundException("Pacote nao encontrado.");
+        var name = request.Name.Trim();
+        await Validate(clinicId, name, request.Items, id, ct);
+        package.Name = name;
+        package.Price = request.Price;
+        package.IsActive = request.IsActive;
+        dbContext.PackageItems.RemoveRange(package.Items);
+        package.Items = request.Items.Select(x => new PackageItem { ClinicId = clinicId, PackageId = id, ProductId = x.ProductId, ApplicationCount = x.ApplicationCount }).ToList();
+        await dbContext.SaveChangesAsync(ct);
+        return await GetAsync(id, clinicId, ct);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var package = await dbContext.Packages.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id && x.ClinicId == clinicId, ct)
+            ?? throw new KeyNotFoundException("Pacote nao encontrado.");
+        var now = DateTimeOffset.UtcNow;
+        package.DeletedAt = now;
+        foreach (var item in package.Items) item.DeletedAt = now;
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    private async Task Validate(Guid clinicId, string name, IReadOnlyList<PackageItemRequest> items, Guid? exceptId, CancellationToken ct)
+    {
+        if (items.Count == 0) throw new InvalidOperationException("O pacote deve conter ao menos um produto.");
+        if (items.Select(x => x.ProductId).Distinct().Count() != items.Count) throw new InvalidOperationException("O produto nao pode ser repetido no pacote.");
+        if (await dbContext.Packages.AnyAsync(x => x.ClinicId == clinicId && x.Id != exceptId && x.Name.ToLower() == name.ToLower(), ct))
+            throw new InvalidOperationException("Ja existe um pacote com este nome.");
+        var productIds = items.Select(x => x.ProductId).ToList();
+        if (await dbContext.Products.CountAsync(x => x.ClinicId == clinicId && x.IsActive && productIds.Contains(x.Id), ct) != productIds.Count)
+            throw new InvalidOperationException("Todos os produtos do pacote devem existir e estar ativos.");
+    }
+
+private async Task<PackageResponse> GetAsync(Guid id, Guid clinicId, CancellationToken ct) =>
+        await dbContext.Packages.AsNoTracking().Where(x => x.Id == id && x.ClinicId == clinicId)
+            .Select(x => new PackageResponse(x.Id, x.Name, x.Price, x.IsActive,
+                x.Items.OrderBy(i => i.Product.Name).Select(i => new PackageItemResponse(i.ProductId, i.Product.Name, i.ApplicationCount)).ToList()))
+            .FirstAsync(ct);
+}
+
+public sealed class PatientApplicationService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
+{
+    public async Task<IReadOnlyList<PatientApplicationBalanceResponse>> GrantBalanceAsync(
+        Guid patientId, GrantApplicationBalanceRequest request, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        await RequirePatient(clinicId, patientId, ct);
+        var source = ParseSource(request.Source);
+
+        if (source == ApplicationBalanceSource.Package && request.PackageId.HasValue)
+        {
+            var package = await dbContext.Packages
+                .Include(x => x.Items)
+                .FirstOrDefaultAsync(x => x.Id == request.PackageId && x.ClinicId == clinicId && x.IsActive, ct)
+                ?? throw new KeyNotFoundException("Pacote nao encontrado.");
+            foreach (var item in package.Items)
+                await GrantUnits(clinicId, patientId, item.ProductId, source, package.Id, item.ApplicationCount, ct);
+        }
+        else if (source == ApplicationBalanceSource.Individual && request.ProductId.HasValue)
+        {
+            var product = await dbContext.Products
+                .FirstOrDefaultAsync(x => x.Id == request.ProductId && x.ClinicId == clinicId && x.IsActive, ct)
+                ?? throw new KeyNotFoundException("Produto nao encontrado.");
+            await GrantUnits(clinicId, patientId, product.Id, source, null, product.ApplicationCount, ct);
+        }
+        else
+        {
+            throw new InvalidOperationException("Informe packageId para pacote ou productId para venda individual.");
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return await ListBalancesAsync(patientId, clinicId, ct);
+    }
+
+    public async Task<IReadOnlyList<PatientApplicationBalanceResponse>> ListBalancesAsync(Guid patientId, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        return await ListBalancesAsync(patientId, clinicId, ct);
+    }
+
+    public async Task<PatientApplicationResponse> RecordApplicationAsync(Guid patientId, PatientApplicationRequest request, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        await RequirePatient(clinicId, patientId, ct);
+        var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == request.ProductId && x.ClinicId == clinicId, ct)
+            ?? throw new KeyNotFoundException("Produto nao encontrado.");
+
+        if (request.DoctorId.HasValue && !await dbContext.Doctors.AnyAsync(x => x.Id == request.DoctorId && x.ClinicId == clinicId, ct))
+            throw new KeyNotFoundException("Medico nao encontrado.");
+
+        var balances = await dbContext.PatientProductBalances
+            .Where(x => x.PatientId == patientId && x.ClinicId == clinicId && x.ProductId == request.ProductId)
+            .ToListAsync(ct);
+        if (request.BalanceId.HasValue)
+        {
+            balances = balances.Where(x => x.Id == request.BalanceId.Value).ToList();
+            if (balances.Count == 0)
+                throw new InvalidOperationException("Saldo informado nao encontrado para este produto.");
+        }
+
+        var pool = balances.Where(x => x.UsedUnits < x.PurchasedUnits).OrderBy(x => x.CreatedAt).ToList();
+        var available = pool.Sum(x => x.PurchasedUnits - x.UsedUnits);
+        if (available < request.Quantity)
+            throw new InvalidOperationException($"Saldo insuficiente de {product.Name}. Restam {available} aplicacao(oes).");
+
+        var toConsume = request.Quantity;
+        foreach (var line in pool)
+        {
+            var free = line.PurchasedUnits - line.UsedUnits;
+            if (free <= 0) continue;
+            var take = Math.Min(free, toConsume);
+            line.UsedUnits += take;
+            toConsume -= take;
+            if (toConsume == 0) break;
+        }
+
+        var application = new PatientApplication
+        {
+            ClinicId = clinicId,
+            PatientId = patientId,
+            ProductId = request.ProductId,
+            Quantity = request.Quantity,
+            AppliedAt = request.AppliedAt ?? DateTimeOffset.UtcNow,
+            DoctorId = request.DoctorId,
+            Notes = request.Notes
+        };
+        dbContext.PatientApplications.Add(application);
+        await dbContext.SaveChangesAsync(ct);
+
+        return new PatientApplicationResponse(application.Id, application.ProductId, product.Name, application.Quantity,
+            application.AppliedAt, application.DoctorId, null, application.Notes);
+    }
+
+    public async Task<IReadOnlyList<PatientApplicationResponse>> ListApplicationsAsync(Guid patientId, CancellationToken ct)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        await RequirePatient(clinicId, patientId, ct);
+        return await dbContext.PatientApplications.AsNoTracking()
+            .Where(x => x.PatientId == patientId && x.ClinicId == clinicId)
+            .OrderByDescending(x => x.AppliedAt)
+            .Select(x => new PatientApplicationResponse(x.Id, x.ProductId, x.Product!.Name, x.Quantity, x.AppliedAt,
+                x.DoctorId, x.Doctor != null ? x.Doctor.Name : null, x.Notes))
+            .ToListAsync(ct);
+    }
+
+    private static ApplicationBalanceSource ParseSource(string source) =>
+        source.ToLowerInvariant() switch
+        {
+            "package" => ApplicationBalanceSource.Package,
+            "individual" => ApplicationBalanceSource.Individual,
+            _ => throw new InvalidOperationException("Source deve ser package ou individual.")
+        };
+
+    private async Task<List<PatientApplicationBalanceResponse>> ListBalancesAsync(Guid patientId, Guid clinicId, CancellationToken ct)
+    {
+        await RequirePatient(clinicId, patientId, ct);
+        return await dbContext.PatientProductBalances.AsNoTracking()
+            .Where(x => x.PatientId == patientId && x.ClinicId == clinicId)
+            .OrderBy(x => x.Product!.Name)
+            .Select(x => new PatientApplicationBalanceResponse(x.Id, x.ProductId, x.Product!.Name, x.Source.ToString(),
+                x.PackageId, x.Package != null ? x.Package.Name : null, x.PurchasedUnits, x.UsedUnits, x.PurchasedUnits - x.UsedUnits))
+            .ToListAsync(ct);
+    }
+
+    private async Task GrantUnits(Guid clinicId, Guid patientId, Guid productId, ApplicationBalanceSource source, Guid? packageId, int units, CancellationToken ct)
+    {
+        var balance = await dbContext.PatientProductBalances
+            .FirstOrDefaultAsync(x => x.ClinicId == clinicId && x.PatientId == patientId && x.ProductId == productId
+                && x.Source == source && x.PackageId == packageId, ct);
+        if (balance is null)
+        {
+            dbContext.PatientProductBalances.Add(new PatientProductBalance
+            {
+                ClinicId = clinicId,
+                PatientId = patientId,
+                ProductId = productId,
+                Source = source,
+                PackageId = packageId,
+                PurchasedUnits = units
+            });
+        }
+        else
+        {
+            balance.PurchasedUnits += units;
+        }
+    }
+
+    private async Task RequirePatient(Guid clinicId, Guid patientId, CancellationToken ct)
+    {
+        if (!await dbContext.Patients.AnyAsync(x => x.ClinicId == clinicId && x.Id == patientId, ct))
+            throw new KeyNotFoundException("Paciente nao encontrado.");
+    }
+}
+
 public sealed class DashboardService(
     IApplicationDbContext dbContext,
     ITenantProvider tenantProvider)
