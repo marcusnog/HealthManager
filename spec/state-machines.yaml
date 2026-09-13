@@ -96,7 +96,7 @@ PaymentIntentStatus:
     - Idempotent via idempotencyKey (unique per clinic)
     - Confirmed creates Payment and updates Receivable
     - Manual mode: admin confirms via API
-    - Gateway mode: webhook confirms (future)
+    - Gateway mode: checkout moves the intent to the gateway status; verified webhook confirms or fails it
   api_endpoints:
     POST /payment-intents: create intent
     POST /payment-intents/{id}/confirm: Created|Processing -> Confirmed

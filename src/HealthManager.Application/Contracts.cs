@@ -169,6 +169,21 @@ public sealed record ExpenseCategoryQuery(int Page = 1, int PageSize = 20, strin
 public sealed record ExpenseCategoryRequest([Required][StringLength(100)] string Name);
 public sealed record ExpenseCategoryResponse(Guid Id, string Name);
 
+public sealed record ProductQuery(int Page = 1, int PageSize = 20, string? Search = null);
+public sealed record ProductRequest([Required][StringLength(100)] string Name, [Range(0.01, double.MaxValue)] decimal Price, [Range(1, int.MaxValue)] int ApplicationCount = 1, bool IsActive = true);
+public sealed record ProductResponse(Guid Id, string Name, decimal Price, int ApplicationCount, bool IsActive);
+
+public sealed record PackageQuery(int Page = 1, int PageSize = 20, string? Search = null);
+public sealed record PackageItemRequest(Guid ProductId, [Range(1, int.MaxValue)] int ApplicationCount);
+public sealed record PackageRequest([Required][StringLength(100)] string Name, [Range(0.01, double.MaxValue)] decimal Price, [MinLength(1)] IReadOnlyList<PackageItemRequest> Items, bool IsActive = true);
+public sealed record PackageItemResponse(Guid ProductId, string ProductName, int ApplicationCount);
+public sealed record PackageResponse(Guid Id, string Name, decimal Price, bool IsActive, IReadOnlyList<PackageItemResponse> Items);
+
+public sealed record GrantApplicationBalanceRequest([Required] string Source, Guid? PackageId = null, Guid? ProductId = null);
+public sealed record PatientApplicationBalanceResponse(Guid Id, Guid ProductId, string ProductName, string Source, Guid? PackageId, string? PackageName, int PurchasedUnits, int UsedUnits, int RemainingUnits);
+public sealed record PatientApplicationRequest([Required] Guid ProductId, [Range(1, int.MaxValue)] int Quantity = 1, DateTimeOffset? AppliedAt = null, Guid? DoctorId = null, string? Notes = null, Guid? BalanceId = null);
+public sealed record PatientApplicationResponse(Guid Id, Guid ProductId, string ProductName, int Quantity, DateTimeOffset AppliedAt, Guid? DoctorId, string? DoctorName, string? Notes);
+
 public sealed record FinancialSummaryResponse(decimal TotalReceived, decimal TotalExpenses, decimal Balance, decimal GrossReceived = 0, decimal ProfessionalLiability = 0, decimal OwnerReceivable = 0);
 public sealed record ProfessionalSettlementRequest([Required] Guid ProfessionalId, DateOnly? ThroughDate, DateTimeOffset? PaidAt);
 public sealed record OwnerSettlementRequest(DateOnly? ThroughDate, DateTimeOffset? SettledAt);

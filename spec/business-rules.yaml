@@ -50,6 +50,16 @@ finance:
   owner_cash: "Card receipts may be held by Owner. Owner settlement marks that receivable as transferred to the clinic; it changes cash/receivable only and never recognizes revenue again."
   financial_result: "Reports distinguish gross patient receipts, clinic recognized revenue, professional liabilities, owner-held receivables, expenses and profit. Profit = clinicRevenue - paidExpenses."
 
+catalog:
+  product: "ClinicAdminOrSecretary manages clinic products. Name is unique per clinic; price and applicationCount must be positive."
+  package: "ClinicAdminOrSecretary manages packages with a positive price and at least one product. Each product appears once per package with a positive applicationCount."
+  deletion: "Products used by a package cannot be deleted. Package deletion soft-deletes its composition."
+  tenant: "Products, packages and package items are isolated by clinic. A package cannot include a product from another clinic."
+  applications_sale: "Selling a package to a patient grants, per package item, purchasedUnits equal to its applicationCount on the patient's balance (source Package, keyed by package). Selling a product individually grants purchasedUnits equal to its applicationCount (source Individual). Requires active clinic products/packages."
+  application_balance: "Balance is tracked per patient, product and source. remainingUnits = purchasedUnits - usedUnits (computed). A patient can hold package and individual balances for the same product simultaneously."
+  application_record: "Recording an application on the patient chart logs the session and consumes quantity from the matching product balances, oldest first (or a specific balance line when balanceId is given). Rejected with the remaining amount when balance is insufficient."
+  application_authorization: "Granting balance (sale) is ClinicAdminOrSecretary. Recording an application is DoctorOnly. Reading is ClinicStaff."
+
 scheduling:
   appointment_type: "Appointments reference a clinic-managed type. Type names are unique per clinic and types in use cannot be deleted."
   conflict: "Same doctor cannot have overlapping non-cancelled appointments. Validated on create and update."
@@ -78,7 +88,8 @@ payment_intents:
   idempotency: "Same idempotencyKey returns existing intent without creating duplicate."
   amount_validation: "Intent amount must not exceed receivable outstanding amount."
   cancellation: "Intent can be cancelled if not yet confirmed."
-  gateway_independence: "Internal states are independent of gateway. Gateway adapter added later."
+  gateway_independence: "Internal states are provider-neutral. Checkout delegates charge creation to IPaymentGatewayClient; verified webhooks map provider events back to PaymentIntentStatus."
+  checkout: "ClinicStaff can create checkout for a clinic receivable; PatientPortal can create it only for the authenticated patient's receivable. Amount defaults to the outstanding balance; cancelled or fully paid receivables are rejected."
 
 address_lookup:
   provider: "ViaCEP, called only by the backend through GET https://viacep.com.br/ws/{cep}/json/."
@@ -134,9 +145,9 @@ seed:
       password: ChangeMe123!
       clinicId: 11111111-1111-1111-1111-111111111111
   demo_data:
-    - doctor: "Dr. Henrique Lima" (CRM-SP-123456, Cardiologia)
-    - patient: "Ana Martins" (CPF: 12345678900)
-    - appointment: 2026-05-07T12:00:00Z, R$ 250
-    - receivable: R$ 250 pending
-    - expenses: Rent R$ 5000, Supplies R$ 350, Utilities R$ 890
-    - outbox_event: appointment.created for demo appointment
+    - doctor: 'Dr. Henrique Lima (CRM-SP-123456, Cardiologia)'
+    - patient: 'Ana Martins (CPF: 12345678900)'
+    - appointment: '2026-05-07T12:00:00Z, R$ 250'
+    - receivable: 'R$ 250 pending'
+    - expenses: 'Rent R$ 5000, Supplies R$ 350, Utilities R$ 890'
+    - outbox_event: 'appointment.created for demo appointment'

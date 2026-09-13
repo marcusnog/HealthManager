@@ -209,6 +209,63 @@ public sealed class ExpenseCategory : TenantEntity
     public string Name { get; set; } = string.Empty;
 }
 
+public sealed class Product : TenantEntity
+{
+    public string Name { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public int ApplicationCount { get; set; } = 1;
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class Package : TenantEntity
+{
+    public string Name { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public bool IsActive { get; set; } = true;
+    public ICollection<PackageItem> Items { get; set; } = new List<PackageItem>();
+}
+
+public sealed class PackageItem : TenantEntity
+{
+    public Guid PackageId { get; set; }
+    public Guid ProductId { get; set; }
+    public int ApplicationCount { get; set; }
+    public Package Package { get; set; } = null!;
+    public Product Product { get; set; } = null!;
+}
+
+public enum ApplicationBalanceSource
+{
+    Package = 0,
+    Individual = 1
+}
+
+public sealed class PatientProductBalance : TenantEntity
+{
+    public Guid PatientId { get; set; }
+    public Patient? Patient { get; set; }
+    public Guid ProductId { get; set; }
+    public Product? Product { get; set; }
+    public ApplicationBalanceSource Source { get; set; }
+    public Guid? PackageId { get; set; }
+    public Package? Package { get; set; }
+    public int PurchasedUnits { get; set; }
+    public int UsedUnits { get; set; }
+}
+
+public sealed class PatientApplication : TenantEntity
+{
+    public Guid PatientId { get; set; }
+    public Patient? Patient { get; set; }
+    public Guid ProductId { get; set; }
+    public Product? Product { get; set; }
+    public int Quantity { get; set; } = 1;
+    public DateTimeOffset AppliedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid? DoctorId { get; set; }
+    public Doctor? Doctor { get; set; }
+    public string? Notes { get; set; }
+}
+
 public sealed class PatientDocument : TenantEntity
 {
     public Guid PatientId { get; set; }

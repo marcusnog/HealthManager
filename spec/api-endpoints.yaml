@@ -1,6 +1,6 @@
 # Canonical API endpoints — source of truth.
 # Full contract: docs/openapi.json
-# Auth header: Bearer {accessToken} (except /auth/login, /auth/refresh, /portal/auth)
+# Auth header: Bearer {accessToken}, except endpoints explicitly marked [No auth].
 
 Auth:
   POST /auth/login: "{ email, password } -> AuthResponse"
@@ -64,10 +64,29 @@ ExpenseCategories:
   PUT /expense-categories/{id}: "{ name } -> ExpenseCategoryResponse [ClinicAdminOrSecretary]"
   DELETE /expense-categories/{id}: "-> 204 (soft delete; rejected while in use) [ClinicAdminOrSecretary]"
 
+Products:
+  GET /products: "?page,pageSize,search -> PagedResult<ProductResponse> [ClinicStaff]"
+  POST /products: "{ name, price, applicationCount, isActive? } -> 201 ProductResponse [ClinicAdminOrSecretary]"
+  PUT /products/{id}: "{ name, price, applicationCount, isActive? } -> ProductResponse [ClinicAdminOrSecretary]"
+  DELETE /products/{id}: "-> 204 (soft delete; rejected while used by a package) [ClinicAdminOrSecretary]"
+
+Packages:
+  GET /packages: "?page,pageSize,search -> PagedResult<PackageResponse> [ClinicStaff]"
+  POST /packages: "{ name, price, isActive?, items: [{ productId, applicationCount }] } -> 201 PackageResponse [ClinicAdminOrSecretary]"
+  PUT /packages/{id}: "{ name, price, isActive?, items: [{ productId, applicationCount }] } -> PackageResponse [ClinicAdminOrSecretary]"
+  DELETE /packages/{id}: "-> 204 (soft delete with its items) [ClinicAdminOrSecretary]"
+
+PatientApplications:
+  GET /patients/{id}/applications/balance: "-> PatientApplicationBalanceResponse[] { product, source, package?, purchased, used, remaining } [ClinicStaff]"
+  POST /patients/{id}/applications/balance: "{ source: package|individual, packageId?, productId? } -> 201 PatientApplicationBalanceResponse[] (grants purchased units) [ClinicAdminOrSecretary]"
+  GET /patients/{id}/applications: "-> PatientApplicationResponse[] (sessions, newest first) [ClinicStaff]"
+  POST /patients/{id}/applications: "{ productId, quantity?, appliedAt?, doctorId?, notes?, balanceId? } -> 201 PatientApplicationResponse (consumes balance) [DoctorOnly]"
+
 Dashboard:
   GET /dashboard/summary: "?doctorId? -> DashboardSummaryResponse [ClinicStaff]"
 
 WhatsApp:
+  GET /whatsapp/webhook: "Meta verification challenge (?hub.mode,hub.verify_token,hub.challenge) [No auth]"
   POST /whatsapp/webhook: "{ clinicId?, appointmentId?, phone, message, providerMessageId? } [No auth]"
   GET /whatsapp/conversations: "?page,pageSize,search -> PagedResult<WhatsAppConversationResponse> [ClinicAdminOrSecretary]"
   GET /whatsapp/conversations/{phone}/messages: "-> WhatsAppMessageResponse[] [ClinicAdminOrSecretary]"
@@ -75,8 +94,15 @@ WhatsApp:
 
 PatientPortal:
   POST /portal/auth: "{ cpf, accessToken } -> PatientPortalAuthResponse [No auth]"
+  GET /portal/me: "-> PatientPortalProfileResponse [PatientPortal]"
   GET /portal/appointments: "-> PatientPortalAppointmentResponse[] [PatientPortal]"
   GET /portal/receivables: "-> PatientPortalReceivableResponse[] [PatientPortal]"
+  GET /portal/documents: "-> PatientDocumentResponse[] [PatientPortal]"
+
+Checkout:
+  POST /checkout: "{ receivableId, paymentMethod, amount?, returnUrl? } -> 201 CheckoutResponse [ClinicStaff]"
+  POST /portal/checkout: "{ receivableId, paymentMethod, amount?, returnUrl? } -> 201 CheckoutResponse [PatientPortal]"
+  GET /checkout/{paymentIntentId}: "-> CheckoutResponse [ClinicStaff]"
 
 HealthInsurances:
   GET /health-insurances: "?page,pageSize,search -> PagedResult<HealthInsuranceResponse> [ClinicAdminOrSecretary]"
@@ -133,6 +159,9 @@ SignalR:
   Hub: /hubs/payments (JWT auth, ClinicStaff policy)
   Client method: JoinClinicGroup(clinicId) / LeaveClinicGroup(clinicId)
   Server event: PaymentStatusChanged { Id, Status, GatewayReference, Amount }
+
+System:
+  GET /health: "ASP.NET Core health check [No auth]"
 
 WhatsAppMessaging:
   # Outbound via Meta Cloud API (service-level, not exposed as REST endpoints)

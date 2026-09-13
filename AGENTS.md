@@ -63,19 +63,22 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenera
 - Modular monolith — wired via `AddApplication()` + `AddInfrastructure()` in `Program.cs`
 - Tenant isolation via `clinic_id` on `TenantEntity` — EF Core query filters on every tenant entity. PlatformAdmin bypasses via `BypassTenantFilter`.
 - Soft delete via `DeletedAt` — global query filter on every entity
-- Finance uses `receivables + payments`; partial payments tracked via `ReceivedAmount` on `Receivable`. Separate `ExpenseService`.
-- Outbox: `OutboxEvent` entity, `OutboxProcessor` batch size 25, `OutboxWorker` polls every 15s
+- Finance uses `receivables + payments`; partial payments tracked via `ReceivedAmount` on `Receivable`. Separate `ExpenseService`. Professional/owner settlements via `/financial/professional-settlements` and `/financial/owner-settlements`.
+- Checkout: `CheckoutService` + `IPaymentGatewayClient` (defaults to `MockPaymentGatewayClient`); gateway handlers registered as `Asaas|MercadoPago|Stripe`. Gateway webhooks (`POST /webhooks/payments/{provider}`, HMAC-verified) update `PaymentIntent` and push `PaymentStatusChanged` over SignalR hub `/hubs/payments`; `PaymentStatusWorker` polls statuses every 30s.
+- Catalog modules: AppointmentTypes, ExpenseCategories, Products, Packages, HealthInsurances, Specialties, DoctorAvailabilities. Plus ClinicalRecords (write/finalize/addendum is `DoctorOnly`), TenantSettings, TenantIntegration (per-clinic WhatsApp / payment-gateway / notification / branding config), PatientPortal.
+- WhatsApp atendimento exposes tenant-isolated conversations to Admin and Secretary; outbound delivery uses the clinic's Meta Cloud API configuration.
+- Outbox: `OutboxEvent` entity, `OutboxProcessor` batch size 25 (infra `Services.cs`), `OutboxWorker` polls every 15s
 - Database auto-migrates on startup (or `EnsureCreatedAsync` for InMemory)
 - `Program.cs` is `partial class Program` — required for `WebApplicationFactory<Program>` in integration tests
-- Error handling maps exceptions to HTTP status: `InvalidOperationException` → 400, `UnauthorizedAccessException` → 401, `KeyNotFoundException` → 404, else 500
+- Error handling maps exceptions to HTTP status: `InvalidOperationException` → 400, `UnauthorizedAccessException` → 401, `KeyNotFoundException` → 404, `DbUpdateConcurrencyException` → 409, Postgres unique violation → 409, foreign key violation → 400, else 500
 - `Directory.Build.props`: `TreatWarningsAsErrors=false`, nullable enabled, implicit usings, central TFM `net10.0`. Individual `.csproj` files must NOT set `<TargetFramework>`.
 - `global.json` pins SDK `10.0.301` with `rollForward: latestMajor`
-- Roles: `PlatformAdmin`, `Admin`, `Secretary`, `Doctor`, `Patient`. Auth policies: `PlatformAdminOnly`, `ClinicAdminOrSecretary`, `ClinicStaff`, `PatientPortal`
-- PatientPortal auth: login via `CPF + PatientAccessToken` (separate JWT lifetime, no refresh tokens)
-- `X-Clinic-Id` header accepted as tenant override (falls back to JWT `clinic_id` claim)
-- No Serilog, no FluentValidation — `Microsoft.Extensions.Logging` + `System.ComponentModel.DataAnnotations`. Boundary interfaces only: `IApplicationDbContext`, `IPasswordHasher`, `IJwtTokenService`, `IOutboxService`, `IStorageService`. Services registered as concrete classes.
-- Worker has its own `appsettings.json` / `appsettings.Production.json`
-- No `.env.*` files. Settings via env vars or `appsettings.json`.
+- Roles: `PlatformAdmin`, `Admin`, `Secretary`, `Doctor`, `Patient`. Auth policies: `PlatformAdminOnly`, `ClinicAdminOrSecretary`, `ClinicAdmin`, `ClinicStaff`, `DoctorOnly`, `PatientPortal`
+- PatientPortal auth: login via `CPF + PatientAccessToken` (separate JWT, 7-day, no refresh tokens); also serves `/portal/checkout` and `/portal/documents`
+- `X-Clinic-Id` header accepted as tenant override (falls back to JWT `clinic_id` claim, absent for PlatformAdmin)
+- No Serilog, no FluentValidation — `Microsoft.Extensions.Logging` + `System.ComponentModel.DataAnnotations`. Boundary interfaces: `IApplicationDbContext`, `IPasswordHasher`, `IJwtTokenService`, `IOutboxService`, `IStorageService`, `IPaymentGatewayClient`, `IPaymentGatewayHandler`, `IMetaCloudApiClient`. Services registered as concrete classes.
+- Worker has its own `appsettings.json` / `appsettings.Production.json` and runs both `OutboxWorker` and `PaymentStatusWorker`
+- No `.env.*` files. Settings via env vars or `appsettings.json`. `README.md` is stale (says .NET 9 / Supabase / `.env.*` files) — ignore it.
 
 ## Testing
 
@@ -83,7 +86,7 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenera
 - Unit: use `FakeTenantProvider`, `FakeStorageService` from `TestDoubles.cs` + `TestHelpers.CreateDbContext()` (fresh InMemory DB per test).
 - Stack: xUnit + FluentAssertions + `Microsoft.AspNetCore.Mvc.Testing` + EF Core InMemory + `coverlet.collector`
 - `ApiTestFactory` exposes `LoginAsync()`, `LoginWithSessionAsync()`, `CreateAuthenticatedClientAsync()`, `WithDbContextAsync()`, `SeedSecondClinicPatientAsync()`
-- Integration tests: `tests/HealthManager.Tests/Integration/` — 13 endpoint test classes covering all major controllers
+- Integration tests: `tests/HealthManager.Tests/Integration/` — 15 endpoint test classes (and `ApiTestFactory.cs`); focused service tests live beside them in `tests/HealthManager.Tests/`
 
 ## Seed data
 
@@ -91,10 +94,11 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenera
 |-----------|-------|----------|
 | PlatformAdmin | `platform@healthmanager.local` | `ChangeMe123!` |
 | Clinic Admin | `admin@clinicaaurora.com` | `ChangeMe123!` |
+| Doctor | `henrique.lima@clinicaaurora.com` | `ChangeMe123!` |
 
 Seed IDs: `clinicId=11111111-1111-1111-1111-111111111111`, `platformAdminId=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`, `clinicAdminId=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb`, `doctorId=cccccccc-cccc-cccc-cccc-cccccccccccc`, `patientId=dddddddd-dddd-dddd-dddd-dddddddddddd`, `appointmentId=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`, `receivableId=ffffffff-ffff-ffff-ffff-ffffffffffff`.
 
-Integration tests reference these GUIDs directly.
+Integration tests reference these GUIDs directly. Seeded `patientAccessToken` is `00000000-0000-0000-0000-000000000001`.
 
 ## CI / Deploy
 

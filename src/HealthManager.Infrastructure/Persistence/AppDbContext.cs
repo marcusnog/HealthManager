@@ -17,6 +17,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<Doctor> Doctors => Set<Doctor>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentType> AppointmentTypes => Set<AppointmentType>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<Package> Packages => Set<Package>();
+    public DbSet<PackageItem> PackageItems => Set<PackageItem>();
+    public DbSet<PatientProductBalance> PatientProductBalances => Set<PatientProductBalance>();
+    public DbSet<PatientApplication> PatientApplications => Set<PatientApplication>();
     public DbSet<Receivable> Receivables => Set<Receivable>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
@@ -100,6 +105,43 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
         modelBuilder.Entity<Specialty>().HasIndex(x => new { x.ClinicId, x.Name }).IsUnique();
         modelBuilder.Entity<ExpenseCategory>().HasIndex(x => new { x.ClinicId, x.Name }).IsUnique();
+        modelBuilder.Entity<Product>().HasIndex(x => new { x.ClinicId, x.Name }).IsUnique();
+        modelBuilder.Entity<Package>().HasIndex(x => new { x.ClinicId, x.Name }).IsUnique();
+        modelBuilder.Entity<PackageItem>().HasIndex(x => new { x.PackageId, x.ProductId }).IsUnique();
+modelBuilder.Entity<PackageItem>().HasOne(x => x.Package).WithMany(x => x.Items).HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PackageItem>().HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PatientProductBalance>()
+            .HasOne(x => x.Patient)
+            .WithMany()
+            .HasForeignKey(x => x.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PatientProductBalance>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PatientProductBalance>()
+            .HasOne(x => x.Package)
+            .WithMany()
+            .HasForeignKey(x => x.PackageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PatientApplication>()
+            .HasOne(x => x.Patient)
+            .WithMany()
+            .HasForeignKey(x => x.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PatientApplication>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PatientApplication>()
+            .HasOne(x => x.Doctor)
+            .WithMany()
+            .HasForeignKey(x => x.DoctorId)
+            .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Expense>()
             .HasOne(x => x.Category)
             .WithMany()
@@ -187,6 +229,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<Expense>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<ExpenseCategory>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<Product>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<Package>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<PackageItem>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<PatientProductBalance>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<PatientApplication>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<WebhookEvent>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<HealthInsurance>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<Specialty>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
