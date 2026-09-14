@@ -7,7 +7,7 @@ public sealed record LoginRequest([Required][EmailAddress] string Email, [Requir
 public sealed record RefreshTokenRequest([Required] string RefreshToken);
 public sealed record ChangePasswordRequest([Required][MinLength(8)] string CurrentPassword, [Required][MinLength(8)] string NewPassword);
 public sealed record AuthTokenBundle(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt);
-public sealed record UserResponse(Guid Id, Guid? ClinicId, string Name, string Email, UserRole Role);
+public sealed record UserResponse(Guid Id, Guid? ClinicId, string Name, string Email, UserRole Role, IReadOnlyList<string> Permissions);
 public sealed record AuthResponse(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt, UserResponse User);
 
 public sealed record CreateClinicRequest(

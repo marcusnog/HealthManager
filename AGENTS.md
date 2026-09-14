@@ -73,7 +73,7 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenera
 - Error handling maps exceptions to HTTP status: `InvalidOperationException` → 400, `UnauthorizedAccessException` → 401, `KeyNotFoundException` → 404, `DbUpdateConcurrencyException` → 409, Postgres unique violation → 409, foreign key violation → 400, else 500
 - `Directory.Build.props`: `TreatWarningsAsErrors=false`, nullable enabled, implicit usings, central TFM `net10.0`. Individual `.csproj` files must NOT set `<TargetFramework>`.
 - `global.json` pins SDK `10.0.301` with `rollForward: latestMajor`
-- Roles: `PlatformAdmin`, `Admin`, `Secretary`, `Doctor`, `Patient`. Auth policies: `PlatformAdminOnly`, `ClinicAdminOrSecretary`, `ClinicAdmin`, `ClinicStaff`, `DoctorOnly`, `PatientPortal`
+- Roles: `PlatformAdmin`, `Admin`, `Secretary`, `Doctor`, `Patient`. Auth policies: `PlatformAdminOnly`, `ClinicAdminOrSecretary`, `ClinicAdmin`, `ClinicStaff`, `DoctorOnly`, `PatientPortal`. Financial module uses granular permission policies (`FinanceCategoriesView/Manage`, `FinanceReceivablesView/Manage`, `FinancePayablesView/Manage`, `FinanceSummaryView`, `FinanceSettlements`) enforced via `permission` JWT claims resolved from `Permissions.ForRole(role)` (`src/HealthManager.Domain/Model.cs`); `UserResponse.Permissions` exposes them to the frontend. Always update `Permissions.ForRole` + the spec's `finance_screens` when changing finance access.
 - PatientPortal auth: login via `CPF + PatientAccessToken` (separate JWT, 7-day, no refresh tokens); also serves `/portal/checkout` and `/portal/documents`
 - `X-Clinic-Id` header accepted as tenant override (falls back to JWT `clinic_id` claim, absent for PlatformAdmin)
 - No Serilog, no FluentValidation — `Microsoft.Extensions.Logging` + `System.ComponentModel.DataAnnotations`. Boundary interfaces: `IApplicationDbContext`, `IPasswordHasher`, `IJwtTokenService`, `IOutboxService`, `IStorageService`, `IPaymentGatewayClient`, `IPaymentGatewayHandler`, `IMetaCloudApiClient`. Services registered as concrete classes.
@@ -86,7 +86,7 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenera
 - Unit: use `FakeTenantProvider`, `FakeStorageService` from `TestDoubles.cs` + `TestHelpers.CreateDbContext()` (fresh InMemory DB per test).
 - Stack: xUnit + FluentAssertions + `Microsoft.AspNetCore.Mvc.Testing` + EF Core InMemory + `coverlet.collector`
 - `ApiTestFactory` exposes `LoginAsync()`, `LoginWithSessionAsync()`, `CreateAuthenticatedClientAsync()`, `WithDbContextAsync()`, `SeedSecondClinicPatientAsync()`
-- Integration tests: `tests/HealthManager.Tests/Integration/` — 15 endpoint test classes (and `ApiTestFactory.cs`); focused service tests live beside them in `tests/HealthManager.Tests/`
+- Integration tests: `tests/HealthManager.Tests/Integration/` — 17 endpoint test classes (and `ApiTestFactory.cs`); focused service tests live beside them in `tests/HealthManager.Tests/`
 
 ## Seed data
 

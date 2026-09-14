@@ -77,7 +77,7 @@ public sealed class AuthService(
             bundle.AccessToken,
             bundle.RefreshToken,
             bundle.ExpiresAt,
-            new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role));
+            new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role, Permissions.ForRole(user.Role)));
     }
 
     public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken)
@@ -156,7 +156,7 @@ public sealed class ClinicProvisioningService(
 
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role);
+        return new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role, Permissions.ForRole(user.Role));
     }
 }
 
@@ -2257,6 +2257,9 @@ private async Task<PackageResponse> GetAsync(Guid id, Guid clinicId, Cancellatio
 
 public sealed class PatientApplicationService(IApplicationDbContext dbContext, ITenantProvider tenantProvider)
 {
+    // ponytail: lock em processo serializa aplicacoes concorrentes (1 task ECS); trocar por lock de linha no DB (SELECT ... FOR UPDATE) se escalar para multi-task.
+    private static readonly SemaphoreSlim ApplicationGate = new(1, 1);
+
     public async Task<IReadOnlyList<PatientApplicationBalanceResponse>> GrantBalanceAsync(
         Guid patientId, GrantApplicationBalanceRequest request, CancellationToken ct)
     {
@@ -2305,47 +2308,55 @@ public sealed class PatientApplicationService(IApplicationDbContext dbContext, I
         if (request.DoctorId.HasValue && !await dbContext.Doctors.AnyAsync(x => x.Id == request.DoctorId && x.ClinicId == clinicId, ct))
             throw new KeyNotFoundException("Medico nao encontrado.");
 
-        var balances = await dbContext.PatientProductBalances
-            .Where(x => x.PatientId == patientId && x.ClinicId == clinicId && x.ProductId == request.ProductId)
-            .ToListAsync(ct);
-        if (request.BalanceId.HasValue)
+        await ApplicationGate.WaitAsync(ct);
+        try
         {
-            balances = balances.Where(x => x.Id == request.BalanceId.Value).ToList();
-            if (balances.Count == 0)
-                throw new InvalidOperationException("Saldo informado nao encontrado para este produto.");
+            var balances = await dbContext.PatientProductBalances
+                .Where(x => x.PatientId == patientId && x.ClinicId == clinicId && x.ProductId == request.ProductId)
+                .ToListAsync(ct);
+            if (request.BalanceId.HasValue)
+            {
+                balances = balances.Where(x => x.Id == request.BalanceId.Value).ToList();
+                if (balances.Count == 0)
+                    throw new InvalidOperationException("Saldo informado nao encontrado para este produto.");
+            }
+
+            var pool = balances.Where(x => x.UsedUnits < x.PurchasedUnits).OrderBy(x => x.CreatedAt).ToList();
+            var available = pool.Sum(x => x.PurchasedUnits - x.UsedUnits);
+            if (available < request.Quantity)
+                throw new InvalidOperationException($"Saldo insuficiente de {product.Name}. Restam {available} aplicacao(oes).");
+
+            var toConsume = request.Quantity;
+            foreach (var line in pool)
+            {
+                var free = line.PurchasedUnits - line.UsedUnits;
+                if (free <= 0) continue;
+                var take = Math.Min(free, toConsume);
+                line.UsedUnits += take;
+                toConsume -= take;
+                if (toConsume == 0) break;
+            }
+
+            var application = new PatientApplication
+            {
+                ClinicId = clinicId,
+                PatientId = patientId,
+                ProductId = request.ProductId,
+                Quantity = request.Quantity,
+                AppliedAt = request.AppliedAt ?? DateTimeOffset.UtcNow,
+                DoctorId = request.DoctorId,
+                Notes = request.Notes
+            };
+            dbContext.PatientApplications.Add(application);
+            await dbContext.SaveChangesAsync(ct);
+
+            return new PatientApplicationResponse(application.Id, application.ProductId, product.Name, application.Quantity,
+                application.AppliedAt, application.DoctorId, null, application.Notes);
         }
-
-        var pool = balances.Where(x => x.UsedUnits < x.PurchasedUnits).OrderBy(x => x.CreatedAt).ToList();
-        var available = pool.Sum(x => x.PurchasedUnits - x.UsedUnits);
-        if (available < request.Quantity)
-            throw new InvalidOperationException($"Saldo insuficiente de {product.Name}. Restam {available} aplicacao(oes).");
-
-        var toConsume = request.Quantity;
-        foreach (var line in pool)
+        finally
         {
-            var free = line.PurchasedUnits - line.UsedUnits;
-            if (free <= 0) continue;
-            var take = Math.Min(free, toConsume);
-            line.UsedUnits += take;
-            toConsume -= take;
-            if (toConsume == 0) break;
+            ApplicationGate.Release();
         }
-
-        var application = new PatientApplication
-        {
-            ClinicId = clinicId,
-            PatientId = patientId,
-            ProductId = request.ProductId,
-            Quantity = request.Quantity,
-            AppliedAt = request.AppliedAt ?? DateTimeOffset.UtcNow,
-            DoctorId = request.DoctorId,
-            Notes = request.Notes
-        };
-        dbContext.PatientApplications.Add(application);
-        await dbContext.SaveChangesAsync(ct);
-
-        return new PatientApplicationResponse(application.Id, application.ProductId, product.Name, application.Quantity,
-            application.AppliedAt, application.DoctorId, null, application.Notes);
     }
 
     public async Task<IReadOnlyList<PatientApplicationResponse>> ListApplicationsAsync(Guid patientId, CancellationToken ct)

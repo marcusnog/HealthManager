@@ -78,7 +78,7 @@ public static class DependencyInjection
                 };
             });
 
-        services.AddAuthorization(options =>
+services.AddAuthorization(options =>
         {
             options.AddPolicy("PlatformAdminOnly", policy => policy.RequireRole(UserRole.PlatformAdmin.ToString()));
             options.AddPolicy("ClinicAdminOrSecretary", policy => policy.RequireRole(UserRole.Admin.ToString(), UserRole.Secretary.ToString()));
@@ -86,6 +86,15 @@ public static class DependencyInjection
             options.AddPolicy("ClinicStaff", policy => policy.RequireRole(UserRole.Admin.ToString(), UserRole.Secretary.ToString(), UserRole.Doctor.ToString()));
             options.AddPolicy("DoctorOnly", policy => policy.RequireRole(UserRole.Doctor.ToString()));
             options.AddPolicy("PatientPortal", policy => policy.RequireRole(UserRole.Patient.ToString()));
+
+            options.AddPolicy("FinanceCategoriesView", policy => policy.RequireClaim(Permissions.ClaimType, Permissions.FinanceCategoriesView, Permissions.FinanceCategoriesManage));
+            options.AddPolicy("FinanceCategoriesManage", policy => policy.RequireClaim(Permissions.ClaimType, Permissions.FinanceCategoriesManage));
+            options.AddPolicy("FinanceReceivablesView", policy => policy.RequireClaim(Permissions.ClaimType, Permissions.FinanceReceivablesView, Permissions.FinanceReceivablesManage));
+            options.AddPolicy("FinanceReceivablesManage", policy => policy.RequireClaim(Permissions.ClaimType, Permissions.FinanceReceivablesManage));
+            options.AddPolicy("FinancePayablesView", policy => policy.RequireClaim(Permissions.ClaimType, Permissions.FinancePayablesView, Permissions.FinancePayablesManage));
+            options.AddPolicy("FinancePayablesManage", policy => policy.RequireClaim(Permissions.ClaimType, Permissions.FinancePayablesManage));
+            options.AddPolicy("FinanceSummaryView", policy => policy.RequireClaim(Permissions.ClaimType, Permissions.FinanceSummaryView));
+            options.AddPolicy("FinanceSettlements", policy => policy.RequireClaim(Permissions.ClaimType, Permissions.FinanceSettlements));
         });
 
         return services;
