@@ -8,6 +8,44 @@ public abstract class Entity
     public DateTimeOffset? DeletedAt { get; set; }
 }
 
+public static class Permissions
+{
+    public const string ClaimType = "permission";
+
+    public const string FinanceCategoriesView = "finance.categories.view";
+    public const string FinanceCategoriesManage = "finance.categories.manage";
+    public const string FinanceReceivablesView = "finance.receivables.view";
+    public const string FinanceReceivablesManage = "finance.receivables.manage";
+    public const string FinancePayablesView = "finance.payables.view";
+    public const string FinancePayablesManage = "finance.payables.manage";
+    public const string FinanceSummaryView = "finance.summary.view";
+    public const string FinanceSettlements = "finance.settlements";
+
+    public static IReadOnlyList<string> ForRole(UserRole role) => role switch
+    {
+        UserRole.PlatformAdmin or UserRole.Admin =>
+        [
+            FinanceCategoriesView, FinanceCategoriesManage,
+            FinanceReceivablesView, FinanceReceivablesManage,
+            FinancePayablesView, FinancePayablesManage,
+            FinanceSummaryView, FinanceSettlements
+        ],
+        UserRole.Secretary =>
+        [
+            FinanceCategoriesView, FinanceCategoriesManage,
+            FinanceReceivablesView, FinanceReceivablesManage,
+            FinancePayablesView,
+            FinanceSummaryView
+        ],
+        UserRole.Doctor =>
+        [
+            FinanceReceivablesView,
+            FinanceSummaryView
+        ],
+        _ => []
+    };
+}
+
 public interface ITenantEntity
 {
     Guid? ClinicId { get; set; }

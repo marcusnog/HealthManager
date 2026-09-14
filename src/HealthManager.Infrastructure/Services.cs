@@ -142,6 +142,11 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
             claims.Add(new Claim("clinic_id", user.ClinicId.Value.ToString()));
         }
 
+        foreach (var permission in Permissions.ForRole(user.Role))
+        {
+            claims.Add(new Claim(Permissions.ClaimType, permission));
+        }
+
         var token = new JwtSecurityToken(
             issuer: config.Issuer,
             audience: config.Audience,

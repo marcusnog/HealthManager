@@ -36,6 +36,25 @@ policies:
   ClinicAdmin: "Requires Admin. Used for tenant-wide configuration."
   PatientPortal: "Requires Patient role. Used for /patient-portal/* routes."
 
+  finance_granular: "Financial module is split per screen (Categorias de despesa, Contas a receber, Contas a pagar, Resumo, Fechamento). Each screen is guarded by a dot-notation permission claim carried in the JWT ('permission'). A screen policy with a View suffix allows anyone holding either the view or the manage permission for that screen; a Manage suffix requires the manage permission. JWT embeds the permission set granted to the user's role."
+  finance_screens:
+    - screen: "Categorias de despesa"
+      permissions: "finance.categories.view / finance.categories.manage"
+      access: "Admin: view+manage. Secretary: view+manage. Doctor: view."
+    - screen: "Contas a receber"
+      permissions: "finance.receivables.view / finance.receivables.manage"
+      access: "Admin: view+manage. Secretary: view+manage. Doctor: view."
+    - screen: "Contas a pagar"
+      permissions: "finance.payables.view / finance.payables.manage"
+      access: "Admin: view+manage. Secretary: view. Doctor: none."
+    - screen: "Resumo"
+      permissions: "finance.summary.view"
+      access: "Admin, Secretary, Doctor: view."
+    - screen: "Fechamento e repasse"
+      permissions: "finance.settlements.manage"
+      access: "Admin only."
+  finance_permission_result: "Roles resolve to permissions at login: PlatformAdmin and Admin hold every finance permission; Secretary holds categories/receivables view+manage, payables view and summary view; Doctor holds receivables view and summary view."
+
 finance:
   expense_category: "Expenses reference a clinic-managed category. Category names are unique per clinic and categories in use cannot be deleted."
   partial_payment: "Payments can be partial. receivedAmount tracks running total. Receivable status auto-computed: Pending(0) -> Partial(>0 && <original) -> Paid(==original)."

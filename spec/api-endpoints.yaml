@@ -44,25 +44,30 @@ AppointmentTypes:
   DELETE /appointment-types/{id}: "-> 204 (soft delete; rejected while in use) [ClinicAdminOrSecretary]"
 
 Financial:
-  GET /financial/receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [ClinicStaff]"
-  GET /financial/payments: "?page,pageSize,receivableId,dateFrom,dateTo,destinationBank -> PagedResult<PaymentResponse> [ClinicStaff]"
-  POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, destinationBank?, fundsRecipient?, notes? } -> 201 PaymentResponse [ClinicStaff]"
+  # Policies: FinanceCategoriesView/Manage, FinanceReceivablesView/Manage, FinancePayablesView/Manage,
+  # FinanceSummaryView, FinanceSettlements — permissions carried as JWT 'permission' claims.
+  # View policies accept view or manage permission; Manage policies require manage only.
+  # Admin: all. Secretary: categories+receivables manage, payables view, summary view. Doctor: receivables/summary view.
+  GET /financial/receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [FinanceReceivablesView]"
+  GET /financial/payments: "?page,pageSize,receivableId,dateFrom,dateTo,destinationBank -> PagedResult<PaymentResponse> [FinanceReceivablesView]"
+  POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, destinationBank?, fundsRecipient?, notes? } -> 201 PaymentResponse [FinanceReceivablesManage]"
+  POST /financial/receivables/manual: "{ patientId, description, amount, dueDate?, paymentMethod?, paidAt? } -> 201 ReceivableResponse [FinanceReceivablesManage]"
 
   # Custom wrappers (not in openapi.json, available via src/services/api.ts):
-  GET /financial/expenses: "?page,pageSize,categoryId,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [ClinicStaff]"
-  POST /financial/expenses: "{ description, amount, categoryId, paymentMethod, paidAt?, status?, notes? } -> 201 ExpenseResponse [ClinicStaff]"
-  PUT /financial/expenses/{id}: "{ ... } -> ExpenseResponse [ClinicStaff]"
-  DELETE /financial/expenses/{id}: "-> 204 [ClinicAdminOrSecretary]"
-  GET /financial/summary: "?destinationBank -> { grossReceived, totalReceived(recognized clinic revenue), professionalLiability, ownerReceivable, totalExpenses, balance(profit) } [ClinicStaff]"
-  GET /financial/professional-settlements: "-> ProfessionalSettlementResponse[] grouped by professional [ClinicAdmin]"
-  POST /financial/professional-settlements: "{ professionalId, throughDate?, paidAt? } -> settlement summary; marks all eligible liabilities paid [ClinicAdmin]"
-  POST /financial/owner-settlements: "{ throughDate?, settledAt? } -> settlement summary; marks eligible Owner receipts transferred [ClinicAdmin]"
+  GET /financial/expenses: "?page,pageSize,categoryId,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [FinancePayablesView]"
+  POST /financial/expenses: "{ description, amount, categoryId, paymentMethod, paidAt?, status?, notes? } -> 201 ExpenseResponse [FinancePayablesManage]"
+  PUT /financial/expenses/{id}: "{ ... } -> ExpenseResponse [FinancePayablesManage]"
+  DELETE /financial/expenses/{id}: "-> 204 [FinancePayablesManage]"
+  GET /financial/summary: "?destinationBank -> { grossReceived, totalReceived(recognized clinic revenue), professionalLiability, ownerReceivable, totalExpenses, balance(profit) } [FinanceSummaryView]"
+  GET /financial/professional-settlements: "-> ProfessionalSettlementResponse[] grouped by professional [FinanceSettlements]"
+  POST /financial/professional-settlements: "{ professionalId, throughDate?, paidAt? } -> settlement summary; marks all eligible liabilities paid [FinanceSettlements]"
+  POST /financial/owner-settlements: "{ throughDate?, settledAt? } -> settlement summary; marks eligible Owner receipts transferred [FinanceSettlements]"
 
 ExpenseCategories:
-  GET /expense-categories: "?page,pageSize,search -> PagedResult<ExpenseCategoryResponse> [ClinicStaff]"
-  POST /expense-categories: "{ name } -> 201 ExpenseCategoryResponse [ClinicAdminOrSecretary]"
-  PUT /expense-categories/{id}: "{ name } -> ExpenseCategoryResponse [ClinicAdminOrSecretary]"
-  DELETE /expense-categories/{id}: "-> 204 (soft delete; rejected while in use) [ClinicAdminOrSecretary]"
+  GET /expense-categories: "?page,pageSize,search -> PagedResult<ExpenseCategoryResponse> [FinanceCategoriesView]"
+  POST /expense-categories: "{ name } -> 201 ExpenseCategoryResponse [FinanceCategoriesManage]"
+  PUT /expense-categories/{id}: "{ name } -> ExpenseCategoryResponse [FinanceCategoriesManage]"
+  DELETE /expense-categories/{id}: "-> 204 (soft delete; rejected while in use) [FinanceCategoriesManage]"
 
 Products:
   GET /products: "?page,pageSize,search -> PagedResult<ProductResponse> [ClinicStaff]"

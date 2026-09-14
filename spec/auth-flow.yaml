@@ -48,3 +48,6 @@ jwt:
     - name: user name
     - email: user email
     - role: UserRole string
+    - permission: string (repeated) — granular permissions granted to the role. Resolved from Permissions.ForRole(role). See business-rules.yaml finance_screens.
+  user_response:
+    - "UserResponse exposes permissions: IReadOnlyList<string> alongside id/clinicId/name/email/role so the frontend can render per-screen navigation."

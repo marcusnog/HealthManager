@@ -77,7 +77,7 @@ public sealed class AuthService(
             bundle.AccessToken,
             bundle.RefreshToken,
             bundle.ExpiresAt,
-            new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role));
+            new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role, Permissions.ForRole(user.Role)));
     }
 
     public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken)
@@ -156,7 +156,7 @@ public sealed class ClinicProvisioningService(
 
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role);
+        return new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role, Permissions.ForRole(user.Role));
     }
 }
 
