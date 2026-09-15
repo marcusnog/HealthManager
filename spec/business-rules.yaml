@@ -65,7 +65,7 @@ finance:
   manual_receivable: "POST /payments supports creating a standalone receivable+payment in one call (no appointment link)."
   destination_bank: "Payments may identify the destination bank/account. Financial accountability can filter monthly revenue by this field and subtract the clinic's paid expenses to calculate the balance to be transferred."
   professional_split: "A billed appointment snapshots the doctor's clinicSharePercentage. Each payment recognizes only amount * percentage / 100 as clinic revenue; the remainder is a professional liability, never an expense."
-  professional_payout: "Friday payout marks unpaid professional liabilities through a selected date as settled. It changes cash and liability only, never profit or expenses."
+  professional_payout: "Friday payout lists paid appointments with unsettled professional liabilities, filterable by professional and payment period. The user selects payment ids to settle; already settled payments cannot be selected again. Unsettled payments before the current week are flagged overdue. Settlement changes cash and liability only, never profit or expenses."
   owner_cash: "Card receipts may be held by Owner. Owner settlement marks that receivable as transferred to the clinic; it changes cash/receivable only and never recognizes revenue again."
   financial_result: "Reports distinguish gross patient receipts, clinic recognized revenue, professional liabilities, owner-held receivables, expenses and profit. Profit = clinicRevenue - paidExpenses."
 

@@ -60,7 +60,7 @@ Financial:
   DELETE /financial/expenses/{id}: "-> 204 [FinancePayablesManage]"
   GET /financial/summary: "?destinationBank -> { grossReceived, totalReceived(recognized clinic revenue), professionalLiability, ownerReceivable, totalExpenses, balance(profit) } [FinanceSummaryView]"
   GET /financial/professional-settlements: "-> ProfessionalSettlementResponse[] grouped by professional [FinanceSettlements]"
-  POST /financial/professional-settlements: "{ professionalId, throughDate?, paidAt? } -> settlement summary; marks all eligible liabilities paid [FinanceSettlements]"
+  POST /financial/professional-settlements: "{ professionalId, paymentIds?, throughDate?, paidAt? } -> settlement summary; marks selected eligible liabilities paid (paymentIds omitted preserves settle-through-date behavior) [FinanceSettlements]"
   POST /financial/owner-settlements: "{ throughDate?, settledAt? } -> settlement summary; marks eligible Owner receipts transferred [FinanceSettlements]"
 
 ExpenseCategories:

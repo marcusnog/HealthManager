@@ -185,10 +185,11 @@ public sealed record PatientApplicationRequest([Required] Guid ProductId, [Range
 public sealed record PatientApplicationResponse(Guid Id, Guid ProductId, string ProductName, int Quantity, DateTimeOffset AppliedAt, Guid? DoctorId, string? DoctorName, string? Notes);
 
 public sealed record FinancialSummaryResponse(decimal TotalReceived, decimal TotalExpenses, decimal Balance, decimal GrossReceived = 0, decimal ProfessionalLiability = 0, decimal OwnerReceivable = 0);
-public sealed record ProfessionalSettlementRequest([Required] Guid ProfessionalId, DateOnly? ThroughDate, DateTimeOffset? PaidAt);
+public sealed record ProfessionalSettlementRequest([Required] Guid ProfessionalId, IReadOnlyList<Guid>? PaymentIds, DateOnly? ThroughDate, DateTimeOffset? PaidAt);
 public sealed record OwnerSettlementRequest(DateOnly? ThroughDate, DateTimeOffset? SettledAt);
 public sealed record SettlementResponse(Guid? ProfessionalId, string? ProfessionalName, decimal Amount, int PaymentCount, DateTimeOffset? SettledAt);
-public sealed record ProfessionalSettlementResponse(Guid ProfessionalId, string ProfessionalName, decimal Accrued, decimal Paid, decimal Outstanding);
+public sealed record ProfessionalSettlementItemResponse(Guid PaymentId, Guid? AppointmentId, string PatientName, DateTimeOffset PaidAt, decimal Amount, bool IsOverdue);
+public sealed record ProfessionalSettlementResponse(Guid ProfessionalId, string ProfessionalName, decimal Accrued, decimal Paid, decimal Outstanding, IReadOnlyList<ProfessionalSettlementItemResponse> Items);
 
 public sealed record DashboardSummaryResponse(int AppointmentsToday, int ConfirmedToday, int CancelledToday, decimal MonthlyRevenue, double NoShowRate, double ConfirmationRate, decimal MonthlyExpenses, decimal MonthlyBalance);
 

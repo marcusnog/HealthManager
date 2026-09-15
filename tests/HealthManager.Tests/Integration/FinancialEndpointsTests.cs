@@ -103,8 +103,37 @@ public sealed class FinancialEndpointsTests
         summary.Should().Be(new SummaryDto(15, 10, 5, 50, 0, 0));
     }
 
+    [Fact]
+    public async Task ProfessionalSettlement_ShouldSettleOnlySelectedPayments()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var professionalId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+
+        await factory.WithDbContextAsync(async dbContext =>
+        {
+            var receivable = await dbContext.Receivables.SingleAsync(x => x.Id == Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff"));
+            receivable.ProfessionalId = professionalId;
+            receivable.ClinicSharePercentage = 30;
+            await dbContext.SaveChangesAsync();
+        });
+        await client.PostAsJsonAsync("/financial/payments", new { receivableId = "ffffffff-ffff-ffff-ffff-ffffffffffff", amount = 20, paymentMethod = "Pix" });
+        await client.PostAsJsonAsync("/financial/payments", new { receivableId = "ffffffff-ffff-ffff-ffff-ffffffffffff", amount = 30, paymentMethod = "Pix" });
+
+        var settlements = await client.GetFromJsonAsync<List<ProfessionalSettlementDto>>("/financial/professional-settlements");
+        var items = settlements!.Single(x => x.ProfessionalId == professionalId).Items;
+        items.Should().HaveCount(2);
+
+        (await client.PostAsJsonAsync("/financial/professional-settlements", new { professionalId, paymentIds = new[] { items[0].PaymentId } })).EnsureSuccessStatusCode();
+
+        settlements = await client.GetFromJsonAsync<List<ProfessionalSettlementDto>>("/financial/professional-settlements");
+        settlements!.Single(x => x.ProfessionalId == professionalId).Items.Should().ContainSingle().Which.PaymentId.Should().Be(items[1].PaymentId);
+    }
+
     private sealed record CategoryDto(Guid Id, string Name);
     private sealed record ExpenseDto(Guid Id, string CategoryName);
     private sealed record SummaryDto(decimal TotalReceived, decimal TotalExpenses, decimal Balance, decimal GrossReceived, decimal ProfessionalLiability, decimal OwnerReceivable);
+    private sealed record ProfessionalSettlementDto(Guid ProfessionalId, List<ProfessionalSettlementItemDto> Items);
+    private sealed record ProfessionalSettlementItemDto(Guid PaymentId);
 }
 

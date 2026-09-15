@@ -2791,6 +2791,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "paymentIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
           "throughDate": {
             "type": "string",
             "format": "date"
@@ -2859,7 +2863,22 @@
           "outstanding": {
             "type": "number",
             "format": "decimal"
+          },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProfessionalSettlementItemResponse" }
           }
+        }
+      },
+      "ProfessionalSettlementItemResponse": {
+        "type": "object",
+        "properties": {
+          "paymentId": { "type": "string", "format": "uuid" },
+          "appointmentId": { "type": "string", "format": "uuid", "nullable": true },
+          "patientName": { "type": "string" },
+          "paidAt": { "type": "string", "format": "date-time" },
+          "amount": { "type": "number", "format": "decimal" },
+          "isOverdue": { "type": "boolean" }
         }
       },
       "UpdateTenantSettingsRequest": {

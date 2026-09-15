@@ -1271,14 +1271,18 @@ public sealed class FinancialService(
     public async Task<IReadOnlyList<ProfessionalSettlementResponse>> ListProfessionalSettlementsAsync(CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
-        return await dbContext.Doctors.AsNoTracking()
-            .Where(d => d.ClinicId == clinicId && dbContext.Payments.Any(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId == d.Id && p.ProfessionalPayableAmount > 0))
-            .Select(d => new ProfessionalSettlementResponse(
-                d.Id, d.Name,
-                dbContext.Payments.Where(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId == d.Id).Sum(p => (decimal?)p.ProfessionalPayableAmount) ?? 0,
-                dbContext.Payments.Where(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId == d.Id && p.ProfessionalPaidAt != null).Sum(p => (decimal?)p.ProfessionalPayableAmount) ?? 0,
-                dbContext.Payments.Where(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId == d.Id && p.ProfessionalPaidAt == null).Sum(p => (decimal?)p.ProfessionalPayableAmount) ?? 0))
+        var payments = await dbContext.Payments.AsNoTracking().Include(p => p.Receivable).ThenInclude(r => r!.Appointment).ThenInclude(a => a!.Patient)
+            .Where(p => p.ClinicId == clinicId && p.Receivable!.ProfessionalId != null && p.ProfessionalPayableAmount > 0)
             .ToListAsync(cancellationToken);
+        var names = await dbContext.Doctors.AsNoTracking().Where(d => d.ClinicId == clinicId).ToDictionaryAsync(d => d.Id, d => d.Name, cancellationToken);
+        var today = DateTimeOffset.UtcNow.Date;
+        var weekStart = today.AddDays(-((int)today.DayOfWeek + 6) % 7);
+        return payments.GroupBy(p => p.Receivable!.ProfessionalId!.Value).Select(group => new ProfessionalSettlementResponse(
+            group.Key, names.GetValueOrDefault(group.Key, "Profissional"), group.Sum(p => p.ProfessionalPayableAmount),
+            group.Where(p => p.ProfessionalPaidAt != null).Sum(p => p.ProfessionalPayableAmount),
+            group.Where(p => p.ProfessionalPaidAt == null).Sum(p => p.ProfessionalPayableAmount),
+            group.Where(p => p.ProfessionalPaidAt == null).OrderBy(p => p.PaidAt).Select(p => new ProfessionalSettlementItemResponse(
+                p.Id, p.Receivable!.AppointmentId, p.Receivable.Appointment?.Patient?.Name ?? "Paciente", p.PaidAt, p.ProfessionalPayableAmount, p.PaidAt < weekStart)).ToList())).ToList();
     }
 
     public async Task<SettlementResponse> SettleProfessionalAsync(ProfessionalSettlementRequest request, CancellationToken cancellationToken)
@@ -1290,6 +1294,7 @@ public sealed class FinancialService(
         var payments = await dbContext.Payments.Include(x => x.Receivable)
             .Where(x => x.ClinicId == clinicId && x.Receivable!.ProfessionalId == request.ProfessionalId && x.ProfessionalPayableAmount > 0 && x.ProfessionalPaidAt == null && x.PaidAt <= through)
             .ToListAsync(cancellationToken);
+        if (request.PaymentIds is not null) payments = payments.Where(x => request.PaymentIds.Contains(x.Id)).ToList();
         if (payments.Count == 0) throw new InvalidOperationException("Nao ha valores pendentes para este profissional.");
         var paidAt = request.PaidAt ?? DateTimeOffset.UtcNow;
         payments.ForEach(x => x.ProfessionalPaidAt = paidAt);
