@@ -7,7 +7,7 @@ Canonical specs in `spec/` — read before making changes to any domain entity, 
 | Spec | Content |
 |------|---------|
 | `spec/entities.yaml` | Entity definitions (all fields, types, constraints) |
-| `spec/state-machines.yaml` | State transitions for Appointment, Receivable, ConfirmationStatus |
+| `spec/state-machines.yaml` | State transitions for Appointment, Receivable, ConfirmationStatus, ClinicalRecord, PaymentIntent |
 | `spec/business-rules.yaml` | Tenant isolation, auth, authorization, scheduling, finance, documents, outbox |
 | `spec/auth-flow.yaml` | Login, refresh, logout, change-password, patient-portal auth, JWT structure |
 | `spec/api-endpoints.yaml` | Every API route with method, auth policy, request/response summary |
@@ -16,12 +16,14 @@ Update the spec first, then code to match. When spec and code disagree, the spec
 
 .NET 10 (`net10.0`) modular monolith — CRM médico multi-tenant, Brazil-first (`pt-BR`, CPF/phone BR, BRL, clinic timezone).
 
+Detailed architecture, data flows, dependencies, gotchas, and navigation are documented in `docs/CODEBASE_MAP.md`.
+
 ## Two repos
 
 | Repo | Path |
 |------|------|
-| Backend (this one) | `C:\Users\Marcus Nogueira\Documents\HealthManager` |
-| Frontend | `C:\Users\Marcus Nogueira\Documents\healthmanager-web` |
+| Backend (this one) | `.` |
+| Frontend | `..\healthmanager-web` |
 
 OpenAPI contract at `docs/openapi.json` — update it when changing request/response, then regenerate frontend client (`npm run generate:api` in frontend repo). Manual testing via `src/HealthManager.Api/HealthManager.Api.http`.
 
@@ -63,9 +65,9 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenera
 - Modular monolith — wired via `AddApplication()` + `AddInfrastructure()` in `Program.cs`
 - Tenant isolation via `clinic_id` on `TenantEntity` — EF Core query filters on every tenant entity. PlatformAdmin bypasses via `BypassTenantFilter`.
 - Soft delete via `DeletedAt` — global query filter on every entity
-- Finance uses `receivables + payments`; partial payments tracked via `ReceivedAmount` on `Receivable`. Separate `ExpenseService`. Professional/owner settlements via `/financial/professional-settlements` and `/financial/owner-settlements`.
+- Finance uses `receivables + payments`; partial payments tracked via `ReceivedAmount` on `Receivable`. Separate `ExpenseService`. Professional/owner settlements via `/financial/professional-settlements` and `/financial/owner-settlements`; professional settlements may target selected `paymentIds` (omitting them preserves settle-through-date behavior).
 - Checkout: `CheckoutService` + `IPaymentGatewayClient` (defaults to `MockPaymentGatewayClient`); gateway handlers registered as `Asaas|MercadoPago|Stripe`. Gateway webhooks (`POST /webhooks/payments/{provider}`, HMAC-verified) update `PaymentIntent` and push `PaymentStatusChanged` over SignalR hub `/hubs/payments`; `PaymentStatusWorker` polls statuses every 30s.
-- Catalog modules: AppointmentTypes, ExpenseCategories, Products, Packages, HealthInsurances, Specialties, DoctorAvailabilities. Plus ClinicalRecords (write/finalize/addendum is `DoctorOnly`), TenantSettings, TenantIntegration (per-clinic WhatsApp / payment-gateway / notification / branding config), PatientPortal.
+- Catalog modules: AppointmentTypes, ExpenseCategories, Products, Packages, HealthInsurances, Specialties, DoctorAvailabilities. PatientApplications tracks package/individual balances and consumes applications FIFO (or from a selected balance); grants are `ClinicAdminOrSecretary`, records are `DoctorOnly`. Plus ClinicalRecords (write/finalize/addendum is `DoctorOnly`), TenantSettings, TenantIntegration (per-clinic WhatsApp / payment-gateway / notification / branding config), PatientPortal.
 - WhatsApp atendimento exposes tenant-isolated conversations to Admin and Secretary; outbound delivery uses the clinic's Meta Cloud API configuration.
 - Outbox: `OutboxEvent` entity, `OutboxProcessor` batch size 25 (infra `Services.cs`), `OutboxWorker` polls every 15s
 - Database auto-migrates on startup (or `EnsureCreatedAsync` for InMemory)
@@ -75,14 +77,15 @@ Local tools in `.config/dotnet-tools.json`: `dotnet-ef` (v10.0.9), `reportgenera
 - `global.json` pins SDK `10.0.301` with `rollForward: latestMajor`
 - Roles: `PlatformAdmin`, `Admin`, `Secretary`, `Doctor`, `Patient`. Auth policies: `PlatformAdminOnly`, `ClinicAdminOrSecretary`, `ClinicAdmin`, `ClinicStaff`, `DoctorOnly`, `PatientPortal`. Financial module uses granular permission policies (`FinanceCategoriesView/Manage`, `FinanceReceivablesView/Manage`, `FinancePayablesView/Manage`, `FinanceSummaryView`, `FinanceSettlements`) enforced via `permission` JWT claims resolved from `Permissions.ForRole(role)` (`src/HealthManager.Domain/Model.cs`); `UserResponse.Permissions` exposes them to the frontend. Always update `Permissions.ForRole` + the spec's `finance_screens` when changing finance access.
 - PatientPortal auth: login via `CPF + PatientAccessToken` (separate JWT, 7-day, no refresh tokens); also serves `/portal/checkout` and `/portal/documents`
-- `X-Clinic-Id` header accepted as tenant override (falls back to JWT `clinic_id` claim, absent for PlatformAdmin)
+- Tenant resolution has a known spec/code mismatch: `spec/business-rules.yaml` requires `X-Clinic-Id` before the JWT `clinic_id`, while `RequestTenantProvider` currently gives the JWT claim precedence. Treat the spec as canonical and resolve this deliberately with tenant-isolation tests before changing behavior.
 - No Serilog, no FluentValidation — `Microsoft.Extensions.Logging` + `System.ComponentModel.DataAnnotations`. Boundary interfaces: `IApplicationDbContext`, `IPasswordHasher`, `IJwtTokenService`, `IOutboxService`, `IStorageService`, `IPaymentGatewayClient`, `IPaymentGatewayHandler`, `IMetaCloudApiClient`. Services registered as concrete classes.
 - Worker has its own `appsettings.json` / `appsettings.Production.json` and runs both `OutboxWorker` and `PaymentStatusWorker`
+- Lambda publishes with `InvariantGlobalization=true` because the custom runtime does not include ICU; preserve this unless ICU is added to the deployment artifact.
 - No `.env.*` files. Settings via env vars or `appsettings.json`. `README.md` is stale (says .NET 9 / Supabase / `.env.*` files) — ignore it.
 
 ## Testing
 
-- Integration: each test class creates `new ApiTestFactory()` — EF Core InMemory, `FakeStorageService` singleton, seeded DB per class. Sets `USE_INMEMORY_DATABASE=true` + `SENTRY_DSN=""` + `Testing` env (bypasses HTTPS redirect).
+- Integration: each test creates `new ApiTestFactory()` — EF Core InMemory, `FakeStorageService` singleton, seeded DB per test. Sets `USE_INMEMORY_DATABASE=true` + `SENTRY_DSN=""` + `Testing` env (bypasses HTTPS redirect).
 - Unit: use `FakeTenantProvider`, `FakeStorageService` from `TestDoubles.cs` + `TestHelpers.CreateDbContext()` (fresh InMemory DB per test).
 - Stack: xUnit + FluentAssertions + `Microsoft.AspNetCore.Mvc.Testing` + EF Core InMemory + `coverlet.collector`
 - `ApiTestFactory` exposes `LoginAsync()`, `LoginWithSessionAsync()`, `CreateAuthenticatedClientAsync()`, `WithDbContextAsync()`, `SeedSecondClinicPatientAsync()`
@@ -110,4 +113,4 @@ Integration tests reference these GUIDs directly. Seeded `patientAccessToken` is
 
 ## Other instruction files
 
-- `CLAUDE.md` is stale — references .NET 9, old machine paths, Railway/Vercel/Supabase. Ignore it; this file is the source of truth.
+- `CLAUDE.md` is a concise orientation file that links back here and to `docs/CODEBASE_MAP.md`; this file remains the source of truth for agent instructions.
