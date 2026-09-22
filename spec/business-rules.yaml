@@ -72,6 +72,7 @@ finance:
 catalog:
   product: "ClinicAdminOrSecretary manages clinic products. Name is unique per clinic; price and applicationCount must be positive."
   package: "ClinicAdminOrSecretary manages packages with a positive price and at least one product. Each product appears once per package with a positive applicationCount."
+  package_update: "Package updates preserve existing composition items, update their applicationCount in place, remove omitted products and add only new products."
   deletion: "Products used by a package cannot be deleted. Package deletion soft-deletes its composition."
   tenant: "Products, packages and package items are isolated by clinic. A package cannot include a product from another clinic."
   applications_sale: "Selling a package to a patient grants, per package item, purchasedUnits equal to its applicationCount on the patient's balance (source Package, keyed by package). Selling a product individually grants purchasedUnits equal to its applicationCount (source Individual). Requires active clinic products/packages."

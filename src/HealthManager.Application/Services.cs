@@ -2225,8 +2225,12 @@ public sealed class PackageService(IApplicationDbContext dbContext, ITenantProvi
         package.Name = name;
         package.Price = request.Price;
         package.IsActive = request.IsActive;
-        dbContext.PackageItems.RemoveRange(package.Items);
-        package.Items = request.Items.Select(x => new PackageItem { ClinicId = clinicId, PackageId = id, ProductId = x.ProductId, ApplicationCount = x.ApplicationCount }).ToList();
+        var requestedItems = request.Items.ToDictionary(x => x.ProductId);
+        dbContext.PackageItems.RemoveRange(package.Items.Where(x => !requestedItems.ContainsKey(x.ProductId)));
+        foreach (var item in package.Items.Where(x => requestedItems.ContainsKey(x.ProductId)))
+            item.ApplicationCount = requestedItems[item.ProductId].ApplicationCount;
+        foreach (var item in request.Items.Where(x => package.Items.All(existing => existing.ProductId != x.ProductId)))
+            package.Items.Add(new PackageItem { ClinicId = clinicId, PackageId = id, ProductId = item.ProductId, ApplicationCount = item.ApplicationCount });
         await dbContext.SaveChangesAsync(ct);
         return await GetAsync(id, clinicId, ct);
     }
