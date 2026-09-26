@@ -30,6 +30,7 @@ Doctors:
 Appointments:
   GET /appointments: "?page,pageSize,date,dateFrom,dateTo,doctorId,status -> PagedResult<AppointmentResponse> [ClinicStaff]"
   POST /appointments: "{ patientId, doctorId, startAt, durationMinutes, notes?, appointmentTypeId, amount } -> 201 AppointmentResponse [ClinicStaff]"
+  POST /appointments/group: "{ patientIds (distinct, min 2), doctorId, startAt, durationMinutes, notes?, appointmentTypeId, amount } -> 201 AppointmentResponse[] (atomic; shared appointmentGroupId) [ClinicStaff]"
   PATCH /appointments/{id}: "{ doctorId?, startAt?, durationMinutes?, notes?, appointmentTypeId?, amount? } -> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/confirm: "-> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/cancel: "-> AppointmentResponse (also cancels receivable if not Paid) [ClinicStaff]"

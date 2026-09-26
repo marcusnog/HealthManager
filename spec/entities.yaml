@@ -91,6 +91,7 @@
 - Appointment:
   id: Guid (auto)
   clinicId: Guid
+  appointmentGroupId: Guid? (shared by appointments created together; null for individual appointments)
   patientId: Guid (FK Patient)
   doctorId: Guid (FK Doctor)
   startAt: DateTimeOffset (UTC)
