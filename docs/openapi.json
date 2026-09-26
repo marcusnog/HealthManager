@@ -716,6 +716,36 @@
         }
       }
     },
+    "/appointments/group": {
+      "post": {
+        "operationId": "appointments_create_group",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupAppointmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppointmentResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/appointments/{id}/confirm": {
       "post": {
         "operationId": "appointments_confirm",
@@ -3674,12 +3704,59 @@
           }
         }
       },
+      "CreateGroupAppointmentRequest": {
+        "type": "object",
+        "required": [
+          "patientIds",
+          "doctorId",
+          "startAt",
+          "appointmentTypeId"
+        ],
+        "properties": {
+          "patientIds": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "default": 30
+          },
+          "notes": {
+            "type": "string"
+          },
+          "appointmentTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal"
+          }
+        }
+      },
       "AppointmentResponse": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "appointmentGroupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           },
           "patientId": {
             "type": "string",

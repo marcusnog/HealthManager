@@ -31,6 +31,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("numeric");
 
+                    b.Property<Guid?>("AppointmentGroupId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("AppointmentTypeId")
                         .HasColumnType("uuid");
 

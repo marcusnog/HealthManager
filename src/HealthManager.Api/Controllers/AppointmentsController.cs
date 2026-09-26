@@ -20,6 +20,10 @@ public sealed class AppointmentsController(AppointmentService appointmentService
         return CreatedAtAction(nameof(Create), new { id = response.Id }, response);
     }
 
+    [HttpPost("group")]
+    public async Task<ActionResult<IReadOnlyList<AppointmentResponse>>> CreateGroup([FromBody] CreateGroupAppointmentRequest request, CancellationToken cancellationToken)
+        => StatusCode(StatusCodes.Status201Created, await appointmentService.CreateGroupAsync(request, cancellationToken));
+
     [HttpPatch("{id:guid}")]
     public async Task<ActionResult<AppointmentResponse>> Update(Guid id, [FromBody] UpdateAppointmentRequest request, CancellationToken cancellationToken)
         => Ok(await appointmentService.UpdateAsync(id, request, cancellationToken));

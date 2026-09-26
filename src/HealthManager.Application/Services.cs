@@ -795,6 +795,72 @@ public sealed class AppointmentService(
         return ToResponse(appointment, patient, doctor);
     }
 
+    public async Task<IReadOnlyList<AppointmentResponse>> CreateGroupAsync(CreateGroupAppointmentRequest request, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var patientIds = request.PatientIds.Distinct().ToList();
+        if (patientIds.Count < 2 || patientIds.Count != request.PatientIds.Count)
+            throw new InvalidOperationException("Informe ao menos dois pacientes distintos.");
+
+        var clinic = await dbContext.Clinics.FirstOrDefaultAsync(x => x.Id == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Clinica nao encontrada.");
+        var patients = await dbContext.Patients.Where(x => patientIds.Contains(x.Id) && x.ClinicId == clinicId && x.DeletedAt == null).ToListAsync(cancellationToken);
+        var doctor = await dbContext.Doctors.FirstOrDefaultAsync(x => x.Id == request.DoctorId && x.ClinicId == clinicId && x.DeletedAt == null && x.IsActive, cancellationToken);
+        var appointmentType = await dbContext.AppointmentTypes.FirstOrDefaultAsync(x => x.Id == request.AppointmentTypeId && x.ClinicId == clinicId, cancellationToken);
+        if (patients.Count != patientIds.Count || doctor is null || appointmentType is null)
+            throw new InvalidOperationException("Paciente ou medico invalido.");
+
+        var endAt = request.StartAt.AddMinutes(request.DurationMinutes == 0 ? 30 : request.DurationMinutes);
+        ValidateBusinessHours(clinic, request.StartAt, endAt);
+        var conflict = await dbContext.Appointments.AnyAsync(x =>
+            x.ClinicId == clinicId && x.DoctorId == request.DoctorId && x.DeletedAt == null &&
+            x.Status != AppointmentStatus.Cancelled && request.StartAt < x.EndAt && endAt > x.StartAt,
+            cancellationToken);
+        if (conflict)
+            throw new InvalidOperationException("Conflito de horario para o medico selecionado.");
+
+        var groupId = Guid.NewGuid();
+        var appointments = patients.Select(patient => new Appointment
+        {
+            ClinicId = clinicId,
+            AppointmentGroupId = groupId,
+            PatientId = patient.Id,
+            Patient = patient,
+            DoctorId = doctor.Id,
+            Doctor = doctor,
+            StartAt = request.StartAt,
+            EndAt = endAt,
+            Notes = request.Notes,
+            AppointmentTypeId = appointmentType.Id,
+            AppointmentType = appointmentType,
+            Amount = request.Amount
+        }).ToList();
+
+        dbContext.Appointments.AddRange(appointments);
+        foreach (var appointment in appointments)
+        {
+            if (request.Amount > 0)
+            {
+                dbContext.Receivables.Add(new Receivable
+                {
+                    ClinicId = clinicId,
+                    Appointment = appointment,
+                    AppointmentId = appointment.Id,
+                    OriginalAmount = request.Amount,
+                    Status = ReceivableStatus.Pending,
+                    DueDate = request.StartAt,
+                    Description = $"Consulta {appointmentType.Name}",
+                    ProfessionalId = doctor.Id,
+                    ClinicSharePercentage = doctor.ClinicSharePercentage
+                });
+            }
+            await outboxService.EnqueueAsync(clinicId, "appointment.created", new { appointment.Id, appointment.PatientId, appointment.DoctorId, appointment.StartAt }, cancellationToken);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return appointments.Select(x => ToResponse(x, x.Patient, doctor)).ToList();
+    }
+
     public async Task<AppointmentResponse> UpdateAsync(Guid appointmentId, UpdateAppointmentRequest request, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
@@ -833,6 +899,7 @@ public sealed class AppointmentService(
                     x.ClinicId == clinicId &&
                     x.DoctorId == targetDoctorId &&
                     x.Id != appointmentId &&
+                    (!appointment.AppointmentGroupId.HasValue || x.AppointmentGroupId != appointment.AppointmentGroupId) &&
                     x.DeletedAt == null &&
                     x.Status != AppointmentStatus.Cancelled &&
                     targetStartAt < x.EndAt &&
@@ -1058,6 +1125,7 @@ public sealed class AppointmentService(
 
         return new(
             appointment.Id,
+            appointment.AppointmentGroupId,
             appointment.PatientId,
             appointment.DoctorId,
             appointment.StartAt,

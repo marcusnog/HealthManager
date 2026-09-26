@@ -148,6 +148,7 @@ public sealed class Doctor : TenantEntity
 
 public sealed class Appointment : TenantEntity
 {
+    public Guid? AppointmentGroupId { get; set; }
     public Guid PatientId { get; set; }
     public Guid DoctorId { get; set; }
     public DateTimeOffset StartAt { get; set; }

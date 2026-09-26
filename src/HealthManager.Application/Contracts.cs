@@ -110,6 +110,15 @@ public sealed record CreateAppointmentRequest(
     [Range(0, double.MaxValue)] decimal Amount,
     AppointmentSource Source = AppointmentSource.Internal);
 
+public sealed record CreateGroupAppointmentRequest(
+    [Required][MinLength(2)] IReadOnlyList<Guid> PatientIds,
+    [Required] Guid DoctorId,
+    [Required] DateTimeOffset StartAt,
+    [Range(15, 240)] int DurationMinutes,
+    string? Notes,
+    [Required] Guid AppointmentTypeId,
+    [Range(0, double.MaxValue)] decimal Amount);
+
 public sealed record UpdateAppointmentRequest(
     Guid? DoctorId,
     DateTimeOffset? StartAt,
@@ -120,6 +129,7 @@ public sealed record UpdateAppointmentRequest(
 
 public sealed record AppointmentResponse(
     Guid Id,
+    Guid? AppointmentGroupId,
     Guid PatientId,
     Guid DoctorId,
     DateTimeOffset StartAt,
