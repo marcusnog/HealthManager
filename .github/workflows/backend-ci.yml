@@ -91,7 +91,7 @@ jobs:
       - name: Verify API
         run: |
           for attempt in {1..12}; do
-            curl --fail --silent --show-error http://157.254.207.208:8080/api/healthz && exit 0
+            curl --fail --silent --show-error http://157.254.207.208:8080/health && exit 0
             sleep 5
           done
           exit 1
