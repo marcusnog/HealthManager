@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: healthmanager
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d healthmanager"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DATABASE_URL: Host=postgres;Port=5432;Database=healthmanager;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      JWT_ISSUER: healthmanager
+      JWT_AUDIENCE: healthmanager-web
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      LOCAL_STORAGE_ROOT: /data/documents
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    ports:
+      - "8080:8080"
+    volumes:
+      - /opt/healthmanager-data:/data/documents
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DATABASE_URL: Host=postgres;Port=5432;Database=healthmanager;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      JWT_ISSUER: healthmanager
+      JWT_AUDIENCE: healthmanager-web
+      JWT_SECRET: ${JWT_SECRET}
+      LOCAL_STORAGE_ROOT: /data/documents
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    volumes:
+      - /opt/healthmanager-data:/data/documents
+
+volumes:
+  postgres_data:

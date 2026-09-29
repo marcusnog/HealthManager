@@ -5,14 +5,6 @@ on:
     branches: ["master", "main", "develop"]
   pull_request:
 
-env:
-  AWS_REGION: us-east-2
-  ECR_API_REPO: healthmanager-api
-  ECS_CLUSTER: healthmanager-cluster
-  ECS_API_SERVICE: healthmanager-api
-  LAMBDA_OUTBOX_FUNCTION: healthmanager-outbox
-  LAMBDA_ARTIFACT_BUCKET: healthmanager-documents-prod
-
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -62,84 +54,44 @@ jobs:
     needs: build-test
     if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name == 'push'
 
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Set image tag
-        id: tag
-        run: echo "TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
-
-      - name: Build and push API image
+      - name: Configure VPS access
         env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          TAG: ${{ steps.tag.outputs.TAG }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
-          docker build -f Dockerfile.api -t $REGISTRY/$ECR_API_REPO:$TAG -t $REGISTRY/$ECR_API_REPO:latest .
-          docker push $REGISTRY/$ECR_API_REPO:$TAG
-          docker push $REGISTRY/$ECR_API_REPO:latest
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/known_hosts
 
-      - name: Publish Lambda
+      - name: Upload release
         run: |
-          dotnet publish src/HealthManager.Lambda/HealthManager.Lambda.csproj \
-            --configuration Release \
-            --runtime linux-x64 \
-            --self-contained true \
-            --output /tmp/lambda-publish
-          cd /tmp/lambda-publish && zip -r /tmp/outbox-lambda.zip .
+          tar --exclude=.git --exclude=bin --exclude=obj --exclude=tmp --exclude=TestResults --exclude=CoverageReport -czf /tmp/healthmanager.tar.gz .
+          scp /tmp/healthmanager.tar.gz root@157.254.207.208:/tmp/healthmanager.tar.gz
 
-      - name: Deploy Lambda
+      - name: Deploy to VPS
         run: |
-          aws s3 cp /tmp/outbox-lambda.zip s3://$LAMBDA_ARTIFACT_BUCKET/lambda-deploy/outbox-lambda.zip
-          aws lambda update-function-code \
-            --function-name $LAMBDA_OUTBOX_FUNCTION \
-            --s3-bucket $LAMBDA_ARTIFACT_BUCKET \
-            --s3-key lambda-deploy/outbox-lambda.zip \
-            --architectures x86_64
+          ssh root@157.254.207.208 '
+            set -eu
+            test -f /opt/healthmanager/.env
+            install -d -o 1654 -g 1654 /opt/healthmanager-data
+            find /opt/healthmanager -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf -- {} +
+            tar -xzf /tmp/healthmanager.tar.gz -C /opt/healthmanager
+            rm /tmp/healthmanager.tar.gz
+            cd /opt/healthmanager
+            docker compose --env-file .env -f docker-compose.vps.yml up -d --build --remove-orphans
+            docker image prune -f
+          '
 
-      - name: Deploy API to ECS
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          TAG: ${{ steps.tag.outputs.TAG }}
+      - name: Verify API
         run: |
-          TASK_DEF=$(aws ecs describe-task-definition --task-definition healthmanager-api --query taskDefinition)
-          NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$REGISTRY/$ECR_API_REPO:$TAG" \
-            '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)')
-          NEW_TASK_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_API_SERVICE \
-            --task-definition $NEW_TASK_ARN \
-            --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true},maximumPercent=200,minimumHealthyPercent=100' \
-            --force-new-deployment
-
-      - name: Wait for API deployment
-        run: |
-          if ! aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_API_SERVICE; then
-            echo "::error::ECS deployment did not reach a stable state. Current deployments and recent service events follow."
-            aws ecs describe-services \
-              --cluster $ECS_CLUSTER \
-              --services $ECS_API_SERVICE \
-              --query 'services[0].{deployments:deployments[*].{status:status,taskDefinition:taskDefinition,rolloutState:rolloutState,rolloutStateReason:rolloutStateReason,failedTasks:failedTasks,runningCount:runningCount,pendingCount:pendingCount},events:events[0:10].[createdAt,message]}' \
-              --output json
-            exit 1
-          fi
+          for attempt in {1..12}; do
+            curl --fail --silent --show-error http://157.254.207.208:8080/api/healthz && exit 0
+            sleep 5
+          done
+          exit 1
