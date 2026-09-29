@@ -18,7 +18,7 @@ AppointmentStatus:
       transitions: []
   invariant:
     - Cancelled appointments cannot be edited (update API rejects)
-    - Same doctor cannot have overlapping non-cancelled appointments (conflict validation on create/update)
+    - Same doctor cannot have overlapping non-cancelled appointments outside the same appointment group (conflict validation on create/update)
   api_endpoints:
     POST /appointments/{id}/confirm: Scheduled -> Confirmed
     POST /appointments/{id}/cancel:  any -> Cancelled (also cancels linked receivable if not Paid)

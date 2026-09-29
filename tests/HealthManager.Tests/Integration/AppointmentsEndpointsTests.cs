@@ -104,6 +104,45 @@ public sealed class AppointmentsEndpointsTests
     }
 
     [Fact]
+    public async Task CreateGroupAppointment_ShouldRejectExternalConflictWithoutCreatingAppointments()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var secondPatientId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var appointmentCount = 0;
+        await factory.WithDbContextAsync(async dbContext =>
+        {
+            dbContext.Patients.Add(new HealthManager.Domain.Patient
+            {
+                Id = secondPatientId,
+                ClinicId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Name = "Segundo paciente",
+                Cpf = "52998224725",
+                Phone = "11999998888"
+            });
+            await dbContext.SaveChangesAsync();
+            appointmentCount = dbContext.Appointments.Count();
+        });
+
+        var response = await client.PostAsJsonAsync("/appointments/group", new
+        {
+            patientIds = new[] { "dddddddd-dddd-dddd-dddd-dddddddddddd", secondPatientId.ToString() },
+            doctorId = "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            startAt = "2026-05-07T12:10:00Z",
+            durationMinutes = 30,
+            appointmentTypeId = "a7000001-0000-0000-0000-000000000001",
+            amount = 180
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await factory.WithDbContextAsync(dbContext =>
+        {
+            dbContext.Appointments.Count().Should().Be(appointmentCount);
+            return Task.CompletedTask;
+        });
+    }
+
+    [Fact]
     public async Task ConfirmAppointment_ShouldUpdateStatusAndConfirmationStatus()
     {
         await using var factory = new ApiTestFactory();
