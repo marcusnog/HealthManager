@@ -52,6 +52,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build-test
+    timeout-minutes: 20
+    concurrency:
+      group: backend-production
+      cancel-in-progress: false
+    env:
+      RELEASE: ${{ github.sha }}
     if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name == 'push'
 
     steps:
@@ -76,22 +82,51 @@ jobs:
 
       - name: Deploy to VPS
         run: |
-          ssh root@157.254.207.208 '
-            set -eu
-            test -f /opt/healthmanager/.env
-            install -d -o 1654 -g 1654 /opt/healthmanager-data
-            find /opt/healthmanager -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf -- {} +
-            tar -xzf /tmp/healthmanager.tar.gz -C /opt/healthmanager
-            rm /tmp/healthmanager.tar.gz
-            cd /opt/healthmanager
-            docker compose --env-file .env -f docker-compose.vps.yml up -d --build --remove-orphans
-            docker image prune -f
-          '
+          ssh root@157.254.207.208 bash -s -- "$RELEASE" <<'REMOTE'
+          set -euo pipefail
+          release="$1"
+          test -f /opt/healthmanager/.env
+          install -d -o 1654 -g 1654 /opt/healthmanager-data
+          release_dir="/opt/healthmanager-releases/$release"
+          install -d "$release_dir"
+          tar -xzf /tmp/healthmanager.tar.gz -C "$release_dir"
+          rm /tmp/healthmanager.tar.gz
+          cd "$release_dir"
+          if command -v k3s >/dev/null && k3s kubectl -n healthmanager get deployment api worker >/dev/null 2>&1; then
+            docker build -f Dockerfile.api -t "localhost/healthmanager-api:$release-k3s" .
+            docker build -f Dockerfile.worker -t "localhost/healthmanager-worker:$release-k3s" .
+            docker save "localhost/healthmanager-api:$release-k3s" "localhost/healthmanager-worker:$release-k3s" | k3s ctr images import -
+            k3s kubectl -n healthmanager set image deployment/api "api=localhost/healthmanager-api:$release-k3s"
+            k3s kubectl -n healthmanager set image deployment/worker "worker=localhost/healthmanager-worker:$release-k3s"
+            if ! k3s kubectl -n healthmanager rollout status deployment/api --timeout=180s ||
+               ! k3s kubectl -n healthmanager rollout status deployment/worker --timeout=180s; then
+              k3s kubectl -n healthmanager rollout undo deployment/api
+              k3s kubectl -n healthmanager rollout undo deployment/worker
+              exit 1
+            fi
+          else
+            docker compose --project-name healthmanager --env-file /opt/healthmanager/.env -f docker-compose.vps.yml up -d --build --remove-orphans
+          fi
+          REMOTE
 
       - name: Verify API
         run: |
-          for attempt in {1..12}; do
-            curl --fail --silent --show-error http://157.254.207.208:8080/health && exit 0
-            sleep 5
-          done
+          ssh root@157.254.207.208 bash -s <<'REMOTE'
+          set -euo pipefail
+          if command -v k3s >/dev/null && k3s kubectl -n healthmanager get deployment api >/dev/null 2>&1; then
+            pod="$(k3s kubectl -n healthmanager get pods -l app=api -o jsonpath='{.items[0].metadata.name}')"
+            k3s kubectl -n healthmanager port-forward "pod/$pod" 18080:8080 >/tmp/healthmanager-health-check.log 2>&1 &
+            forward_pid=$!
+            trap 'kill "$forward_pid" 2>/dev/null || true' EXIT
+            for attempt in {1..12}; do
+              curl --fail --silent --show-error http://127.0.0.1:18080/health && exit 0
+              sleep 5
+            done
+          else
+            for attempt in {1..12}; do
+              curl --fail --silent --show-error http://127.0.0.1:8080/health && exit 0
+              sleep 5
+            done
+          fi
           exit 1
+          REMOTE
