@@ -10,7 +10,7 @@ namespace HealthManager.Tests;
 public sealed class AppointmentServiceTests
 {
     [Fact]
-    public async Task CreateAsync_ShouldRejectConflictingAppointment()
+    public async Task CreateAsync_ShouldAllowDifferentPatientsAndRejectSamePatientOverlap()
     {
         var clinicId = Guid.NewGuid();
         var doctorId = Guid.NewGuid();
@@ -44,8 +44,14 @@ public sealed class AppointmentServiceTests
             new OutboxService(dbContext),
             new WhatsAppMessagingService(dbContext, new FakeMetaCloudApiClient(), new OutboxService(dbContext)));
 
+        var created = await service.CreateAsync(new CreateAppointmentRequest(patientB, doctorId, startAt, 30, null, appointmentTypeId, 150), CancellationToken.None);
+        created.AppointmentGroupId.Should().BeNull();
+        await service.UpdateAsync(created.Id, new UpdateAppointmentRequest(null, startAt, 45, null, null, null), CancellationToken.None);
+        dbContext.Appointments.Single(x => x.PatientId == patientA).EndAt.Should().Be(startAt.AddMinutes(30));
+        dbContext.Receivables.Single().AppointmentId.Should().Be(created.Id);
+
         var action = async () => await service.CreateAsync(
-            new CreateAppointmentRequest(patientB, doctorId, startAt.AddMinutes(10), 30, null, appointmentTypeId, 150),
+            new CreateAppointmentRequest(patientA, doctorId, startAt.AddMinutes(10), 30, null, appointmentTypeId, 150),
             CancellationToken.None);
 
         await action.Should().ThrowAsync<InvalidOperationException>()

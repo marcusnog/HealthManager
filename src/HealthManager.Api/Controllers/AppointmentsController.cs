@@ -28,6 +28,17 @@ public sealed class AppointmentsController(AppointmentService appointmentService
     public async Task<ActionResult<AppointmentResponse>> Update(Guid id, [FromBody] UpdateAppointmentRequest request, CancellationToken cancellationToken)
         => Ok(await appointmentService.UpdateAsync(id, request, cancellationToken));
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        await appointmentService.DeleteAsync(id, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPatch("{id:guid}/status")]
+    public async Task<ActionResult<AppointmentResponse>> UpdateStatus(Guid id, [FromBody] UpdateAppointmentStatusRequest request, CancellationToken cancellationToken)
+        => Ok(await appointmentService.UpdateStatusAsync(id, request, cancellationToken));
+
     [HttpPost("{id:guid}/confirm")]
     public async Task<ActionResult<AppointmentResponse>> Confirm(Guid id, CancellationToken cancellationToken)
         => Ok(await appointmentService.ConfirmAsync(id, cancellationToken));

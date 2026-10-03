@@ -740,6 +740,7 @@ public sealed class AppointmentService(
         var conflict = await dbContext.Appointments.AnyAsync(x =>
             x.ClinicId == clinicId &&
             x.DoctorId == request.DoctorId &&
+            x.PatientId == request.PatientId &&
             x.DeletedAt == null &&
             x.Status != AppointmentStatus.Cancelled &&
             request.StartAt < x.EndAt &&
@@ -813,7 +814,7 @@ public sealed class AppointmentService(
         var endAt = request.StartAt.AddMinutes(request.DurationMinutes == 0 ? 30 : request.DurationMinutes);
         ValidateBusinessHours(clinic, request.StartAt, endAt);
         var conflict = await dbContext.Appointments.AnyAsync(x =>
-            x.ClinicId == clinicId && x.DoctorId == request.DoctorId && x.DeletedAt == null &&
+            x.ClinicId == clinicId && x.DoctorId == request.DoctorId && patientIds.Contains(x.PatientId) && x.DeletedAt == null &&
             x.Status != AppointmentStatus.Cancelled && request.StartAt < x.EndAt && endAt > x.StartAt,
             cancellationToken);
         if (conflict)
@@ -899,7 +900,7 @@ public sealed class AppointmentService(
                     x.ClinicId == clinicId &&
                     x.DoctorId == targetDoctorId &&
                     x.Id != appointmentId &&
-                    (!appointment.AppointmentGroupId.HasValue || x.AppointmentGroupId != appointment.AppointmentGroupId) &&
+                    x.PatientId == appointment.PatientId &&
                     x.DeletedAt == null &&
                     x.Status != AppointmentStatus.Cancelled &&
                     targetStartAt < x.EndAt &&
@@ -1065,10 +1066,87 @@ public sealed class AppointmentService(
     public async Task<AppointmentResponse> MarkNoShowAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
         var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
-        if (appointment.Status != AppointmentStatus.InProgress)
+        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.Confirmed or AppointmentStatus.InProgress))
             throw new InvalidOperationException($"Nao e possivel marcar no-show de um agendamento no status {appointment.Status}.");
         appointment.Status = AppointmentStatus.NoShow;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(appointment, patient, doctor);
+    }
+
+    public async Task DeleteAsync(Guid appointmentId, CancellationToken cancellationToken)
+    {
+        var (appointment, _, _) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        if (await dbContext.ClinicalRecords.AnyAsync(x => x.AppointmentId == appointmentId && x.ClinicId == appointment.ClinicId, cancellationToken))
+            throw new InvalidOperationException("Agendamento com prontuario nao pode ser excluido. Utilize a correcao de status.");
+
+        var receivable = await dbContext.Receivables.FirstOrDefaultAsync(x =>
+            x.AppointmentId == appointmentId && x.ClinicId == appointment.ClinicId, cancellationToken);
+        if (receivable is not null)
+        {
+            if (receivable.ReceivedAmount > 0 || await dbContext.Payments.AnyAsync(x => x.ReceivableId == receivable.Id && x.ClinicId == appointment.ClinicId, cancellationToken))
+                throw new InvalidOperationException("Agendamento com pagamento registrado nao pode ser excluido. Utilize a correcao de status.");
+            if (await dbContext.PaymentIntents.AnyAsync(x => x.ReceivableId == receivable.Id && x.ClinicId == appointment.ClinicId &&
+                (x.Status == PaymentIntentStatus.Created || x.Status == PaymentIntentStatus.Processing), cancellationToken))
+                throw new InvalidOperationException("Cancele a cobranca em andamento antes de excluir o agendamento.");
+            receivable.Status = ReceivableStatus.Cancelled;
+            receivable.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        appointment.DeletedAt = DateTimeOffset.UtcNow;
+        appointment.UpdatedAt = appointment.DeletedAt.Value;
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            ClinicId = appointment.ClinicId,
+            UserId = tenantProvider.UserId,
+            Action = "appointment.deleted",
+            EntityName = nameof(Appointment),
+            EntityId = appointment.Id,
+            PayloadJson = JsonSerializer.Serialize(new { appointment.PatientId, appointment.DoctorId, appointment.StartAt, status = appointment.Status.ToString() })
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<AppointmentResponse> UpdateStatusAsync(Guid appointmentId, UpdateAppointmentStatusRequest request, CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(request.Status))
+            throw new InvalidOperationException("Status de consulta invalido.");
+        var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        var previousStatus = appointment.Status;
+        if (previousStatus == request.Status) return ToResponse(appointment, patient, doctor);
+
+        if (previousStatus == AppointmentStatus.Cancelled && request.Status != AppointmentStatus.Cancelled)
+        {
+            var conflict = await dbContext.Appointments.AnyAsync(x =>
+                x.ClinicId == appointment.ClinicId && x.Id != appointment.Id &&
+                x.DoctorId == appointment.DoctorId && x.PatientId == appointment.PatientId &&
+                x.Status != AppointmentStatus.Cancelled &&
+                appointment.StartAt < x.EndAt && appointment.EndAt > x.StartAt, cancellationToken);
+            if (conflict) throw new InvalidOperationException("Conflito de horario para o paciente selecionado.");
+        }
+
+        var receivable = await dbContext.Receivables.FirstOrDefaultAsync(x =>
+            x.AppointmentId == appointmentId && x.ClinicId == appointment.ClinicId, cancellationToken);
+        if (receivable is not null)
+        {
+            if (request.Status == AppointmentStatus.Cancelled && receivable.Status != ReceivableStatus.Paid)
+                receivable.Status = ReceivableStatus.Cancelled;
+            else if (previousStatus == AppointmentStatus.Cancelled && appointment.Amount > 0)
+                receivable.Status = receivable.ReceivedAmount >= receivable.OriginalAmount
+                    ? ReceivableStatus.Paid
+                    : receivable.ReceivedAmount > 0 ? ReceivableStatus.Partial : ReceivableStatus.Pending;
+            receivable.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        appointment.Status = request.Status;
+        appointment.UpdatedAt = DateTimeOffset.UtcNow;
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            ClinicId = appointment.ClinicId,
+            UserId = tenantProvider.UserId,
+            Action = "appointment.status_changed",
+            EntityName = nameof(Appointment),
+            EntityId = appointment.Id,
+            PayloadJson = JsonSerializer.Serialize(new { previousStatus = previousStatus.ToString(), status = request.Status.ToString() })
+        });
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToResponse(appointment, patient, doctor);
     }

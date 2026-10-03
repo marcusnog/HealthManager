@@ -32,6 +32,8 @@ Appointments:
   POST /appointments: "{ patientId, doctorId, startAt, durationMinutes, notes?, appointmentTypeId, amount } -> 201 AppointmentResponse [ClinicStaff]"
   POST /appointments/group: "{ patientIds (distinct, min 2), doctorId, startAt, durationMinutes, notes?, appointmentTypeId, amount } -> 201 AppointmentResponse[] (atomic; shared appointmentGroupId) [ClinicStaff]"
   PATCH /appointments/{id}: "{ doctorId?, startAt?, durationMinutes?, notes?, appointmentTypeId?, amount? } -> AppointmentResponse [ClinicStaff]"
+  DELETE /appointments/{id}: "-> 204 (soft delete, cancel unpaid receivable, audit; 400 for clinical record/payment/active checkout, 404 if missing) [ClinicStaff]"
+  PATCH /appointments/{id}/status: "{ status: AppointmentStatus } -> AppointmentResponse (audited correction; preserves payments and clinical records) [ClinicStaff]"
   POST /appointments/{id}/confirm: "-> AppointmentResponse [ClinicStaff]"
   POST /appointments/{id}/cancel: "-> AppointmentResponse (also cancels receivable if not Paid) [ClinicStaff]"
   POST /appointments/{id}/in-progress: "-> AppointmentResponse [ClinicStaff]"

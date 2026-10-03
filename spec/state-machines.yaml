@@ -5,26 +5,29 @@ AppointmentStatus:
   initial: Scheduled
   states:
     Scheduled:
-      transitions: [Confirmed, Cancelled, InProgress]
+      transitions: [Confirmed, Cancelled, InProgress, Completed, NoShow]
     Confirmed:
-      transitions: [Cancelled, InProgress]
+      transitions: [Scheduled, Cancelled, InProgress, Completed, NoShow]
     InProgress:
-      transitions: [Completed, NoShow]
+      transitions: [Scheduled, Confirmed, Cancelled, Completed, NoShow]
     Completed:
-      transitions: []
+      transitions: [Scheduled, Confirmed, InProgress, Cancelled, NoShow]
     Cancelled:
-      transitions: []
+      transitions: [Scheduled, Confirmed, InProgress, Completed, NoShow]
     NoShow:
-      transitions: []
+      transitions: [Scheduled, Confirmed, InProgress, Completed, Cancelled]
   invariant:
-    - Cancelled appointments cannot be edited (update API rejects)
-    - Same doctor cannot have overlapping non-cancelled appointments outside the same appointment group (conflict validation on create/update)
+    - Cancelled appointments must be reactivated before editing
+    - Different patients may overlap; the same patient cannot overlap with the same doctor
+    - Direct corrections preserve clinical records, applications and payments and are audited
+    - Deletion is soft, audited and requires no clinical record, recorded payment or active payment intent; unpaid receivable is cancelled
   api_endpoints:
+    PATCH /appointments/{id}/status: any -> requested status (audited correction, no notifications)
     POST /appointments/{id}/confirm: Scheduled -> Confirmed
-    POST /appointments/{id}/cancel:  any -> Cancelled (also cancels linked receivable if not Paid)
+    POST /appointments/{id}/cancel: any -> Cancelled (also cancels linked receivable if not Paid)
     POST /appointments/{id}/in-progress: Scheduled|Confirmed -> InProgress
     POST /appointments/{id}/complete: InProgress -> Completed
-    POST /appointments/{id}/no-show: InProgress -> NoShow
+    POST /appointments/{id}/no-show: Scheduled|Confirmed|InProgress -> NoShow
 
 ReceivableStatus:
   initial: Pending
@@ -36,8 +39,9 @@ ReceivableStatus:
     Paid:
       transitions: []
     Cancelled:
-      transitions: []
+      transitions: [Pending, Partial, Paid]
   invariant:
+    - Cancelled receivables may only be restored by reactivating their linked appointment; status is recomputed from originalAmount and receivedAmount
     - Paid when receivedAmount == originalAmount
     - Partial when 0 < receivedAmount < originalAmount
     - Payment that would exceed outstanding balance is rejected

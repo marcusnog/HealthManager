@@ -182,6 +182,147 @@ public sealed class AppointmentsEndpointsTests
         });
     }
 
+    [Theory]
+    [InlineData("NoShow")]
+    [InlineData("Completed")]
+    [InlineData("Cancelled")]
+    public async Task StatusCorrection_ShouldRestoreAppointmentAndPreserveReceivedAmounts(string status)
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var appointmentId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        await factory.WithDbContextAsync(async db =>
+        {
+            var receivable = await db.Receivables.SingleAsync(x => x.AppointmentId == appointmentId);
+            receivable.ReceivedAmount = 50;
+            receivable.Status = HealthManager.Domain.ReceivableStatus.Partial;
+            await db.SaveChangesAsync();
+        });
+        (await client.PatchAsJsonAsync($"/appointments/{appointmentId}/status", new { status })).StatusCode.Should().Be(HttpStatusCode.OK);
+        var response = await client.PatchAsJsonAsync($"/appointments/{appointmentId}/status", new { status = "Scheduled" });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<AppointmentHttpResponse>())!.Status.Should().Be("Scheduled");
+        await factory.WithDbContextAsync(db =>
+        {
+            var receivable = db.Receivables.Single(x => x.AppointmentId == appointmentId);
+            receivable.ReceivedAmount.Should().Be(50);
+            receivable.Status.Should().Be(HealthManager.Domain.ReceivableStatus.Partial);
+            db.AuditLogs.Count(x => x.EntityId == appointmentId && x.Action == "appointment.status_changed").Should().Be(2);
+            return Task.CompletedTask;
+        });
+        (await client.PatchAsJsonAsync($"/appointments/{appointmentId}/status", new { status = "Scheduled" })).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task StatusCorrection_ShouldRejectInvalidOrMissingStatusAndUnknownAppointment()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        (await client.PatchAsJsonAsync("/appointments/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/status", new { status = 999 })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await client.PatchAsJsonAsync("/appointments/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/status", new { })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await client.PatchAsJsonAsync($"/appointments/{Guid.NewGuid()}/status", new { status = "Scheduled" })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task StatusCorrection_ShouldRejectReactivationWhenPatientAlreadyHasAnotherAppointment()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        const string id = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+        (await client.PostAsync($"/appointments/{id}/cancel", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync("/appointments", new
+        {
+            patientId = "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            doctorId = "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            startAt = "2026-05-07T12:00:00Z", durationMinutes = 30,
+            appointmentTypeId = "a7000001-0000-0000-0000-000000000001", amount = 180
+        })).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await client.PatchAsJsonAsync($"/appointments/{id}/status", new { status = "Scheduled" })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await factory.WithDbContextAsync(db =>
+        {
+            db.Appointments.Single(x => x.Id == Guid.Parse(id)).Status.Should().Be(HealthManager.Domain.AppointmentStatus.Cancelled);
+            return Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public async Task DeleteAppointment_ShouldHideAppointmentCancelReceivableAndAudit()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var id = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        (await client.DeleteAsync($"/appointments/{id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await client.DeleteAsync($"/appointments/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        await factory.WithDbContextAsync(db =>
+        {
+            db.Appointments.Any(x => x.Id == id).Should().BeFalse();
+            db.Appointments.IgnoreQueryFilters().Single(x => x.Id == id).DeletedAt.Should().NotBeNull();
+            db.Receivables.Single(x => x.AppointmentId == id).Status.Should().Be(HealthManager.Domain.ReceivableStatus.Cancelled);
+            db.AuditLogs.Single(x => x.EntityId == id && x.Action == "appointment.deleted").UserId.Should().Be(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+            return Task.CompletedTask;
+        });
+        var list = await client.GetFromJsonAsync<HealthManager.Application.PagedResult<AppointmentHttpResponse>>("/appointments?date=2026-05-07");
+        list!.Items.Should().NotContain(x => x.Id == id);
+    }
+
+    [Theory]
+    [InlineData("partial")]
+    [InlineData("paid")]
+    [InlineData("payment")]
+    [InlineData("clinical")]
+    [InlineData("checkout")]
+    public async Task DeleteAppointment_ShouldRejectProtectedHistoryWithoutChangingData(string protection)
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var id = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        await factory.WithDbContextAsync(async db =>
+        {
+            var appointment = db.Appointments.Single(x => x.Id == id);
+            var receivable = db.Receivables.Single(x => x.AppointmentId == id);
+            if (protection is "partial" or "paid") receivable.ReceivedAmount = protection == "paid" ? receivable.OriginalAmount : 50;
+            if (protection == "payment") db.Payments.Add(new HealthManager.Domain.Payment { ClinicId = appointment.ClinicId, ReceivableId = receivable.Id, Amount = 50 });
+            if (protection == "clinical") db.ClinicalRecords.Add(new HealthManager.Domain.ClinicalRecord { ClinicId = appointment.ClinicId, AppointmentId = id, PatientId = appointment.PatientId, DoctorId = appointment.DoctorId });
+            if (protection == "checkout") db.PaymentIntents.Add(new HealthManager.Domain.PaymentIntent { ClinicId = appointment.ClinicId, ReceivableId = receivable.Id, Amount = 50, IdempotencyKey = "delete-protection", Status = HealthManager.Domain.PaymentIntentStatus.Processing });
+            await db.SaveChangesAsync();
+        });
+        (await client.DeleteAsync($"/appointments/{id}")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await factory.WithDbContextAsync(db =>
+        {
+            db.Appointments.Single(x => x.Id == id).DeletedAt.Should().BeNull();
+            db.Receivables.Single(x => x.AppointmentId == id).Status.Should().Be(HealthManager.Domain.ReceivableStatus.Pending);
+            db.AuditLogs.Any(x => x.EntityId == id && x.Action == "appointment.deleted").Should().BeFalse();
+            return Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public async Task DeleteAppointment_ShouldRequireAuthenticationAndIsolateClinic()
+    {
+        await using var factory = new ApiTestFactory();
+        using var anonymous = factory.CreateClient();
+        (await anonymous.DeleteAsync("/appointments/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var id = Guid.NewGuid();
+        var clinicId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        await factory.SeedSecondClinicPatientAsync();
+        await factory.WithDbContextAsync(async db =>
+        {
+            var doctor = new HealthManager.Domain.Doctor { ClinicId = clinicId, Name = "Outro medico", Crm = "OUTRO" };
+            var type = new HealthManager.Domain.AppointmentType { ClinicId = clinicId, Name = "Consulta" };
+            db.Doctors.Add(doctor);
+            db.AppointmentTypes.Add(type);
+            db.Appointments.Add(new HealthManager.Domain.Appointment { Id = id, ClinicId = clinicId, DoctorId = doctor.Id, PatientId = Guid.Parse("99999999-9999-9999-9999-999999999999"), AppointmentTypeId = type.Id, StartAt = DateTimeOffset.UtcNow, EndAt = DateTimeOffset.UtcNow.AddMinutes(30) });
+            await db.SaveChangesAsync();
+        });
+        (await client.DeleteAsync($"/appointments/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        await factory.WithDbContextAsync(db =>
+        {
+            db.Appointments.IgnoreQueryFilters().Single(x => x.Id == id).DeletedAt.Should().BeNull();
+            return Task.CompletedTask;
+        });
+    }
+
     private sealed record AppointmentHttpResponse(
         Guid Id,
         Guid? AppointmentGroupId,

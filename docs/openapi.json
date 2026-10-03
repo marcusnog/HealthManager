@@ -10,6 +10,44 @@
     }
   ],
   "paths": {
+    "/appointments/{id}/status": {
+      "patch": {
+        "operationId": "AppointmentsUpdateStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppointmentStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/login": {
       "post": {
         "operationId": "auth_login",
@@ -887,6 +925,31 @@
       }
     },
     "/appointments/{id}": {
+      "delete": {
+        "operationId": "AppointmentsDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Appointment has protected clinical or financial records"
+          },
+          "404": {
+            "description": "Appointment not found"
+          }
+        }
+      },
       "patch": {
         "operationId": "appointments_update",
         "parameters": [
@@ -2811,6 +2874,25 @@
   },
   "components": {
     "schemas": {
+      "UpdateAppointmentStatusRequest": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "Scheduled",
+              "Confirmed",
+              "Cancelled",
+              "Completed",
+              "NoShow",
+              "InProgress"
+            ]
+          }
+        }
+      },
       "ProfessionalSettlementRequest": {
         "type": "object",
         "required": [

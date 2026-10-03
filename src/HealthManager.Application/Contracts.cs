@@ -359,3 +359,5 @@ public sealed record CheckoutResponse(
     string? PixCopyPaste = null,
     string? CheckoutUrl = null,
     DateTimeOffset? ExpiresAt = null);
+
+public sealed record UpdateAppointmentStatusRequest([property: System.Text.Json.Serialization.JsonRequired] AppointmentStatus Status);

@@ -82,8 +82,10 @@ catalog:
 
 scheduling:
   appointment_type: "Appointments reference a clinic-managed type. Type names are unique per clinic and types in use cannot be deleted."
-  conflict: "Same doctor cannot have overlapping non-cancelled appointments. Validated on create and update."
-  group_appointment: "A group appointment atomically creates one independent appointment per distinct patient with a shared appointmentGroupId. Members of the same group may overlap each other; overlap with any non-cancelled appointment outside the group remains forbidden. Each member keeps independent status, receivable and clinical record."
+  conflict: "Different patients may overlap for the same doctor without a group. The same patient cannot have overlapping non-cancelled appointments with that doctor. Validated on create, update and reactivation."
+  group_appointment: "A group appointment atomically creates one independent appointment per distinct patient with a shared appointmentGroupId. Legacy compatibility endpoint; overlap follows the same patient conflict rule as individual appointments. Each member keeps independent status, receivable and clinical record."
+  status_correction: "ClinicStaff may directly change any appointment status, including terminal states. Changes are audited with actor and old/new status. Corrections do not send notifications or undo payments, clinical records or consumed applications. Reactivation restores the linked receivable status from its amounts, unless the appointment amount is zero. ConfirmationStatus remains separate. Repeating the current status is a no-op."
+  deletion: "ClinicStaff may soft-delete an appointment. Reject when it has a clinical record, any recorded payment or an active payment intent (Created/Processing). Cancel its unpaid receivable, preserve related history and audit appointment.deleted. No automatic patient notification."
   business_hours: "Appointment start-end must fall within clinic BusinessHoursJson window. Clinic timezone applied."
   default_duration: "30 minutes if durationMinutes is 0."
   amount_auto: "Appointment with amount > 0 auto-creates a Receivable."
