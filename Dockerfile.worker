@@ -13,4 +13,5 @@ RUN apt-get update && apt-get install -y libgssapi-krb5-2 --no-install-recommend
 COPY --from=build /app/publish .
 
 USER app
+EXPOSE 9091
 ENTRYPOINT ["dotnet", "HealthManager.Worker.dll"]

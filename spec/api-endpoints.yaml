@@ -2,6 +2,9 @@
 # Full contract: docs/openapi.json
 # Auth header: Bearer {accessToken}, except endpoints explicitly marked [No auth].
 
+WorkerObservability:
+  GET /metrics: "Worker-only listener on WORKER_METRICS_URL (default http://+:9091); Prometheus process uptime, CPU seconds and resident memory. Internal cluster monitoring only; not served by the API. [No auth]"
+
 Auth:
   POST /auth/login: "{ email, password } -> AuthResponse"
   POST /auth/refresh: "{ refreshToken } -> AuthResponse"
