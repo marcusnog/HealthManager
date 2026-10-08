@@ -35,7 +35,7 @@ public sealed class RequestTenantProvider(IHttpContextAccessor httpContextAccess
     private static Guid? ParseGuid(string? value) => Guid.TryParse(value, out var parsed) ? parsed : null;
 }
 
-public sealed class StorageService(IAmazonS3 s3, IConfiguration configuration) : IStorageService
+public sealed class StorageService(IConfiguration configuration, IAmazonS3? s3 = null) : IStorageService
 {
     private readonly string? bucket = configuration["AWS_S3_BUCKET"];
     private readonly string localStorageRoot = configuration["LOCAL_STORAGE_ROOT"] ?? Path.Combine(Path.GetTempPath(), "healthmanager-storage");
@@ -65,7 +65,7 @@ public sealed class StorageService(IAmazonS3 s3, IConfiguration configuration) :
             ContentType = contentType,
         };
 
-        var response = await s3.PutObjectAsync(request, cancellationToken);
+        var response = await s3!.PutObjectAsync(request, cancellationToken);
         if ((int)response.HttpStatusCode >= 300)
             throw new InvalidOperationException($"Falha ao enviar arquivo para o S3: {response.HttpStatusCode}");
     }
@@ -80,7 +80,7 @@ public sealed class StorageService(IAmazonS3 s3, IConfiguration configuration) :
             return File.OpenRead(localPath);
         }
 
-        var response = await s3.GetObjectAsync(bucket, storagePath, cancellationToken);
+        var response = await s3!.GetObjectAsync(bucket, storagePath, cancellationToken);
         var memoryStream = new MemoryStream();
         await response.ResponseStream.CopyToAsync(memoryStream, cancellationToken);
         memoryStream.Position = 0;
