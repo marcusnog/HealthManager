@@ -34,11 +34,11 @@
   clinicId: Guid
   name: string
   socialName: string?
-  cpf: 'string (unique per clinic: clinicId+cpf index, validated with check digits)'
+  cpf: 'string (optional at registration; empty string when absent; unique per clinic for non-empty CPF, validated with check digits when supplied)'
   rg: string?
   birthDate: DateOnly?
   sex: string? (Masculino|Feminino|Prefiro não informar)
-  phone: string
+  phone: string (optional at registration; empty string when absent)
   secondaryPhone: string?
   commercialPhone: string?
   contactName: string?

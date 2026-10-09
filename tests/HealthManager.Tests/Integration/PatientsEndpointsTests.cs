@@ -190,7 +190,42 @@ public sealed class PatientsEndpointsTests
         });
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreatePatients_ShouldAllowMultiplePatientsWithoutCpfOrPhone(string? empty)
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        for (var i = 0; i < 2; i++)
+        {
+            var response = await client.PostAsJsonAsync("/patients", new { name = $"Paciente rapido {i}", cpf = empty, phone = empty });
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+            var patient = (await response.Content.ReadFromJsonAsync<PatientHttpResponse>())!;
+            patient.Cpf.Should().BeEmpty();
+            patient.Phone.Should().BeEmpty();
+            var update = await client.PatchAsJsonAsync($"/patients/{patient.Id}", new { name = patient.Name });
+            update.StatusCode.Should().Be(HttpStatusCode.OK);
+            var portal = await client.PostAsJsonAsync("/portal/auth", new { cpf = ".", accessToken = patient.PatientAccessToken.ToString() });
+            portal.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+    }
+
+    [Fact]
+    public async Task CreatePatient_ShouldStillRejectInvalidAndDuplicateCpf()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var invalid = await client.PostAsJsonAsync("/patients", new { name = "Paciente invalido", cpf = "123" });
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var valid = await client.PostAsJsonAsync("/patients", new { name = "Paciente valido", cpf = "935.411.347-80" });
+        valid.StatusCode.Should().Be(HttpStatusCode.Created);
+        var duplicate = await client.PostAsJsonAsync("/patients", new { name = "Paciente duplicado", cpf = "93541134780" });
+        duplicate.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private sealed record PagedPatientsHttpResponse(List<PatientHttpResponse> Items, int Page, int PageSize, int Total);
-    private sealed record PatientHttpResponse(Guid Id, string Name, string Cpf, string Phone, string? Email, string? HealthInsurance);
+    private sealed record PatientHttpResponse(Guid Id, string Name, string Cpf, string Phone, string? Email, string? HealthInsurance, Guid PatientAccessToken);
     private sealed record PatientDocumentHttpResponse(Guid Id, string FileName, string ContentType, long SizeInBytes, string StoragePath);
 }

@@ -229,11 +229,11 @@ public sealed class PatientService(
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
-        var normalizedCpf = AppHelpers.NormalizeDigits(request.Cpf);
-        if (!AppHelpers.ValidateCpf(normalizedCpf))
+        var normalizedCpf = AppHelpers.NormalizeDigits(request.Cpf ?? "");
+        if (!string.IsNullOrWhiteSpace(request.Cpf) && !AppHelpers.ValidateCpf(normalizedCpf))
             throw new InvalidOperationException("CPF invalido.");
 
-        var exists = await dbContext.Patients.AnyAsync(x => x.ClinicId == clinicId && x.Cpf == normalizedCpf && x.DeletedAt == null, cancellationToken);
+        var exists = normalizedCpf.Length > 0 && await dbContext.Patients.AnyAsync(x => x.ClinicId == clinicId && x.Cpf == normalizedCpf && x.DeletedAt == null, cancellationToken);
         if (exists)
             throw new InvalidOperationException("Paciente ja cadastrado para esta clinica.");
 
@@ -243,7 +243,7 @@ public sealed class PatientService(
             Name = request.Name,
             Cpf = normalizedCpf,
             BirthDate = request.BirthDate,
-            Phone = request.Phone,
+            Phone = request.Phone?.Trim() ?? "",
             Email = request.Email,
             HealthInsurance = request.HealthInsurance,
             HealthInsuranceId = request.HealthInsuranceId,
@@ -295,7 +295,7 @@ public sealed class PatientService(
             ?? throw new KeyNotFoundException("Paciente nao encontrado.");
 
         patient.Name = request.Name;
-        patient.Phone = request.Phone;
+        patient.Phone = request.Phone?.Trim() ?? "";
         patient.Email = request.Email;
         patient.HealthInsurance = request.HealthInsurance;
         patient.HealthInsuranceId = request.HealthInsuranceId;
@@ -2679,7 +2679,7 @@ public sealed class PatientPortalService(
     public async Task<PatientPortalAuthResponse> LoginAsync(PatientPortalLoginRequest request, CancellationToken cancellationToken)
     {
         var normalizedCpf = AppHelpers.NormalizeDigits(request.Cpf);
-        if (!Guid.TryParse(request.AccessToken, out var tokenGuid))
+        if (normalizedCpf.Length == 0 || !Guid.TryParse(request.AccessToken, out var tokenGuid))
         {
             throw new UnauthorizedAccessException("Credenciais invalidas.");
         }

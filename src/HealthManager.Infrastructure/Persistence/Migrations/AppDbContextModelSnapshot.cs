@@ -974,7 +974,8 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.HasIndex("HealthInsuranceId");
 
                     b.HasIndex("ClinicId", "Cpf")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"Cpf\" <> ''");
 
                     b.ToTable("Patients");
                 });

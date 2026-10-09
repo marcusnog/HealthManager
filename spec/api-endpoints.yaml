@@ -13,8 +13,8 @@ Auth:
 
 Patients:
   GET /patients: "?page,pageSize,search,sortBy,sortDirection,email,healthInsurance -> PagedResult<PatientResponse> [ClinicAdminOrSecretary]"
-  POST /patients: "{ identification (sex: Masculino|Feminino|Prefiro não informar), insurance/marketing, contacts, address, complementary data, notes } -> 201 PatientResponse [ClinicAdminOrSecretary]"
-  PATCH /patients/{id}: "{ all editable patient fields; cpf remains immutable } -> PatientResponse [ClinicAdminOrSecretary]"
+  POST /patients: "{ identification (cpf optional; sex: Masculino|Feminino|Prefiro não informar), insurance/marketing, contacts (phone optional), address, complementary data, notes } -> 201 PatientResponse [ClinicAdminOrSecretary]"
+  PATCH /patients/{id}: "{ all editable patient fields; phone optional; cpf remains immutable } -> PatientResponse [ClinicAdminOrSecretary]"
   DELETE /patients/{id}: "-> 204 (soft delete, audit logged) [ClinicAdminOrSecretary]"
   POST /patients/{id}/access-token/regenerate: "-> new Guid (regenerates patientAccessToken) [ClinicAdminOrSecretary]"
   GET /address/cep/{cep}: "-> CepAddressResponse via ViaCEP [ClinicAdminOrSecretary]"

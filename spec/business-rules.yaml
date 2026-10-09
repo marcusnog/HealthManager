@@ -27,6 +27,7 @@ authorization:
     Patient: "Portal only. Scoped to own data via PatientAccessToken."
 
 patients:
+  optional_identification: "CPF and primary phone are optional for quick patient registration and phone updates. Missing values are stored as empty strings. Supplied CPF must be valid and unique per clinic; multiple patients without CPF are allowed. Portal login still requires a non-empty CPF."
   medical_record_number: "Generated automatically from the patient id on creation as P-{first 12 uppercase hex digits}; clients cannot define or change it."
 
 policies:

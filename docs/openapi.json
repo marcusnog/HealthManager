@@ -3163,23 +3163,23 @@
       "CreatePatientRequest": {
         "type": "object",
         "required": [
-          "name",
-          "cpf",
-          "phone"
+          "name"
         ],
         "properties": {
           "name": {
             "type": "string"
           },
           "cpf": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "birthDate": {
             "type": "string",
             "format": "date"
           },
           "phone": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "email": {
             "type": "string"
@@ -3301,15 +3301,15 @@
       "UpdatePatientRequest": {
         "type": "object",
         "required": [
-          "name",
-          "phone"
+          "name"
         ],
         "properties": {
           "name": {
             "type": "string"
           },
           "phone": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "email": {
             "type": "string"

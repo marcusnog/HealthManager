@@ -51,9 +51,9 @@ public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSi
 
 public sealed record CreatePatientRequest(
     [Required][StringLength(160)] string Name,
-    [Required][StringLength(14)] string Cpf,
+    [StringLength(14)] string? Cpf,
     DateOnly? BirthDate,
-    [Required][StringLength(20)] string Phone,
+    [StringLength(20)] string? Phone,
     string? Email,
     string? HealthInsurance,
     Guid? HealthInsuranceId,
@@ -62,7 +62,7 @@ public sealed record CreatePatientRequest(
 
 public sealed record UpdatePatientRequest(
     [Required] string Name,
-    [Required] string Phone,
+    [StringLength(20)] string? Phone,
     string? Email,
     string? HealthInsurance,
     Guid? HealthInsuranceId,
