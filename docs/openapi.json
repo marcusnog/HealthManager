@@ -2075,6 +2075,26 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1,
+              "maximum": 1000000
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            }
           }
         ],
         "responses": {
@@ -2083,15 +2103,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/WhatsAppMessageResponse"
-                  }
+                  "$ref": "#/components/schemas/PagedWhatsAppMessageResponse"
                 }
               }
             }
           }
-        }
+        },
+        "description": "Pass page or pageSize for a paged response. During rollout, omitting both returns the latest 50 messages as a chronological legacy array."
       },
       "post": {
         "operationId": "whatsapp_message_send",
@@ -2870,6 +2888,115 @@
         },
         "operationId": "patient_application_balance_grant"
       }
+    },
+    "/whatsapp/webhook": {
+      "get": {
+        "operationId": "whatsapp_webhook_verify",
+        "parameters": [
+          {
+            "name": "hub.mode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hub.verify_token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hub.challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Challenge",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid challenge"
+          }
+        }
+      },
+      "post": {
+        "operationId": "whatsapp_webhook_receive",
+        "description": "Native Meta envelope; HMAC SHA256 of raw body required. No legacy clinicId/appointmentId DTO. Maximum 1 MiB.",
+        "parameters": [
+          {
+            "name": "X-Hub-Signature-256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "object",
+                  "entry"
+                ],
+                "properties": {
+                  "object": {
+                    "type": "string",
+                    "enum": [
+                      "whatsapp_business_account"
+                    ]
+                  },
+                  "entry": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted"
+          },
+          "400": {
+            "description": "Malformed envelope"
+          },
+          "401": {
+            "description": "Invalid signature"
+          },
+          "409": {
+            "description": "Concurrent delivery; safe to retry"
+          },
+          "413": {
+            "description": "Payload too large"
+          },
+          "503": {
+            "description": "App secret not configured"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2905,7 +3032,10 @@
           },
           "paymentIds": {
             "type": "array",
-            "items": { "type": "string", "format": "uuid" }
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           },
           "throughDate": {
             "type": "string",
@@ -2978,19 +3108,38 @@
           },
           "items": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/ProfessionalSettlementItemResponse" }
+            "items": {
+              "$ref": "#/components/schemas/ProfessionalSettlementItemResponse"
+            }
           }
         }
       },
       "ProfessionalSettlementItemResponse": {
         "type": "object",
         "properties": {
-          "paymentId": { "type": "string", "format": "uuid" },
-          "appointmentId": { "type": "string", "format": "uuid", "nullable": true },
-          "patientName": { "type": "string" },
-          "paidAt": { "type": "string", "format": "date-time" },
-          "amount": { "type": "number", "format": "decimal" },
-          "isOverdue": { "type": "boolean" }
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "patientName": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "isOverdue": {
+            "type": "boolean"
+          }
         }
       },
       "UpdateTenantSettingsRequest": {
@@ -4602,6 +4751,11 @@
               "Inbound",
               "Outbound"
             ]
+          },
+          "lastInboundAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -4658,7 +4812,8 @@
               "Pending",
               "Sent",
               "Delivered",
-              "Failed"
+              "Failed",
+              "Read"
             ]
           },
           "direction": {
@@ -4671,6 +4826,11 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "providerTimestamp": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -4683,6 +4843,11 @@
           "message": {
             "type": "string",
             "maxLength": 4096
+          },
+          "clientRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },
@@ -5188,6 +5353,32 @@
           }
         },
         "additionalProperties": false
+      },
+      "PagedWhatsAppMessageResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WhatsAppMessageResponse"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
       }
     }
   }

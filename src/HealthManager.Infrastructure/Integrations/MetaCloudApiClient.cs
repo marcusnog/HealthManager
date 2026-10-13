@@ -63,22 +63,24 @@ public sealed class MetaCloudApiClient(IHttpClientFactory httpClientFactory) : I
             request.Headers.Authorization = new("Bearer", accessToken);
 
             var client = httpClientFactory.CreateClient("MetaCloudApi");
-            var response = await client.SendAsync(request, cancellationToken);
+            using var response = await client.SendAsync(request, cancellationToken);
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
             if (!response.IsSuccessStatusCode)
-                return new MetaMessageResponse { Success = false, Error = $"HTTP {(int)response.StatusCode}: {body}" };
+                return new MetaMessageResponse { Success = false, DeliveryUncertain = (int)response.StatusCode >= 500,
+                    Error = "O provedor nao confirmou o envio. Verifique a configuracao do WhatsApp." };
 
             using var doc = JsonDocument.Parse(body);
             var messageId = doc.RootElement
                 .GetProperty("messages")[0]
                 .GetProperty("id").GetString();
+            if (string.IsNullOrWhiteSpace(messageId)) throw new JsonException("Missing provider message id.");
 
             return new MetaMessageResponse { Success = true, MessageId = messageId };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException)
         {
-            return new MetaMessageResponse { Success = false, Error = ex.Message };
+            return new MetaMessageResponse { Success = false, DeliveryUncertain = true, Error = "Resultado do envio ainda desconhecido." };
         }
     }
 }

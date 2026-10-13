@@ -220,17 +220,17 @@ Content-Type: application/json
 }
 
 ###
-# Simular webhook de confirmacao por WhatsApp
-POST {{apiBaseUrl}}/whatsapp/webhook
-Content-Type: application/json
+# Challenge Meta (configurar WHATSAPP_VERIFY_TOKEN no servidor)
+GET {{apiBaseUrl}}/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=SUBSTITUIR&hub.challenge=12345
 
-{
-  "clinicId": "{{seedClinicId}}",
-  "appointmentId": "{{seedAppointmentId}}",
-  "phone": "11999998888",
-  "message": "CONFIRMAR",
-  "providerMessageId": "meta-demo-001"
-}
+###
+# Histórico paginado do atendimento (Admin/Secretary)
+GET {{apiBaseUrl}}/whatsapp/conversations/5511999998888/messages?page=1&pageSize=50
+Authorization: Bearer {{clinicToken}}
+
+###
+# POST /whatsapp/webhook requer envelope nativo e HMAC SHA256 do corpo exato.
+# Consultar docs/plans/atendimento-meta-2026-10-12.md; payload legado não é mais aceito.
 
 ###
 # Provisionar nova clinica como PlatformAdmin

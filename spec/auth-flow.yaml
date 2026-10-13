@@ -1,5 +1,10 @@
 # Canonical auth flow — source of truth.
 
+whatsapp_webhook_auth:
+  post: "No JWT. Require HMAC-SHA256 of raw bytes with WHATSAPP_APP_SECRET and X-Hub-Signature-256; fail closed when absent."
+  tenant: "Resolve verified metadata.phone_number_id to exactly one enabled clinic configuration; never use X-Clinic-Id, JWT or a client-provided clinicId."
+  get: "Require hub.mode=subscribe and non-empty WHATSAPP_VERIFY_TOKEN; echo challenge as text/plain."
+
 clinic_auth:
   login:
     request: POST /auth/login { email, password }

@@ -98,10 +98,10 @@ Dashboard:
 
 WhatsApp:
   GET /whatsapp/webhook: "Meta verification challenge (?hub.mode,hub.verify_token,hub.challenge) [No auth]"
-  POST /whatsapp/webhook: "{ clinicId?, appointmentId?, phone, message, providerMessageId? } [No auth]"
+  POST /whatsapp/webhook: "Native Meta envelope; mandatory X-Hub-Signature-256 HMAC, tenant from metadata.phone_number_id; 200 accepted, 400 malformed, 401 signature invalid, 503 missing server secret [No JWT; see atendimento.yaml]"
   GET /whatsapp/conversations: "?page,pageSize,search -> PagedResult<WhatsAppConversationResponse> [ClinicAdminOrSecretary]"
-  GET /whatsapp/conversations/{phone}/messages: "-> WhatsAppMessageResponse[] [ClinicAdminOrSecretary]"
-  POST /whatsapp/conversations/{phone}/messages: "{ message } -> WhatsAppMessageResponse [ClinicAdminOrSecretary]"
+  GET /whatsapp/conversations/{phone}/messages: "?page=1,pageSize=50 -> PagedResult<WhatsAppMessageResponse> newest first; without either pagination parameter, legacy chronological array (latest 50) during rollout [ClinicAdminOrSecretary]"
+  POST /whatsapp/conversations/{phone}/messages: "{ message, clientRequestId? } -> WhatsAppMessageResponse; Pending for unknown delivery, Failed for explicit rejection; same request id returns original attempt [ClinicAdminOrSecretary]"
 
 PatientPortal:
   POST /portal/auth: "{ cpf, accessToken } -> PatientPortalAuthResponse [No auth]"

@@ -373,6 +373,10 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.HasIndex("ClinicId")
                         .IsUnique();
 
+                    b.HasIndex("PhoneNumberOfId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
                     b.ToTable("ClinicWhatsAppConfigs");
                 });
 
@@ -1485,6 +1489,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ClientRequestId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ClinicId")
                         .HasColumnType("uuid");
 
@@ -1511,13 +1518,27 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.Property<string>("ProviderMessageId")
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("ProviderTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClinicId", "ClientRequestId")
+                        .IsUnique()
+                        .HasFilter("\"ClientRequestId\" IS NOT NULL");
+
+                    b.HasIndex("ClinicId", "Direction", "ProviderMessageId")
+                        .IsUnique()
+                        .HasFilter("\"ProviderMessageId\" IS NOT NULL");
+
+                    b.HasIndex("ClinicId", "Phone", "CreatedAt");
 
                     b.ToTable("WhatsAppMessages");
                 });

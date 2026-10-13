@@ -244,6 +244,14 @@ modelBuilder.Entity<PackageItem>().HasOne(x => x.Package).WithMany(x => x.Items)
         modelBuilder.Entity<PaymentIntent>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || TenantClinicId == null || x.ClinicId == TenantClinicId));
 
         modelBuilder.Entity<ClinicWhatsAppConfig>().HasIndex(x => x.ClinicId).IsUnique();
+        modelBuilder.Entity<ClinicWhatsAppConfig>().HasIndex(x => x.PhoneNumberOfId).IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL");
+        modelBuilder.Entity<WhatsAppMessage>().HasIndex(x => new { x.ClinicId, x.Direction, x.ProviderMessageId }).IsUnique()
+            .HasFilter("\"ProviderMessageId\" IS NOT NULL");
+        modelBuilder.Entity<WhatsAppMessage>().HasIndex(x => new { x.ClinicId, x.ClientRequestId }).IsUnique()
+            .HasFilter("\"ClientRequestId\" IS NOT NULL");
+        modelBuilder.Entity<WhatsAppMessage>().HasIndex(x => new { x.ClinicId, x.Phone, x.CreatedAt });
+        modelBuilder.Entity<WhatsAppMessage>().Property(x => x.Status).IsConcurrencyToken();
         modelBuilder.Entity<ClinicWhatsAppConfig>()
             .HasOne(x => x.Clinic).WithOne(x => x.WhatsAppConfig)
             .HasForeignKey<ClinicWhatsAppConfig>(x => x.ClinicId)

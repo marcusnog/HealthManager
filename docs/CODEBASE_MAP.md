@@ -123,6 +123,8 @@ Important service groups:
 | Finance/payments | `FinancialService`, `ExpenseService`, `ExpenseCategoryService`, `PaymentIntentService`, `CheckoutService`, `DashboardService` |
 | Messaging | `WhatsAppWebhookService`, `WhatsAppMessagingService`, `WhatsAppAtendimentoService` |
 
+The three WhatsApp services now live in separate `Application/WhatsApp*Service.cs` files. The webhook accepts signed native Meta envelopes and resolves the tenant from the configured provider number, independently of request headers/JWT. Incoming text does not mutate appointments. Outbound attempts are persisted before provider calls, support client request IDs and retain Pending on uncertain delivery. The inbox/history use database pagination; see `spec/atendimento.yaml` and `docs/plans/atendimento-meta-2026-10-12.md`.
+
 `PackageService.UpdateAsync` reconciles package composition instead of replacing it wholesale: existing `PackageItem` rows keep their IDs and receive `ApplicationCount` updates in place, omitted products are removed, and only newly selected products create rows. This matches `catalog.package_update` and avoids persistence conflicts when saving an unchanged product composition.
 
 `AddApplication()` currently registers `MockPaymentGatewayClient` as the global `IPaymentGatewayClient`. Provider-specific Asaas, Mercado Pago, and Stripe handlers validate and parse webhooks but do not replace that outbound client.

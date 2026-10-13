@@ -10,10 +10,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace HealthManager.Tests.Integration;
 
-public sealed class ApiTestFactory : WebApplicationFactory<Program>
+public sealed class ApiTestFactory(string? whatsAppSecret = "test-meta-app-secret") : WebApplicationFactory<Program>
 {
     private readonly string databaseName = $"healthmanager-tests-{Guid.NewGuid()}";
 
@@ -22,6 +23,7 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.ConfigureLogging(logging => logging.ClearProviders());
 
         builder.ConfigureAppConfiguration((_, config) =>
         {
@@ -29,7 +31,9 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
             {
                 ["USE_INMEMORY_DATABASE"] = "true",
                 ["INMEMORY_DATABASE_NAME"] = databaseName,
-                ["SENTRY_DSN"] = ""
+                ["SENTRY_DSN"] = "",
+                ["WHATSAPP_APP_SECRET"] = whatsAppSecret,
+                ["WHATSAPP_VERIFY_TOKEN"] = "test-meta-verify-token"
             });
         });
 

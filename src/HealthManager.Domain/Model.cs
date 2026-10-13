@@ -324,6 +324,8 @@ public sealed class WhatsAppMessage : TenantEntity
     public WhatsAppMessageStatus Status { get; set; } = WhatsAppMessageStatus.Pending;
     public MessageDirection Direction { get; set; } = MessageDirection.Outbound;
     public string? ProviderMessageId { get; set; }
+    public Guid? ClientRequestId { get; set; }
+    public DateTimeOffset? ProviderTimestamp { get; set; }
 }
 
 public sealed class AuditLog : TenantEntity
@@ -526,7 +528,8 @@ public enum WhatsAppMessageStatus
     Pending = 1,
     Sent = 2,
     Delivered = 3,
-    Failed = 4
+    Failed = 4,
+    Read = 5
 }
 
 public enum OutboxStatus

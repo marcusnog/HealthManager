@@ -338,15 +338,19 @@
   patientId: Guid?
   phone: string
   message: string
-  status: WhatsAppMessageStatus (Pending|Sent|Delivered|Failed)
+  status: WhatsAppMessageStatus (Pending|Sent|Delivered|Failed|Read)
   direction: MessageDirection (Inbound|Outbound)
   providerMessageId: string?
+  clientRequestId: Guid? (unique per clinic when present)
+  providerTimestamp: DateTimeOffset? (UTC, received from Meta; used for service window)
+  # Unique (clinicId, direction, providerMessageId) when providerMessageId is present.
+  # Index (clinicId, phone, createdAt); phone normalized at every write and by migration.
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
 - ClinicWhatsAppConfig:
   id: Guid (auto)
   clinicId: Guid (FK Clinic, unique index)
-  phoneNumberOfId: string
+  phoneNumberOfId: string (unique among non-deleted configs)
   accessToken: string (should be encrypted at rest)
   wABAId: string?
   isEnabled: bool (default false)

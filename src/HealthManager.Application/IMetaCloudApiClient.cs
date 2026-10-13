@@ -5,6 +5,8 @@ public sealed class MetaMessageResponse
     public bool Success { get; init; }
     public string? MessageId { get; init; }
     public string? Error { get; init; }
+    public bool DeliveryUncertain { get; init; }
+    public WhatsAppMessageResponse? StoredMessage { get; init; }
 }
 
 public interface IMetaCloudApiClient

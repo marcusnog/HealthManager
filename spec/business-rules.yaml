@@ -144,12 +144,13 @@ payment_gateway_processing:
 whatsapp_messaging:
   meta_cloud_api: "Outbound messages sent via Meta Graph API v21.0 (typed HTTP client). Each clinic has its own phoneNumberOfId and accessToken."
   config_check: "SendAsync verifies ClinicWhatsAppConfig exists and IsEnabled=true for the clinic. Returns error if not configured."
-  phone_normalization: "Brazilian phone numbers normalized to international format: strip non-digits, prepend '55' if 10 or 11 digits."
-  message_persist: "Every outbound message stored as WhatsAppMessage (direction=Outbound, status=Sent|Failed, providerMessageId)."
+  phone_normalization: "Strip non-ASCII digits; prepend '55' to all 10/11 digit national numbers, including DDD 55. See atendimento.yaml."
+  message_persist: "Persist Pending before provider call, then Sent/Failed; uncertain transport remains Pending. Return exact stored message, never last message by phone. See atendimento.yaml."
   appointment_integration: "SendAppointmentConfirmationAsync and SendAppointmentCancellationAsync are service-level convenience methods. Call them from AppointmentService on status transitions."
   outbox_events: "Confirmation messages also enqueue 'whatsapp.appointment.confirmed' outbox event for downstream processing."
   timezone: "Appointment dates displayed in clinic timezone (hardcoded BRT offset for now — upgrade path: resolve from clinic config)."
   atendimento: "Admin and Secretary (displayed as Recepção) can list conversations, read message history and send text replies. Tenant filters isolate every clinic."
+  atendimento_contract: "spec/atendimento.yaml defines signed Meta ingestion, idempotency, pagination, service window and UI acceptance. No automatic appointment changes from inbound text."
 
 outbox:
   events: "appointment.created, appointment.updated, appointment.cancelled, whatsapp.appointment.confirmed"

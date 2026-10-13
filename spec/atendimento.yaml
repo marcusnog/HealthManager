@@ -1,0 +1,39 @@
+# Atendimento humano e Meta — aprovado pelo usuário em 2026-10-12.
+scope:
+  included: [inbox, text_replies, signed_meta_webhook, delivery_status, pagination, draft_per_phone]
+  excluded: [ai_agent, rag, ixc, twilio, media_upload_download, automatic_appointment_changes]
+  reference: "Obsidian: Gestor360 - Estado atual; gestor360-meta-migration; gestor360-whatsapp-cross-company-leak (atualizados em 2026-08-13). Referência documental, não inspeção da produção atual."
+architecture:
+  structure: "Manter monólito modular e IMetaCloudApiClient; serviços WhatsApp em arquivos próprios, sem infraestrutura de agentes ou novo broker."
+  conversation_key: "clinicId + telefone normalizado. Telefone compartilhado não comprova identidade nem autoriza acesso a prontuário."
+  normalization: "Somente dígitos ASCII; 10/11 dígitos nacionais recebem 55, inclusive DDD 55; formato internacional de 12 a 15 dígitos. Migração normaliza histórico."
+webhook:
+  authentication: "HMAC-SHA256 do corpo bruto, comparação em tempo constante, X-Hub-Signature-256 obrigatório. WHATSAPP_APP_SECRET ausente bloqueia POST (503). Limite 1 MiB."
+  challenge: "hub.mode=subscribe, WHATSAPP_VERIFY_TOKEN não vazio e token correspondente; resposta text/plain."
+  tenant: "Resolver exclusivamente metadata.phone_number_id em configuração habilitada de clínica ativa. Ignorar JWT, X-Clinic-Id e clinicId do payload. Número sem vínculo ou ambíguo nunca grava mensagens."
+  payload: "Envelope nativo object=whatsapp_business_account, entry[].changes[].value; não aceitar DTO legado que escolhia clínica/consulta."
+  idempotency: "Chave única de mensagem (clinicId, direction, providerMessageId), incluindo soft-deleted. Reentrega é no-op. Corrida no banco pode devolver 409; retry do provedor encontra registro persistido e recebe 200."
+  inbound: "Texto e respostas de botão/interativo viram texto; outros tipos recebem marcador de conteúdo não suportado. Timestamp do provedor preservado separadamente de CreatedAt. Não modificar consultas por palavras."
+  statuses: "Aplicar somente à mensagem Outbound da clínica resolvida. sent/delivered/read avançam monotonicamente; failed não substitui Delivered/Read. Evento desconhecido não cria mensagem."
+  storage: "Não armazenar envelope bruto nem credenciais em logs. Mensagens são duráveis antes do ACK; lote parcialmente persistido é seguro para replay."
+outbound:
+  authorization: "Admin/Secretary, clinicId obrigatório, configuração habilitada; texto 1..4096 após trim."
+  service_window: "Respostas livres na central exigem última mensagem recebida há menos de 24 horas, pelo timestamp do provedor. Fora da janela orientar paciente a enviar nova mensagem. Templates existentes seguem integração de notificações."
+  idempotency: "ClientRequestId UUID opcional para compatibilidade, enviado pela UI e único por clínica. Mesmo id/telefone/texto retorna a mesma mensagem; conteúdo diferente é rejeitado."
+  durability: "Persistir Pending antes do HTTP Meta. Persistir Sent/Failed após resultado. Retornar o registro exato criado, nunca consultar última mensagem do telefone."
+  uncertain_delivery: "Timeout/cancelamento/erro de transporte mantém Pending; não reenviar automaticamente. Repetir ClientRequestId consulta a tentativa existente. Nova tentativa só com nova intenção explícita. Não prometer exactly-once no provedor."
+inbox:
+  access: "Admin/Secretary. Todas as consultas exigem clínica e filtram clinicId explicitamente."
+  list: "Última mensagem por telefone em SQL; ordenar CreatedAt desc e Id desc, paginação 1..100; busca telefone/nome. Sem carregar histórico completo em memória."
+  history: "PagedResult, page/pageSize (padrão 1/50, máximo 100), mensagens recentes primeiro. Resposta inclui providerTimestamp para atualizar a janela mesmo com conversa fora da página atual da lista. UI apresenta cronologicamente e permite carregar anteriores."
+  rollout_compatibility: "Durante o rollout, GET de mensagens sem page e sem pageSize preserva array cronológico limitado às últimas 50 mensagens. Clientes novos sempre enviam paginação explícita e recebem PagedResult."
+deployment:
+  meta_environment: "Docker Compose local/VPS repassa WHATSAPP_APP_SECRET e WHATSAPP_VERIFY_TOKEN para API; K3s deve fornecer ambas por Secret. Ausência continua falhando fechada, sem bloquear os demais módulos."
+  frontend: "Atualizar lista e conversa a cada 10s; paginação da lista; rascunho e erro independentes por telefone, sem localStorage; envio captura destinatário/texto/chave antes do await. Estados Pending/Sent/Delivered/Read/Failed legíveis."
+acceptance:
+  - "Assinatura inválida, segredo ausente, número desconhecido e payload legado não gravam dados."
+  - "Mesmo telefone em duas clínicas permanece isolado inclusive com JWT/header de clínica divergente no webhook."
+  - "Replays não duplicam mensagens e statuses fora de ordem não regridem leitura."
+  - "Envio concorrente retorna seu próprio registro; falha/timeout não vira confirmação falsa."
+  - "Página limitada, navegação entre conversas preserva rascunhos e envio em andamento."
+  - "Migração e snapshot EF, contrato OpenAPI, cliente gerado, testes backend/frontend e builds validados."

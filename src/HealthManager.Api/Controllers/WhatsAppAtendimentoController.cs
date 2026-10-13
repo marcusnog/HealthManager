@@ -14,8 +14,14 @@ public sealed class WhatsAppAtendimentoController(WhatsAppAtendimentoService ser
         => Ok(await service.ListAsync(query, cancellationToken));
 
     [HttpGet("{phone}/messages")]
-    public async Task<ActionResult<IReadOnlyList<WhatsAppMessageResponse>>> Messages(string phone, CancellationToken cancellationToken)
-        => Ok(await service.MessagesAsync(phone, cancellationToken));
+    public async Task<ActionResult<PagedResult<WhatsAppMessageResponse>>> Messages(string phone, CancellationToken cancellationToken, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    {
+        var result = await service.MessagesAsync(phone, cancellationToken, page, pageSize);
+        // The previous frontend expects an array until its independent deployment completes.
+        if (!Request.Query.ContainsKey("page") && !Request.Query.ContainsKey("pageSize"))
+            return Ok(result.Items.Reverse());
+        return Ok(result);
+    }
 
     [HttpPost("{phone}/messages")]
     public async Task<ActionResult<WhatsAppMessageResponse>> Send(string phone, [FromBody] SendWhatsAppMessageRequest request, CancellationToken cancellationToken)

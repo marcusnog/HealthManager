@@ -1,6 +1,24 @@
 # Canonical state machines — source of truth.
 # Changes here must be reflected in backend domain enums + frontend generated models.
 
+WhatsAppMessageStatus:
+  initial: Pending
+  states:
+    Pending:
+      transitions: [Sent, Delivered, Read, Failed]
+    Sent:
+      transitions: [Delivered, Read, Failed]
+    Failed:
+      transitions: [Delivered, Read]
+    Delivered:
+      transitions: [Read]
+    Read:
+      transitions: []
+  invariant:
+    - Status callbacks are tenant-scoped and never create messages
+    - Repeated or older callbacks are no-ops; delivery/read evidence supersedes failure
+    - Transport uncertainty preserves Pending and does not trigger automatic resend
+
 AppointmentStatus:
   initial: Scheduled
   states:
