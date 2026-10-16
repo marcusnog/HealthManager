@@ -25,6 +25,7 @@
   name: string
   email: 'string, unique index (filter: DeletedAt IS NULL)'
   passwordHash: string (BCrypt)
+  screenAccessJson: string? (JSON array of screen keys; null uses role defaults; empty array denies all screens; Admin always has all screens)
   role: UserRole (PlatformAdmin|Admin|Secretary|Doctor|Patient; Secretary is displayed as Recepção)
   isActive: bool (default true)
   # Inherited: CreatedAt, UpdatedAt, DeletedAt

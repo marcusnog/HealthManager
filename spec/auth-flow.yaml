@@ -8,7 +8,7 @@ whatsapp_webhook_auth:
 clinic_auth:
   login:
     request: POST /auth/login { email, password }
-    lookup: "User by email where DeletedAt IS NULL and IsActive = true"
+    lookup: "User by trimmed, case-insensitive email where DeletedAt IS NULL and IsActive = true"
     verify: "BCrypt.Verify(password, user.PasswordHash)"
     response: { accessToken, refreshToken, expiresAt, user: { id, clinicId, name, email, role } }
     side_effect: "RefreshToken record created with BCrypt-hashed token, UserAgent from request"
@@ -53,6 +53,8 @@ jwt:
     - name: user name
     - email: user email
     - role: UserRole string
-    - permission: string (repeated) — granular permissions granted to the role. Resolved from Permissions.ForRole(role). See business-rules.yaml finance_screens.
+    - permission: string (repeated) — granular permissions granted to the role. Resolved from Permissions.ForUser(user), including screen grants and finance grants limited by selected screens. See business-rules.yaml finance_screens.
   user_response:
     - "UserResponse exposes permissions: IReadOnlyList<string> alongside id/clinicId/name/email/role so the frontend can render per-screen navigation."
+
+staff_session_validation: "JWT validation reloads the active, non-deleted user by sub and verifies clinic_id before replacing role/permission claims. Patient portal tokens retain the separate portal flow."

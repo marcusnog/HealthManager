@@ -55,7 +55,14 @@ public sealed class WebhooksController(
 
         if (intent is not null)
         {
-            await hubContext.Clients.Group(clinicId.ToString())
+            var users = await dbContext.Users.AsNoTracking()
+                .Where(user => user.ClinicId == clinicId && user.IsActive && user.DeletedAt == null)
+                .Select(user => new User { Id = user.Id, Role = user.Role, ScreenAccessJson = user.ScreenAccessJson })
+                .ToListAsync(ct);
+            var recipients = users.Where(user => Permissions.ForUser(user).Any(permission =>
+                    permission is Permissions.FinanceReceivablesView or Permissions.FinanceReceivablesManage))
+                .Select(user => user.Id.ToString()).ToArray();
+            await hubContext.Clients.Users(recipients)
                 .SendAsync("PaymentStatusChanged", new
                 {
                     intent.Id,

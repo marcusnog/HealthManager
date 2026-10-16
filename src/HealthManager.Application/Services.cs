@@ -13,9 +13,10 @@ public sealed class AuthService(
 {
     public async Task<AuthResponse> LoginAsync(LoginRequest request, string? userAgent, CancellationToken cancellationToken)
     {
+        var email = request.Email.Trim().ToLowerInvariant();
         var user = await dbContext.Users
             .Include(x => x.Clinic)
-            .FirstOrDefaultAsync(x => x.Email == request.Email && x.DeletedAt == null && x.IsActive, cancellationToken)
+            .FirstOrDefaultAsync(x => x.Email.ToLower() == email && x.DeletedAt == null && x.IsActive, cancellationToken)
             ?? throw new InvalidOperationException("Credenciais invalidas.");
 
         if (!passwordHasher.Verify(request.Password, user.PasswordHash))
@@ -61,6 +62,8 @@ public sealed class AuthService(
 
     private async Task<AuthResponse> IssueTokensAsync(User user, string? userAgent, CancellationToken cancellationToken)
     {
+        if (!user.IsActive || user.DeletedAt is not null)
+            throw new InvalidOperationException("Usuario inativo.");
         var bundle = jwtTokenService.Generate(user);
         dbContext.RefreshTokens.Add(new RefreshToken
         {
@@ -77,7 +80,7 @@ public sealed class AuthService(
             bundle.AccessToken,
             bundle.RefreshToken,
             bundle.ExpiresAt,
-            new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role, Permissions.ForRole(user.Role)));
+            new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role, Permissions.ForUser(user)));
     }
 
     public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken)
@@ -156,7 +159,7 @@ public sealed class ClinicProvisioningService(
 
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role, Permissions.ForRole(user.Role));
+        return new UserResponse(user.Id, user.ClinicId, user.Name, user.Email, user.Role, Permissions.ForUser(user));
     }
 }
 

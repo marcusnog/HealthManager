@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Security.Claims;
 
 namespace HealthManager.Infrastructure;
 
@@ -66,6 +67,32 @@ public static class DependencyInjection
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = async context =>
+                    {
+                        var principal = context.Principal!;
+                        if (principal.IsInRole(UserRole.Patient.ToString())) return;
+                        if (!Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id))
+                        {
+                            context.Fail("Usuario invalido.");
+                            return;
+                        }
+                        var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                        var user = await db.Users.IgnoreQueryFilters().AsNoTracking()
+                            .FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null && x.IsActive, context.HttpContext.RequestAborted);
+                        if (user is null || principal.FindFirstValue("clinic_id") != user.ClinicId?.ToString())
+                        {
+                            context.Fail("Sessao invalida.");
+                            return;
+                        }
+                        var identity = (ClaimsIdentity)principal.Identity!;
+                        foreach (var claim in identity.FindAll(Permissions.ClaimType).Concat(identity.FindAll(identity.RoleClaimType)).ToArray())
+                            identity.RemoveClaim(claim);
+                        identity.AddClaim(new Claim(identity.RoleClaimType, user.Role.ToString()));
+                        identity.AddClaims(Permissions.ForUser(user).Select(value => new Claim(Permissions.ClaimType, value)));
+                    }
+                };
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,

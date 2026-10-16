@@ -16,7 +16,7 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["SENTRY_DSN"]))
 
 builder.Services.AddProblemDetails();
 builder.Services
-    .AddControllers()
+    .AddControllers(options => options.Filters.Add<HealthManager.Api.ScreenAccessFilter>())
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());

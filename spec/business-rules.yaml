@@ -37,7 +37,7 @@ policies:
   ClinicAdmin: "Requires Admin. Used for tenant-wide configuration."
   PatientPortal: "Requires Patient role. Used for /patient-portal/* routes."
 
-  finance_granular: "Financial module is split per screen (Categorias de despesa, Contas a receber, Contas a pagar, Resumo, Fechamento). Each screen is guarded by a dot-notation permission claim carried in the JWT ('permission'). A screen policy with a View suffix allows anyone holding either the view or the manage permission for that screen; a Manage suffix requires the manage permission. JWT embeds the permission set granted to the user's role."
+  finance_granular: "Financial module is split per screen (Categorias de despesa, Contas a receber, Contas a pagar, Resumo, Fechamento). Each screen is guarded by a dot-notation permission claim carried in the JWT ('permission'). A screen policy with a View suffix allows anyone holding either the view or the manage permission for that screen; a Manage suffix requires the manage permission. JWT embeds the role permission set restricted by the user screen selection when configured."
   finance_screens:
     - screen: "Categorias de despesa"
       permissions: "finance.categories.view / finance.categories.manage"
@@ -138,8 +138,8 @@ payment_gateway_processing:
   webhook_receiver: "POST /webhooks/payments/{provider} — generic receiver for any gateway. No auth required. HMAC signature verified via WebhookSignatureVerifier (provider-specific header)."
   signature_verification: "Shared WebhookSignatureVerifier handles Asaas (X-Asaas-Signature), MercadoPago (X-Signature), Stripe (X-Hub-Signature-256). All use HMAC-SHA256 with hex comparison."
   handler_resolver: "PaymentGatewayHandlerResolver resolves IPaymentGatewayHandler by provider enum value. Each handler maps gateway-specific payloads to WebhookPaymentResult."
-  signalr_broadcast: "On successful webhook processing, PaymentHub broadcasts PaymentStatusChanged event to the clinic's SignalR group."
-  hub_auth: "PaymentHub requires JWT auth (ClinicStaff policy). JoinClinicGroup(clinicId) validates JWT clinic_id claim matches the requested clinicId — prevents joining arbitrary groups."
+  signalr_broadcast: "On successful webhook processing, PaymentStatusChanged is sent only to active, non-deleted users of the event clinic whose current permissions include finance.receivables.view/manage. Recipients are resolved on every event, so existing connections lose delivery after revocation."
+  hub_auth: "PaymentHub requires JWT auth (ClinicStaff and FinanceReceivablesView policies). JoinClinicGroup(clinicId) validates JWT clinic_id claim matches the requested clinicId — prevents joining arbitrary groups."
 
 whatsapp_messaging:
   meta_cloud_api: "Outbound messages sent via Meta Graph API v21.0 (typed HTTP client). Each clinic has its own phoneNumberOfId and accessToken."
@@ -176,3 +176,14 @@ seed:
     - receivable: 'R$ 250 pending'
     - expenses: 'Rent R$ 5000, Supplies R$ 350, Utilities R$ 890'
     - outbox_event: 'appointment.created for demo appointment'
+
+user_management:
+  scope: "Only clinic Admin can list, create and update users in their own JWT clinic. Roles: Admin, Secretary, Doctor; no PlatformAdmin or Patient provisioning."
+  profiles: "Existing roles define action permissions. Admin selects screen access per user within the role allowed screens. Admin always has full access. Null screen selection restores role defaults; [] denies every screen."
+  validation: "Trim name/email, normalize email to lower case, reject duplicate email globally without revealing tenant information; password minimum 8 characters. Cannot deactivate or demote yourself."
+  enforcement: "Screen restrictions apply to API requests as well as navigation, in addition to existing action policies. Shared GET lookups needed by granted screens remain available. Dashboard includes schedule and patient lookups; finance still requires its own screen."
+  sessions: "Each authenticated staff request reloads current active user and role/permission claims from the database; inactive/deleted users are rejected immediately. Refresh also rejects inactive/deleted users."
+  finance_screens: "Existing role finance grants are intersected with selected finance screens; empty access never means full access. Admin remains unrestricted."
+  screens: "dashboard, atendimento, agenda, tipos-consulta, pacientes, produtos-pacotes, financeiro, financeiro-pagar, financeiro-repasses, categorias-despesa, medicos, convenios, especialidades, agenda-medicos, configuracoes, usuarios; financial summary permission follows financeiro."
+  dashboard_finance: "Custom screen access without financeiro redacts monetary dashboard summary values to zero."
+  payables_lookup: "Contas a pagar includes read-only expense category lookup even when category management screen is disabled."

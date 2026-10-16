@@ -21,6 +21,22 @@ public static class Permissions
     public const string FinanceSummaryView = "finance.summary.view";
     public const string FinanceSettlements = "finance.settlements";
 
+    public static IReadOnlyList<string> ForUser(User user)
+    {
+        var screens = ScreenAccess.ForUser(user);
+        var finance = ForRole(user.Role).Where(permission => user.ScreenAccessJson is null || user.Role is UserRole.Admin or UserRole.PlatformAdmin || screens.Contains(permission switch
+        {
+            FinanceCategoriesView or FinanceCategoriesManage => "categorias-despesa",
+            FinancePayablesView or FinancePayablesManage => "financeiro-pagar",
+            FinanceSettlements => "financeiro-repasses",
+            _ => "financeiro"
+        }));
+        if (screens.Contains("financeiro-pagar") && user.Role is UserRole.Secretary)
+            finance = finance.Append(FinanceCategoriesView).Distinct();
+        return finance.Concat(screens.Select(screen => "screen." + screen))
+            .Concat(user.ScreenAccessJson is not null && user.Role is not (UserRole.Admin or UserRole.PlatformAdmin) ? ["screen.restricted"] : Array.Empty<string>()).ToArray();
+    }
+
     public static IReadOnlyList<string> ForRole(UserRole role) => role switch
     {
         UserRole.PlatformAdmin or UserRole.Admin =>
@@ -82,6 +98,7 @@ public sealed class User : TenantEntity
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.Secretary;
     public bool IsActive { get; set; } = true;
+    public string? ScreenAccessJson { get; set; }
     public Clinic? Clinic { get; set; }
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

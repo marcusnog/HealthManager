@@ -167,7 +167,7 @@ PaymentWebhooks:
   POST /webhooks/payments/{provider}: "Generic webhook receiver for any payment gateway. Headers: X-Clinic-Id, X-Hub-Signature-256|X-Signature. Body: gateway-specific JSON. Returns 200 OK on success. [No auth, HMAC verified]"
 
 SignalR:
-  Hub: /hubs/payments (JWT auth, ClinicStaff policy)
+  Hub: /hubs/payments (JWT auth, ClinicStaff and FinanceReceivablesView policies)
   Client method: JoinClinicGroup(clinicId) / LeaveClinicGroup(clinicId)
   Server event: PaymentStatusChanged { Id, Status, GatewayReference, Amount }
 
@@ -182,3 +182,9 @@ WhatsAppMessaging:
   # WhatsAppMessagingService.SendAppointmentCancellationAsync(appointment, patient)
   # Requires ClinicWhatsAppConfig with IsEnabled=true for the clinic
   # Messages stored as WhatsAppMessage (direction=Outbound) and enqueued via outbox
+
+Users:
+  GET /users: "-> ManagedUserResponse[] of own clinic [ClinicAdmin]"
+  GET /users/access-profiles: "-> AccessProfileResponse[] with role, availableScreens and defaultScreens [ClinicAdmin]"
+  POST /users: "{ name, email, password, role, screens? } -> 201 ManagedUserResponse [ClinicAdmin]"
+  PUT /users/{id}: "{ name, email, role, isActive, screens? } -> ManagedUserResponse [ClinicAdmin]; own account cannot be demoted/deactivated"

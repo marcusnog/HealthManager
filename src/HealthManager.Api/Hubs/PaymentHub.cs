@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.SignalR;
 namespace HealthManager.Api.Hubs;
 
 [Authorize(Policy = "ClinicStaff")]
+[Authorize(Policy = "FinanceReceivablesView")]
 public sealed class PaymentHub : Hub
 {
     public async Task JoinClinicGroup(string clinicId)

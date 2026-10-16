@@ -142,7 +142,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
             claims.Add(new Claim("clinic_id", user.ClinicId.Value.ToString()));
         }
 
-        foreach (var permission in Permissions.ForRole(user.Role))
+        foreach (var permission in Permissions.ForUser(user))
         {
             claims.Add(new Claim(Permissions.ClaimType, permission));
         }
