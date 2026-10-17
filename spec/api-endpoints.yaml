@@ -28,6 +28,7 @@ Doctors:
   GET /doctors: "?page,pageSize,search,sortBy,sortDirection -> PagedResult<DoctorResponse> (includes Specialties list) [ClinicAdminOrSecretary]"
   POST /doctors: "{ name, crm, phone?, email?, clinicSharePercentage, specialtyIds } -> 201 DoctorResponse [ClinicAdminOrSecretary]"
   PUT /doctors/{id}: "{ name, phone?, email?, isActive, clinicSharePercentage, specialtyIds } -> DoctorResponse [ClinicAdminOrSecretary]"
+  # specialtyIds: omitted/null preserves current links; [] removes all; a list replaces the selection.
   DELETE /doctors/{id}: "-> 204 (soft delete, audit logged) [ClinicAdminOrSecretary]"
 
 Appointments:
