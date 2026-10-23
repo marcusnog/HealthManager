@@ -1,4 +1,5 @@
 # Canonical entity definitions — source of truth.
+# ClinicalCatalogItem / ClinicalEntry are defined below and detailed in clinical-workspace.yaml.
 # Backend: HealthManager.Domain/Model.cs.
 # Frontend: src/generated/models/ (regenerated from openapi.json).
 
@@ -386,3 +387,35 @@
   secondaryColor: string? (hex)
   customClinicName: string?
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
+
+- ClinicalCatalogItem:
+  id: Guid
+  clinicId: Guid
+  kind: string (Document|Exam|Food|Anamnesis|Questionnaire)
+  folder: string (required, max 120)
+  title: string (required, max 200)
+  content: string (max 30000, plain text)
+  fieldsJson: string (serialized ClinicalField[], see clinical-workspace.yaml)
+  ownerUserId: Guid? (null shared; personal doctor UserId)
+  revision: Guid (optimistic concurrency token)
+  # Entity timestamps and soft delete inherited
+- ClinicalEntry:
+  id: Guid
+  clinicId: Guid
+  appointmentId: Guid (FK Appointment)
+  patientId: Guid (FK Patient)
+  doctorId: Guid (FK Doctor)
+  authorId: Guid (FK User)
+  clientRequestId: Guid (unique clinic + appointment + request)
+  correctsEntryId: Guid? (same appointment and kind)
+  kind: string (Document|ExamOrder|ExamResult|Anamnesis|Questionnaire|Nutrition|Summary)
+  title: string (required, max 200)
+  content: string (max 30000, immutable snapshot)
+  fieldsJson: string (immutable field definition snapshot)
+  valuesJson: string (validated answers, max 100)
+  signatureMode: string (Paper|DigitalMock; Document only)
+  patientName: string (snapshot)
+  doctorName: string (snapshot)
+  doctorCrm: string (snapshot)
+  clinicName: string (snapshot)
+  # Entity timestamps inherited; no update/delete endpoint

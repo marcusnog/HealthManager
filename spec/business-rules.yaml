@@ -187,3 +187,7 @@ user_management:
   screens: "dashboard, atendimento, agenda, tipos-consulta, pacientes, produtos-pacotes, financeiro, financeiro-pagar, financeiro-repasses, categorias-despesa, medicos, convenios, especialidades, agenda-medicos, configuracoes, usuarios; financial summary permission follows financeiro."
   dashboard_finance: "Custom screen access without financeiro redacts monetary dashboard summary values to zero."
   payables_lookup: "Contas a pagar includes read-only expense category lookup even when category management screen is disabled."
+
+clinical_workspace:
+  specification: "See clinical-workspace.yaml. Clinical catalog shared Admin/Doctor; personal only owning Doctor. Clinical entries immutable, tenant isolated, owning Doctor writes in Draft only."
+  screens: "New clinical-settings screen for Admin/Doctor. Catalog reads allowed from agenda/dashboard/pacientes; edits require clinical-settings. Appointment clinical-record (including addendum) and clinical-entries endpoints also accept pacientes screen access to support opening an existing record directly from the patient list. Other appointment operations still require agenda/dashboard. Patient clinical history and document list/download/upload also accept agenda/dashboard grants; document deletion remains pacientes-only."

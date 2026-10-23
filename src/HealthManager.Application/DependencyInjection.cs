@@ -28,6 +28,7 @@ services.AddScoped<ProductService>();
         services.AddScoped<SpecialtyService>();
         services.AddScoped<DoctorAvailabilityService>();
         services.AddScoped<ClinicalRecordService>();
+        services.AddScoped<ClinicalWorkspaceService>();
         services.AddScoped<PaymentIntentService>();
         services.AddScoped<CheckoutService>();
         services.AddScoped<TenantIntegrationService>();

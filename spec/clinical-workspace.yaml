@@ -1,0 +1,21 @@
+# Clinical workspace extension. Provider-dependent integrations are not simulated in production.
+catalog:
+  kinds: [Document, Exam, Food, Anamnesis, Questionnaire]
+  fields: "Ordered list of unique labels (1..120 chars), type Text|Number|Boolean, required flag, optional unit (max 30), optional numeric min/max, defaultValue (max 10000), weight (Number/Boolean only, -1000..1000), alertBelow/alertAbove (Number only, below <= above). Max 100 fields. Defaults validated against type/ranges. Values/ranges are clinic-authored, never supplied as clinical guidance."
+  ownership: "Admin and Doctor may manage shared catalog items. Personal items belong to the authenticated doctor UserId; only that doctor may read/update/delete them. Changing ownership/kind is not supported."
+  folders: "Folder is a required catalog grouping label, max 120 characters. Renaming by editing an item does not change other items. Empty standalone folders are not persisted."
+  content: "Plain text, max 30000 chars, rendered as text; Document supports {{paciente}}, {{medico}}, {{crm}}, {{data}}, {{clinica}}. Variable substitution uses server-side appointment/clinic data and clinic timezone."
+events:
+  kinds: [Document, ExamOrder, ExamResult, Anamnesis, Questionnaire, Nutrition, Summary]
+  immutable: "Entries are append-only snapshots. Template edits/deletion never affect existing entries. Corrections are new entries with CorrectsEntryId referencing the same appointment and kind."
+  access: "Admin/Secretary read clinic entries; Doctor reads/writes only own appointments. Personal catalog entries cannot be used by another user."
+  write: "DoctorOnly, owning doctor, Draft clinical record required. No new entries/corrections after finalization; use existing clinical record addendum instead. No implicit appointment completion."
+  summary: "Summary is a structured clinical event; latest visible Summary for this patient is shown alongside its date/author, preserving history. Doctors see only their own entries."
+  forms: "Catalog fields are snapshotted at submission; reject unknown fields, enforce required/type/ranges, max 100 values each max 10000 chars. UI derives weighted sum from answered fields with explicit weight (Boolean true=1,false=0); absent answers not scored. Alerts display only explicit clinician-configured numeric bounds; no diagnostic interpretation or seeded medical thresholds."
+  documents: "Doctor reviews content before saving immutable document. SignatureMode Paper or DigitalMock. Paper includes signature area; DigitalMock always carries an explicit simulation watermark, no legal validity, no Signed state, no external provider call. Mock explicitly requested by user."
+  idempotency: "ClientRequestId is required, unique per clinic+appointment. Retry returns the existing entry only when author matches; no duplicate events."
+integrations:
+  digital_signature: "User authorized DigitalMock only; never represent it as a real digital signature."
+  ai_transcription: "Excluded at explicit user request; manual clinical record entry remains available."
+  telemedicine: "Excluded at explicit user request."
+  percentiles: "Excluded entirely at explicit user request."

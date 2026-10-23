@@ -123,3 +123,13 @@ PaymentIntentStatus:
     POST /payment-intents: create intent
     POST /payment-intents/{id}/confirm: Created|Processing -> Confirmed
     POST /payment-intents/{id}/cancel: Created|Processing -> Cancelled
+
+ClinicalEntry:
+  initial: Recorded
+  states:
+    Recorded:
+      transitions: []
+  invariant:
+    - Append-only; corrections create a new entry linked by correctsEntryId
+    - No entry writes when the clinical record is Finalized
+    - DigitalMock is a simulation mode, never a signature state

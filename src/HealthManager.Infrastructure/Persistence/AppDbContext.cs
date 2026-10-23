@@ -11,6 +11,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     private Guid? TenantClinicId => tenantProvider?.ClinicId;
     private bool BypassTenantFilter => tenantProvider?.IsPlatformAdmin ?? false;
 
+    public DbSet<ClinicalCatalogItem> ClinicalCatalogItems => Set<ClinicalCatalogItem>();
+    public DbSet<ClinicalEntry> ClinicalEntries => Set<ClinicalEntry>();
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Patient> Patients => Set<Patient>();
@@ -47,6 +49,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<ClinicalCatalogItem>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<ClinicalEntry>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || x.ClinicId == TenantClinicId));
+        modelBuilder.Entity<ClinicalCatalogItem>().Property(x => x.Revision).IsConcurrencyToken();
+        modelBuilder.Entity<ClinicalRecord>().Property(x => x.UpdatedAt).IsConcurrencyToken();
+        modelBuilder.Entity<ClinicalCatalogItem>().HasIndex(x => new { x.ClinicId, x.Kind, x.OwnerUserId });
+        modelBuilder.Entity<ClinicalCatalogItem>().HasOne<User>().WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClinicalEntry>().HasIndex(x => new { x.ClinicId, x.AppointmentId, x.ClientRequestId }).IsUnique();
+        modelBuilder.Entity<ClinicalEntry>().HasIndex(x => new { x.ClinicId, x.PatientId, x.CreatedAt });
+        modelBuilder.Entity<ClinicalEntry>().HasOne<Appointment>().WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClinicalEntry>().HasOne<Patient>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClinicalEntry>().HasOne<Doctor>().WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClinicalEntry>().HasOne<User>().WithMany().HasForeignKey(x => x.AuthorId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClinicalEntry>().HasOne<ClinicalEntry>().WithMany().HasForeignKey(x => x.CorrectsEntryId).OnDelete(DeleteBehavior.Restrict);
+
 
         modelBuilder.Entity<Clinic>().HasIndex(x => x.Slug).IsUnique();
         modelBuilder.Entity<User>().HasIndex(x => x.Email).IsUnique().HasFilter("\"DeletedAt\" IS NULL");

@@ -37,6 +37,8 @@ public interface IOutboxService
 
 public interface IApplicationDbContext
 {
+    DbSet<ClinicalCatalogItem> ClinicalCatalogItems { get; }
+    DbSet<ClinicalEntry> ClinicalEntries { get; }
     DbSet<Clinic> Clinics { get; }
     DbSet<User> Users { get; }
     DbSet<Patient> Patients { get; }

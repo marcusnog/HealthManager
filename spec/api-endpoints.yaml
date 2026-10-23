@@ -189,3 +189,12 @@ Users:
   GET /users/access-profiles: "-> AccessProfileResponse[] with role, availableScreens and defaultScreens [ClinicAdmin]"
   POST /users: "{ name, email, password, role, screens? } -> 201 ManagedUserResponse [ClinicAdmin]"
   PUT /users/{id}: "{ name, email, role, isActive, screens? } -> ManagedUserResponse [ClinicAdmin]; own account cannot be demoted/deactivated"
+
+ClinicalWorkspace:
+  GET /clinical-catalog: "?kind,search -> ClinicalCatalogResponse[] (max 500; filter search) [Admin/Doctor; shared+own]"
+  POST /clinical-catalog: "SaveClinicalCatalogRequest -> 201 ClinicalCatalogResponse [Admin/Doctor]"
+  PUT /clinical-catalog/{id}: "SaveClinicalCatalogRequest (revision required) -> ClinicalCatalogResponse [Admin/Doctor; shared+own; conflict 409]"
+  DELETE /clinical-catalog/{id}: "?revision -> 204 (soft delete; conflict 409) [Admin/Doctor; shared+own]"
+  GET /appointments/{appointmentId}/clinical-entries: "-> ClinicalEntryResponse[] (appointment entries) [ClinicStaff; owning Doctor]"
+  POST /appointments/{appointmentId}/clinical-entries: "CreateClinicalEntryRequest -> 201 ClinicalEntryResponse [DoctorOnly; owner; Draft]"
+  GET /patients/{patientId}/clinical-entries: "?page=1,pageSize=50,kind? -> PagedResult<ClinicalEntryResponse> [ClinicStaff; Doctor own entries only]"
