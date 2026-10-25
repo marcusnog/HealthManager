@@ -169,7 +169,7 @@ public sealed record ReceivableResponse(
 
 public sealed record PaymentQuery(int Page = 1, int PageSize = 20, Guid? ReceivableId = null, DateOnly? DateFrom = null, DateOnly? DateTo = null, string? DestinationBank = null);
 public sealed record CreatePaymentRequest([Required] Guid ReceivableId, [Range(0.01, double.MaxValue)] decimal Amount, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, [StringLength(100)] string? DestinationBank, FundsRecipient FundsRecipient = FundsRecipient.Clinic, string? Notes = null);
-public sealed record CreateManualReceivableRequest([Range(0.01, double.MaxValue)] decimal Amount, string? Description, DateTimeOffset? DueDate, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, [StringLength(100)] string? DestinationBank, FundsRecipient FundsRecipient = FundsRecipient.Clinic, string? Notes = null);
+public sealed record CreateManualReceivableRequest([Range(0.01, double.MaxValue)] decimal Amount, string? Description, DateTimeOffset? DueDate, [Required] PaymentMethod PaymentMethod, DateTimeOffset? PaidAt, [StringLength(100)] string? DestinationBank, FundsRecipient FundsRecipient = FundsRecipient.Clinic, string? Notes = null, Guid? PatientId = null);
 public sealed record PaymentResponse(Guid Id, Guid ReceivableId, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset PaidAt, PaymentStatus Status, string? PatientName = null, string? DestinationBank = null, FundsRecipient FundsRecipient = FundsRecipient.Clinic, decimal ClinicRevenueAmount = 0, decimal ProfessionalPayableAmount = 0);
 
 public sealed record ExpenseQuery(int Page = 1, int PageSize = 20, Guid? CategoryId = null, string? Status = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
@@ -198,8 +198,8 @@ public sealed record FinancialSummaryResponse(decimal TotalReceived, decimal Tot
 public sealed record ProfessionalSettlementRequest([Required] Guid ProfessionalId, IReadOnlyList<Guid>? PaymentIds, DateOnly? ThroughDate, DateTimeOffset? PaidAt);
 public sealed record OwnerSettlementRequest(DateOnly? ThroughDate, DateTimeOffset? SettledAt);
 public sealed record SettlementResponse(Guid? ProfessionalId, string? ProfessionalName, decimal Amount, int PaymentCount, DateTimeOffset? SettledAt);
-public sealed record ProfessionalSettlementItemResponse(Guid PaymentId, Guid? AppointmentId, string PatientName, DateTimeOffset PaidAt, decimal Amount, bool IsOverdue);
-public sealed record ProfessionalSettlementResponse(Guid ProfessionalId, string ProfessionalName, decimal Accrued, decimal Paid, decimal Outstanding, IReadOnlyList<ProfessionalSettlementItemResponse> Items);
+public sealed record ProfessionalSettlementItemResponse(Guid PaymentId, Guid? AppointmentId, string PatientName, DateTimeOffset PaidAt, decimal Amount, bool IsOverdue, DateTimeOffset? ProfessionalPaidAt = null);
+public sealed record ProfessionalSettlementResponse(Guid ProfessionalId, string ProfessionalName, decimal Accrued, decimal Paid, decimal Outstanding, IReadOnlyList<ProfessionalSettlementItemResponse> Items, IReadOnlyList<ProfessionalSettlementItemResponse> SettledItems);
 
 public sealed record DashboardSummaryResponse(int AppointmentsToday, int ConfirmedToday, int CancelledToday, decimal MonthlyRevenue, double NoShowRate, double ConfirmationRate, decimal MonthlyExpenses, decimal MonthlyBalance);
 

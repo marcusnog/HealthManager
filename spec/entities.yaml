@@ -116,6 +116,7 @@
   id: Guid (auto)
   clinicId: Guid
   appointmentId: Guid? (FK Appointment, nullable for manual receivable)
+  patientId: Guid? (FK Patient; patient associated with a manual payment, same clinic)
   originalAmount: decimal
   receivedAmount: decimal (sum of payments)
   status: ReceivableStatus (Pending|Partial|Paid|Cancelled)

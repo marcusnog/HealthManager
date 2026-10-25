@@ -58,7 +58,7 @@ Financial:
   GET /financial/receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [FinanceReceivablesView]"
   GET /financial/payments: "?page,pageSize,receivableId,dateFrom,dateTo,destinationBank -> PagedResult<PaymentResponse> [FinanceReceivablesView]"
   POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, destinationBank?, fundsRecipient?, notes? } -> 201 PaymentResponse [FinanceReceivablesManage]"
-  POST /financial/receivables/manual: "{ patientId, description, amount, dueDate?, paymentMethod?, paidAt? } -> 201 ReceivableResponse [FinanceReceivablesManage]"
+  POST /financial/receivables/manual: "{ patientId?, description?, amount, dueDate?, paymentMethod, paidAt?, destinationBank?, fundsRecipient?, notes? } -> 201 ReceivableResponse (patient link, no appointment) [FinanceReceivablesManage]"
 
   # Custom wrappers (not in openapi.json, available via src/services/api.ts):
   GET /financial/expenses: "?page,pageSize,categoryId,status,dateFrom,dateTo -> PagedResult<ExpenseResponse> [FinancePayablesView]"
@@ -66,7 +66,7 @@ Financial:
   PUT /financial/expenses/{id}: "{ ... } -> ExpenseResponse [FinancePayablesManage]"
   DELETE /financial/expenses/{id}: "-> 204 [FinancePayablesManage]"
   GET /financial/summary: "?destinationBank -> { grossReceived, totalReceived(recognized clinic revenue), professionalLiability, ownerReceivable, totalExpenses, balance(profit) } [FinanceSummaryView]"
-  GET /financial/professional-settlements: "-> ProfessionalSettlementResponse[] grouped by professional [FinanceSettlements]"
+  GET /financial/professional-settlements: "-> ProfessionalSettlementResponse[] grouped by professional, pending items and settledItems with professionalPaidAt for reports [FinanceSettlements]"
   POST /financial/professional-settlements: "{ professionalId, paymentIds?, throughDate?, paidAt? } -> settlement summary; marks selected eligible liabilities paid (paymentIds omitted preserves settle-through-date behavior) [FinanceSettlements]"
   POST /financial/owner-settlements: "{ throughDate?, settledAt? } -> settlement summary; marks eligible Owner receipts transferred [FinanceSettlements]"
 
@@ -108,7 +108,7 @@ PatientPortal:
   POST /portal/auth: "{ cpf, accessToken } -> PatientPortalAuthResponse [No auth]"
   GET /portal/me: "-> PatientPortalProfileResponse [PatientPortal]"
   GET /portal/appointments: "-> PatientPortalAppointmentResponse[] [PatientPortal]"
-  GET /portal/receivables: "-> PatientPortalReceivableResponse[] [PatientPortal]"
+  GET /portal/receivables: "-> PatientPortalReceivableResponse[] (patient's appointment-linked and manual receipts) [PatientPortal]"
   GET /portal/documents: "-> PatientDocumentResponse[] [PatientPortal]"
 
 Checkout:

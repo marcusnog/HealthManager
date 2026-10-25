@@ -1268,8 +1268,8 @@ public sealed class FinancialService(
                 x.OriginalAmount - x.ReceivedAmount,
                 x.Status,
                 x.DueDate,
-                x.Appointment != null ? x.Appointment.PatientId : null,
-                x.Appointment != null && x.Appointment.Patient != null ? x.Appointment.Patient.Name : null,
+                x.PatientId ?? (x.Appointment != null ? x.Appointment.PatientId : null),
+                x.Patient != null ? x.Patient.Name : x.Appointment != null && x.Appointment.Patient != null ? x.Appointment.Patient.Name : null,
                 x.Description,
                 x.Appointment != null ? x.Appointment.StartAt : null,
                 x.Appointment != null ? x.Appointment.AppointmentType.Name : null,
@@ -1319,7 +1319,7 @@ public sealed class FinancialService(
                 x.PaymentMethod,
                 x.PaidAt,
                 x.Status,
-                x.Receivable != null && x.Receivable.Appointment != null && x.Receivable.Appointment.Patient != null ? x.Receivable.Appointment.Patient.Name : null,
+                x.Receivable != null && x.Receivable.Patient != null ? x.Receivable.Patient.Name : x.Receivable != null && x.Receivable.Appointment != null && x.Receivable.Appointment.Patient != null ? x.Receivable.Appointment.Patient.Name : null,
                 x.DestinationBank,
                 x.FundsRecipient,
                 x.ClinicRevenueAmount,
@@ -1333,10 +1333,16 @@ public sealed class FinancialService(
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
 
+        var patient = request.PatientId.HasValue
+            ? await dbContext.Patients.FirstOrDefaultAsync(x => x.Id == request.PatientId.Value && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+                ?? throw new KeyNotFoundException("Paciente nao encontrado.")
+            : null;
+
         var receivable = new Receivable
         {
             ClinicId = clinicId,
             AppointmentId = null,
+            PatientId = patient?.Id,
             OriginalAmount = request.Amount,
             ReceivedAmount = request.Amount,
             Status = ReceivableStatus.Paid,
@@ -1369,7 +1375,7 @@ public sealed class FinancialService(
             receivable.ReceivedAmount,
             receivable.OriginalAmount - receivable.ReceivedAmount,
             receivable.Status,
-            receivable.DueDate);
+            receivable.DueDate, patient?.Id, patient?.Name, receivable.Description);
     }
 
     public async Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken)
@@ -1431,7 +1437,9 @@ public sealed class FinancialService(
             group.Where(p => p.ProfessionalPaidAt != null).Sum(p => p.ProfessionalPayableAmount),
             group.Where(p => p.ProfessionalPaidAt == null).Sum(p => p.ProfessionalPayableAmount),
             group.Where(p => p.ProfessionalPaidAt == null).OrderBy(p => p.PaidAt).Select(p => new ProfessionalSettlementItemResponse(
-                p.Id, p.Receivable!.AppointmentId, p.Receivable.Appointment?.Patient?.Name ?? "Paciente", p.PaidAt, p.ProfessionalPayableAmount, p.PaidAt < weekStart)).ToList())).ToList();
+                p.Id, p.Receivable!.AppointmentId, p.Receivable.Appointment?.Patient?.Name ?? "Paciente", p.PaidAt, p.ProfessionalPayableAmount, p.PaidAt < weekStart)).ToList(),
+            group.Where(p => p.ProfessionalPaidAt != null).OrderByDescending(p => p.ProfessionalPaidAt).Select(p => new ProfessionalSettlementItemResponse(
+                p.Id, p.Receivable!.AppointmentId, p.Receivable.Appointment?.Patient?.Name ?? "Paciente", p.PaidAt, p.ProfessionalPayableAmount, false, p.ProfessionalPaidAt)).ToList())).ToList();
     }
 
     public async Task<SettlementResponse> SettleProfessionalAsync(ProfessionalSettlementRequest request, CancellationToken cancellationToken)
@@ -2681,11 +2689,8 @@ public sealed class PatientPortalService(
         var patientId = RequirePatientId();
         return await dbContext.Receivables
             .AsNoTracking()
-            .Where(x => x.DeletedAt == null)
-            .Join(dbContext.Appointments.Where(a => a.PatientId == patientId && a.DeletedAt == null),
-                r => r.AppointmentId,
-                a => a.Id,
-                (r, _) => new PatientPortalReceivableResponse(
+            .Where(x => x.DeletedAt == null && (x.PatientId == patientId || (x.Appointment != null && x.Appointment.PatientId == patientId)))
+            .Select(r => new PatientPortalReceivableResponse(
                     r.Id,
                     r.OriginalAmount,
                     r.ReceivedAmount,

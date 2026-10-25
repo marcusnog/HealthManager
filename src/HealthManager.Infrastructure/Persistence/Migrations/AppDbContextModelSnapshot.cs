@@ -1458,6 +1458,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("OriginalAmount")
                         .HasColumnType("numeric");
 
+                    b.Property<Guid?>("PatientId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ProfessionalId")
                         .HasColumnType("uuid");
 
@@ -1473,6 +1476,8 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AppointmentId");
+
+                    b.HasIndex("PatientId");
 
                     b.HasIndex("ProfessionalId");
 
@@ -2016,12 +2021,19 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                         .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HealthManager.Domain.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("HealthManager.Domain.Doctor", null)
                         .WithMany()
                         .HasForeignKey("ProfessionalId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Appointment");
+
+                    b.Navigation("Patient");
                 });
 
             modelBuilder.Entity("HealthManager.Domain.RefreshToken", b =>
