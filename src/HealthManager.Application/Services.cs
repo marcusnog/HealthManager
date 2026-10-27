@@ -1715,7 +1715,7 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
 
         var doctorId = await ResolveDoctorIdAsync(cancellationToken);
         if (doctorId is null || appointment.DoctorId != doctorId)
-            throw new UnauthorizedAccessException("Apenas o medico responsavel pode criar o atendimento.");
+            throw new ForbiddenAccessException("Apenas o medico responsavel pode criar o atendimento.");
 
         if (await dbContext.ClinicalRecords.AnyAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken))
             throw new InvalidOperationException("Atendimento ja existe para esta consulta.");
@@ -1756,7 +1756,7 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
 
         var doctorId = await ResolveDoctorIdAsync(cancellationToken);
         if (doctorId is null || record.DoctorId != doctorId)
-            throw new UnauthorizedAccessException("Apenas o medico responsavel pode editar o atendimento.");
+            throw new ForbiddenAccessException("Apenas o medico responsavel pode editar o atendimento.");
 
         if (request.ChiefComplaint is not null) record.ChiefComplaint = request.ChiefComplaint;
         if (request.History is not null) record.History = request.History;
@@ -1786,7 +1786,7 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
 
         var doctorId = await ResolveDoctorIdAsync(cancellationToken);
         if (doctorId is null || record.DoctorId != doctorId)
-            throw new UnauthorizedAccessException("Apenas o medico responsavel pode finalizar o atendimento.");
+            throw new ForbiddenAccessException("Apenas o medico responsavel pode finalizar o atendimento.");
 
         record.Status = ClinicalRecordStatus.Finalized;
         record.FinalizedAt = DateTimeOffset.UtcNow;
@@ -1810,7 +1810,7 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
 
         var doctorId = await ResolveDoctorIdAsync(cancellationToken);
         if (doctorId is null || record.DoctorId != doctorId)
-            throw new UnauthorizedAccessException("Apenas o medico responsavel pode incluir adendos.");
+            throw new ForbiddenAccessException("Apenas o medico responsavel pode incluir adendos.");
 
         var content = request.Content.Trim();
         if (content.Length == 0)
@@ -1861,7 +1861,7 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
         if (tenantProvider.Role == UserRole.Doctor)
         {
             var doctorId = await ResolveDoctorIdAsync(cancellationToken)
-                ?? throw new UnauthorizedAccessException("Medico nao vinculado.");
+                ?? throw new ForbiddenAccessException("Usuario medico sem profissional vinculado. Solicite ao administrador um cadastro em Medicos com o mesmo e-mail do usuario.");
             query = query.Where(x => x.DoctorId == doctorId);
         }
 
@@ -1877,7 +1877,7 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
         if (tenantProvider.Role != UserRole.Doctor) return;
         var doctorId = await ResolveDoctorIdAsync(cancellationToken);
         if (doctorId is null || doctorId != owningDoctorId)
-            throw new UnauthorizedAccessException("Apenas o medico responsavel pode acessar o atendimento.");
+            throw new ForbiddenAccessException("Apenas o medico responsavel pode acessar o atendimento.");
     }
 
     private static ClinicalRecordResponse ToResponse(ClinicalRecord r) =>

@@ -108,6 +108,7 @@ clinical_records:
   access_read: "Admin, Secretary, and the owning Doctor can read clinical records."
   access_write: "Only the owning Doctor can create/update Draft and add addendums."
   patient_isolation: "Clinical records respect tenant isolation (clinicId query filter)."
+  access_errors: "Authenticated users without a linked doctor (same clinic and email), or accessing another doctor records, receive HTTP 403 with an actionable message. Missing/invalid authentication remains HTTP 401; access denials must not end the session."
 
 payment_intents:
   creation: "Create intent linked to a receivable. Idempotency via idempotencyKey."

@@ -32,7 +32,7 @@ public sealed class ClinicalWorkspaceService(IApplicationDbContext db, ITenantPr
     private Guid User => tenant.UserId ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
     private void RequireCatalogAccess()
     {
-        if (tenant.Role is not (UserRole.Admin or UserRole.Doctor)) throw new UnauthorizedAccessException("Acesso restrito a médicos e administradores.");
+        if (tenant.Role is not (UserRole.Admin or UserRole.Doctor)) throw new ForbiddenAccessException("Acesso restrito a médicos e administradores.");
     }
     private IQueryable<ClinicalCatalogItem> Catalog() => db.ClinicalCatalogItems.Where(x => x.ClinicId == Clinic && x.DeletedAt == null && (x.OwnerUserId == null || x.OwnerUserId == User));
 
@@ -50,7 +50,7 @@ public sealed class ClinicalWorkspaceService(IApplicationDbContext db, ITenantPr
         RequireCatalogAccess();
         if (!CatalogKinds.Contains(request.Kind)) throw new InvalidOperationException("Tipo de cadastro inválido.");
         Text(request.Title, 200, true); Text(request.Folder, 120, true); Text(request.Content, 30000);
-        if (request.Personal && tenant.Role != UserRole.Doctor) throw new UnauthorizedAccessException("Somente médicos possuem modelos pessoais.");
+        if (request.Personal && tenant.Role != UserRole.Doctor) throw new ForbiddenAccessException("Somente médicos possuem modelos pessoais.");
         var fields = request.Fields ?? [];
         ValidateFields(fields);
         var item = id is null ? new ClinicalCatalogItem { ClinicId = Clinic, Kind = request.Kind, OwnerUserId = request.Personal ? User : null }
@@ -101,7 +101,7 @@ public sealed class ClinicalWorkspaceService(IApplicationDbContext db, ITenantPr
         var appointment = await AppointmentAsync(appointmentId, true, ct);
         if (request.ClientRequestId == Guid.Empty) throw new InvalidOperationException("Identificador da requisição obrigatório.");
         var existing = await db.ClinicalEntries.AsNoTracking().FirstOrDefaultAsync(x => x.ClinicId == Clinic && x.AppointmentId == appointmentId && x.ClientRequestId == request.ClientRequestId, ct);
-        if (existing is not null) { if (existing.AuthorId != User) throw new UnauthorizedAccessException(); return EntryResponse(existing); }
+        if (existing is not null) { if (existing.AuthorId != User) throw new ForbiddenAccessException(); return EntryResponse(existing); }
         var record = await db.ClinicalRecords.FirstOrDefaultAsync(x => x.ClinicId == Clinic && x.AppointmentId == appointmentId, ct);
         if (record is null || record.Status != ClinicalRecordStatus.Draft)
             throw new InvalidOperationException("Crie um prontuário em rascunho antes de registrar. Prontuários finalizados aceitam somente adendos.");
@@ -142,13 +142,13 @@ public sealed class ClinicalWorkspaceService(IApplicationDbContext db, ITenantPr
     private async Task<Guid> DoctorIdAsync(CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.ClinicId == Clinic && x.Id == User && x.IsActive, ct) ?? throw new UnauthorizedAccessException();
-        return await db.Doctors.Where(x => x.ClinicId == Clinic && x.Email == user.Email && x.IsActive).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct) ?? throw new UnauthorizedAccessException("Médico não vinculado.");
+        return await db.Doctors.Where(x => x.ClinicId == Clinic && x.Email == user.Email && x.IsActive).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct) ?? throw new ForbiddenAccessException("Usuario medico sem profissional vinculado. Solicite ao administrador um cadastro em Medicos com o mesmo e-mail do usuario.");
     }
     private async Task<Appointment> AppointmentAsync(Guid id, bool write, CancellationToken ct)
     {
-        if (write && tenant.Role != UserRole.Doctor) throw new UnauthorizedAccessException("Somente o médico responsável pode registrar conteúdo clínico.");
+        if (write && tenant.Role != UserRole.Doctor) throw new ForbiddenAccessException("Somente o médico responsável pode registrar conteúdo clínico.");
         var appointment = await db.Appointments.Include(x => x.Patient).Include(x => x.Doctor).FirstOrDefaultAsync(x => x.ClinicId == Clinic && x.Id == id, ct) ?? throw new KeyNotFoundException("Consulta não encontrada.");
-        if (tenant.Role == UserRole.Doctor && await DoctorIdAsync(ct) != appointment.DoctorId) throw new UnauthorizedAccessException("Consulta de outro profissional.");
+        if (tenant.Role == UserRole.Doctor && await DoctorIdAsync(ct) != appointment.DoctorId) throw new ForbiddenAccessException("Consulta de outro profissional.");
         return appointment;
     }
     private static void Text(string? value, int max, bool required = false)

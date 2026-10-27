@@ -54,6 +54,7 @@ app.UseExceptionHandler(exceptionHandlerApp =>
         var statusCode = exception switch
         {
             InvalidOperationException => StatusCodes.Status400BadRequest,
+            ForbiddenAccessException => StatusCodes.Status403Forbidden,
             UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
             KeyNotFoundException => StatusCodes.Status404NotFound,
             DbUpdateConcurrencyException => StatusCodes.Status409Conflict,

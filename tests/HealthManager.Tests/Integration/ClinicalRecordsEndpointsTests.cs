@@ -13,6 +13,27 @@ public sealed class ClinicalRecordsEndpointsTests
     private static readonly Guid DoctorUserId = Guid.Parse("a1a2a3a4-a1a2-a1a2-a1a2-a1a2a3a4a5a6");
 
     [Fact]
+    public async Task UnlinkedDoctor_ShouldReceiveForbidden_AndKeepValidSession()
+    {
+        await using var factory = new ApiTestFactory();
+        await factory.WithDbContextAsync(async db =>
+        {
+            var owner = await db.Users.SingleAsync(x => x.Id == DoctorUserId);
+            db.Users.Add(new User { ClinicId = owner.ClinicId, Name = "Medico sem vinculo",
+                Email = "sem.vinculo@clinicaaurora.com", PasswordHash = owner.PasswordHash, Role = UserRole.Doctor });
+            await db.SaveChangesAsync();
+        });
+        using var client = await factory.CreateAuthenticatedClientAsync("sem.vinculo@clinicaaurora.com", "ChangeMe123!");
+        var response = await client.GetAsync($"/patients/{PatientId}/clinical-records");
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("mesmo e-mail");
+        var patients = await client.GetAsync("/patients");
+        patients.StatusCode.Should().Be(HttpStatusCode.OK);
+        var history = await client.GetAsync($"/patients/{PatientId}/clinical-entries");
+        history.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Doctor_ShouldSaveReadAndClearFreeText_WithoutChangingLegacyFields()
     {
         await using var factory = new ApiTestFactory();
@@ -200,7 +221,7 @@ public sealed class ClinicalRecordsEndpointsTests
         using var otherDoctorClient = await factory.CreateAuthenticatedClientAsync("outra.medica@clinicaaurora.com", "ChangeMe123!");
         var response = await otherDoctorClient.GetAsync($"/appointments/{AppointmentId}/clinical-record/addendums");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]

@@ -122,7 +122,7 @@ public sealed class ClinicalWorkspaceEndpointsTests
             appointment.DoctorId = other.Id;
             await db.SaveChangesAsync();
         });
-        (await doctor.GetAsync($"/appointments/{Appointment}/clinical-entries")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await doctor.PostAsJsonAsync($"/appointments/{Appointment}/clinical-entries", new CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Documento", "Teste", null))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await doctor.GetAsync($"/appointments/{Appointment}/clinical-entries")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await doctor.PostAsJsonAsync($"/appointments/{Appointment}/clinical-entries", new CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Documento", "Teste", null))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }
