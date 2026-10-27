@@ -269,6 +269,8 @@
   physicalExam: string? (exame físico)
   assessment: string? (avaliação/diagnóstico)
   plan: string? (plano de tratamento)
+  content: string? (texto livre do prontuario; plain text)
+  prescription: string? (receituario em texto livre, incluindo produtos/pacotes selecionados)
   finalizedAt: DateTimeOffset?
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 

@@ -548,6 +548,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ClinicId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Content")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -570,6 +573,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("Plan")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Prescription")
                         .HasColumnType("text");
 
                     b.Property<int>("Status")

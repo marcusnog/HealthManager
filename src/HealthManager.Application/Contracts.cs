@@ -249,8 +249,8 @@ public sealed record UpdateAvailabilityRequest([Required] int DayOfWeek, [Requir
 public sealed record DoctorAvailabilityResponse(Guid Id, Guid DoctorId, string DoctorName, int DayOfWeek, string StartTime, string EndTime, bool IsAvailable);
 
 // ── ClinicalRecord ──
-public sealed record CreateClinicalRecordRequest(string? ChiefComplaint, string? History, string? PhysicalExam, string? Assessment, string? Plan);
-public sealed record UpdateClinicalRecordRequest(string? ChiefComplaint, string? History, string? PhysicalExam, string? Assessment, string? Plan);
+public sealed record CreateClinicalRecordRequest(string? ChiefComplaint, string? History, string? PhysicalExam, string? Assessment, string? Plan, string? Content = null, string? Prescription = null);
+public sealed record UpdateClinicalRecordRequest(string? ChiefComplaint, string? History, string? PhysicalExam, string? Assessment, string? Plan, string? Content = null, string? Prescription = null);
 public sealed record ClinicalRecordResponse(
     Guid Id,
     Guid AppointmentId,
@@ -264,7 +264,9 @@ public sealed record ClinicalRecordResponse(
     string? Plan,
     DateTimeOffset? FinalizedAt,
     string? PatientName = null,
-    string? DoctorName = null);
+    string? DoctorName = null,
+    string? Content = null,
+    string? Prescription = null);
 public sealed record CreateAddendumRequest([Required] string Content);
 public sealed record ClinicalRecordAddendumResponse(Guid Id, string Content, Guid AuthorId, string? AuthorName, DateTimeOffset CreatedAt);
 

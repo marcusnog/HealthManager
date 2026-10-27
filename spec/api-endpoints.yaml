@@ -144,8 +144,8 @@ TenantSettings:
 
 ClinicalRecords:
   GET /appointments/{appointmentId}/clinical-record: "-> ClinicalRecordResponse [ClinicStaff]"
-  POST /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan? } -> 201 ClinicalRecordResponse [DoctorOnly]"
-  PATCH /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan? } -> ClinicalRecordResponse [DoctorOnly]"
+  POST /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan?, content?, prescription? } -> 201 ClinicalRecordResponse [DoctorOnly]"
+  PATCH /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan?, content?, prescription? } -> ClinicalRecordResponse [DoctorOnly]"
   POST /appointments/{appointmentId}/clinical-record/finalize: "-> ClinicalRecordResponse [DoctorOnly]"
   POST /appointments/{appointmentId}/clinical-record/addendum: "{ content } -> 201 ClinicalRecordAddendumResponse [DoctorOnly]"
   GET /appointments/{appointmentId}/clinical-record/addendums: "-> ClinicalRecordAddendumResponse[] [ClinicStaff]"

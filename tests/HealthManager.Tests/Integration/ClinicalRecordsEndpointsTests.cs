@@ -13,6 +13,31 @@ public sealed class ClinicalRecordsEndpointsTests
     private static readonly Guid DoctorUserId = Guid.Parse("a1a2a3a4-a1a2-a1a2-a1a2-a1a2a3a4a5a6");
 
     [Fact]
+    public async Task Doctor_ShouldSaveReadAndClearFreeText_WithoutChangingLegacyFields()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
+        var url = $"/appointments/{AppointmentId}/clinical-record";
+        var created = await client.PostAsJsonAsync(url, new
+        {
+            chiefComplaint = "Queixa anterior", content = "Texto livre\nSegunda linha", prescription = "Produto — orientacoes"
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var saved = await client.GetFromJsonAsync<System.Text.Json.JsonElement>(url);
+        saved.GetProperty("content").GetString().Should().Be("Texto livre\nSegunda linha");
+        saved.GetProperty("prescription").GetString().Should().Be("Produto — orientacoes");
+        var updated = await client.PatchAsJsonAsync(url, new { content = "Revisado", prescription = "" });
+        updated.StatusCode.Should().Be(HttpStatusCode.OK);
+        saved = await client.GetFromJsonAsync<System.Text.Json.JsonElement>(url);
+        saved.GetProperty("content").GetString().Should().Be("Revisado");
+        saved.GetProperty("prescription").GetString().Should().Be("");
+        saved.GetProperty("chiefComplaint").GetString().Should().Be("Queixa anterior");
+        await client.PostAsync($"{url}/finalize", null);
+        var rejected = await client.PatchAsJsonAsync(url, new { content = "Alteracao", prescription = "Alteracao" });
+        rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Doctor_ShouldCreateDraft_WhenStartingConsultation()
     {
         await using var factory = new ApiTestFactory();

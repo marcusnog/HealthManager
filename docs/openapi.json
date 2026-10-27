@@ -4876,7 +4876,9 @@
           "plan": {
             "type": "string",
             "nullable": true
-          }
+          },
+          "content": { "type": "string", "nullable": true },
+          "prescription": { "type": "string", "nullable": true }
         }
       },
       "UpdateClinicalRecordRequest": {
@@ -4901,7 +4903,9 @@
           "plan": {
             "type": "string",
             "nullable": true
-          }
+          },
+          "content": { "type": "string", "nullable": true },
+          "prescription": { "type": "string", "nullable": true }
         }
       },
       "ClinicalRecordResponse": {
@@ -4962,7 +4966,9 @@
           "doctorName": {
             "type": "string",
             "nullable": true
-          }
+          },
+          "content": { "type": "string", "nullable": true },
+          "prescription": { "type": "string", "nullable": true }
         }
       },
       "CreateAddendumRequest": {

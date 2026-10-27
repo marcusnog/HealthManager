@@ -396,6 +396,8 @@ public sealed class ClinicalRecord : TenantEntity
     public string? PhysicalExam { get; set; }
     public string? Assessment { get; set; }
     public string? Plan { get; set; }
+    public string? Content { get; set; }
+    public string? Prescription { get; set; }
     public DateTimeOffset? FinalizedAt { get; set; }
     public Appointment? Appointment { get; set; }
     public Patient? Patient { get; set; }

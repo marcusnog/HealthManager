@@ -1730,7 +1730,9 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
             History = request.History,
             PhysicalExam = request.PhysicalExam,
             Assessment = request.Assessment,
-            Plan = request.Plan
+            Plan = request.Plan,
+            Content = request.Content,
+            Prescription = request.Prescription
         };
 
         dbContext.ClinicalRecords.Add(record);
@@ -1761,6 +1763,8 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
         if (request.PhysicalExam is not null) record.PhysicalExam = request.PhysicalExam;
         if (request.Assessment is not null) record.Assessment = request.Assessment;
         if (request.Plan is not null) record.Plan = request.Plan;
+        if (request.Content is not null) record.Content = request.Content;
+        if (request.Prescription is not null) record.Prescription = request.Prescription;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -1880,7 +1884,7 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
         new(r.Id, r.AppointmentId, r.PatientId, r.DoctorId, r.Status,
             r.ChiefComplaint, r.History, r.PhysicalExam, r.Assessment, r.Plan,
             r.FinalizedAt,
-            r.Patient?.Name, r.Doctor?.Name);
+            r.Patient?.Name, r.Doctor?.Name, r.Content, r.Prescription);
 
     private static ClinicalRecordAddendumResponse ToAddendumResponse(ClinicalRecordAddendum a) =>
         new(a.Id, a.Content, a.AuthorId, a.Author?.Name, a.CreatedAt);
