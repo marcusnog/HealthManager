@@ -10,6 +10,7 @@ artifacts/
 *.suo
 *.cache
 *.log
+__pycache__/
 appsettings.Development.json
 .env
 .env.*
