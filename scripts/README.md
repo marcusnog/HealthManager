@@ -61,4 +61,6 @@ Quando o endereço público limitar a carga, `HEALTHMANAGER_SSH_TUNNEL_PORT` per
 
 `--include-expense-categories` importa somente subgrupos de pais explicitamente classificados como `Despesas`, após consultar categorias ativas e excluídas. Nomes duplicados ou ambíguos ficam pendentes; o grupo original permanece no mapeamento privado. Não cria lançamentos, pagamentos ou saldos.
 
+`medx_repair_exam_units.py` corrige unidades importadas sem o denominador original (`Peso/Volume`). Usa os mesmos argumentos de destino e `--apply`, exige os snapshots privados originais e atualiza somente modelos ainda intactos, com revisão otimista. Registra antes/depois e reconcilia respostas perdidas sem repetir atualizações incertas. Não converte resultados nem altera referências clínicas.
+
 A cópia limita os arquivos em trânsito a cerca de 8 MiB no total; um arquivo maior ocupa o limite sozinho. Isso permite concorrência para arquivos pequenos sem enfileirar dezenas de arquivos grandes na conexão. Cada intenção continua durável antes do POST.

@@ -64,7 +64,8 @@ def exam_candidate(row, subscription):
     key = f"medx:{subscription}:Exames_modelo:{source_id(row.get('Id do exame'))}"
     title = text(row.get("Exame"))
     folder = "MedX - Exames / " + (text(row.get("Grupo")) or "Geral")
-    unit = text(row.get("Peso"))
+    weight, volume = text(row.get("Peso")), text(row.get("Volume"))
+    unit = weight + ("/" + volume if weight and volume else "")
     content = ["Referências originais do MedX, pendentes de revisão clínica.",
         f"Unidade: {unit or 'não informada'}",
         f"Referência masculina: {row.get('Homem_de')} a {row.get('Homem_até')}",
@@ -76,6 +77,8 @@ def exam_candidate(row, subscription):
     result = {"sourceKey": key, "resource": "clinical-catalog", "status": "held"}
     if source_id(row.get("Id do exame")) is None:
         return result | {"reason": "invalid_source_id"}
+    if volume and not weight:
+        return result | {"reason": "unit_denominator_without_numerator"}
     if row.get("Ocultar") or not title or len(title) > 200 or len(folder) > 120 or len("\n".join(content)) > 30000:
         return result | {"reason": "invalid_or_hidden_exam"}
     return result | {"status": "create", "payload": {"kind": "Exam", "folder": folder,

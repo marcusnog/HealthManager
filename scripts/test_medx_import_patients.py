@@ -166,6 +166,17 @@ class ImportTests(unittest.TestCase):
             self.assertEqual("https://example.invalid/backend", api.base)
             self.assertEqual("example.invalid", connection.request.call_args.kwargs["headers"]["Host"])
 
+    def test_put_preserves_revision_payload_and_tenant_headers(self):
+        api = object.__new__(Api)
+        api.connection = Mock()
+        api.connection.getresponse.return_value = Mock(status=200, read=Mock(return_value=b"{}"))
+        api.base_path, api.clinic_id, api.token, api.host_header = "/backend", "clinic", "token", "example.invalid"
+        api.put("/clinical-catalog/exam", {"revision": "original"})
+        call = api.connection.request.call_args
+        self.assertEqual(("PUT", "/backend/clinical-catalog/exam"), call.args)
+        self.assertEqual({"revision": "original"}, json.loads(call.kwargs["body"]))
+        self.assertEqual("clinic", call.kwargs["headers"]["X-Clinic-Id"])
+
     def test_invalid_tunnel_ports_are_rejected_before_connection(self):
         for port in ("0", "65536", "remote:80"):
             with patch.dict("os.environ", {"HEALTHMANAGER_SSH_TUNNEL_PORT": port}), self.assertRaises(ValueError):

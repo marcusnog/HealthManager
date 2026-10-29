@@ -9,6 +9,14 @@ from medx_prepare import sha256, write_json
 
 
 class CatalogTests(unittest.TestCase):
+    def test_exam_unit_keeps_explicit_denominator_without_converting_values(self):
+        row = self.exam() | {"Peso": "mg", "Volume": "dl"}
+        result = exam_candidate(row, "1")
+        self.assertEqual("mg/dl", result["payload"]["fields"][0]["unit"])
+        self.assertIn("Unidade: mg/dl", result["payload"]["content"])
+        self.assertIn("masculina: 1 a 2", result["payload"]["content"])
+        self.assertEqual("held", exam_candidate(row | {"Peso": ""}, "1")["status"])
+
     def test_expense_categories_require_explicit_parent_type_and_preserve_group(self):
         groups = [{"Id do Grupo": 0, "Grupo": "Administrativo", "Tipo": "Despesas"},
                   {"Id do Grupo": 1, "Grupo": "Consultas", "Tipo": "Receitas"}]

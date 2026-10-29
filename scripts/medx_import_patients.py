@@ -75,14 +75,17 @@ class Api:
     def request(self, path, data=None):
         return json.loads(self.request_bytes(path, json.dumps(data).encode() if data is not None else None))
 
-    def request_bytes(self, path, body=None, content_type="application/json"):
+    def put(self, path, data):
+        return json.loads(self.request_bytes(path, json.dumps(data).encode(), method="PUT"))
+
+    def request_bytes(self, path, body=None, content_type="application/json", *, method=None):
         self.connection.timeout = 120 if content_type.startswith("multipart/") else 45
         if self.connection.sock:
             self.connection.sock.settimeout(self.connection.timeout)
         headers = {"Content-Type": content_type, "X-Clinic-Id": self.clinic_id, "Host": self.host_header}
         if self.token:
             headers["Authorization"] = "Bearer " + self.token
-        self.connection.request("POST" if body is not None else "GET", self.base_path + path,
+        self.connection.request(method or ("POST" if body is not None else "GET"), self.base_path + path,
             body=body, headers=headers)
         response = self.connection.getresponse()
         body = response.read()
