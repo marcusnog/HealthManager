@@ -14,7 +14,8 @@ import time
 import uuid
 import zlib
 
-from medx_import_patients import Api, append_event
+from medx_import_patients import Api
+from medx_journal import DurableJournal
 from medx_prepare import sha256, write_json
 
 
@@ -168,9 +169,10 @@ def run(stage, source, api, password, seven_zip, limit, workers, verify_on_serve
     mutex, stop = threading.Lock(), threading.Event()
     local, clients = threading.local(), []
     totals = Counter()
+    writer = DurableJournal(journal)
     def event(value):
+        writer.append(value)
         with mutex:
-            append_event(journal, value)
             if value["status"] != "intent":
                 totals[value["status"]] += 1
                 if value["status"] in ("uploaded", "created", "matched"):
@@ -214,6 +216,7 @@ def run(stage, source, api, password, seven_zip, limit, workers, verify_on_serve
         write_json(directory / "last-run-summary.json", dict(totals))
         return dict(totals)
     finally:
+        writer.close()
         for client in clients:
             client.connection.close()
         lock.unlink()

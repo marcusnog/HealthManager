@@ -3,6 +3,7 @@ import argparse
 import base64
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -10,7 +11,6 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs7
 
-from medx_import_patients import append_event
 from medx_prepare import write_json
 
 
@@ -69,8 +69,12 @@ def verify(stage, certificate, run_id):
     events = [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines()]
     updates = reconcile(events, files)
     write_json(directory / f"server-files-{run_id}.json", files)
-    for event in updates:
-        append_event(journal, event | {"verificationRunId": run_id})
+    # Upload intents are already durable; batch only repeatable read-only verification results.
+    with journal.open("a", encoding="utf-8") as stream:
+        for event in updates:
+            stream.write(json.dumps(event | {"verificationRunId": run_id}) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
     receipt["workflowRunId"] = run_id
     write_json(stage / "server-backup-receipt.json", receipt)
     summary = {"verifiedAtUtc": datetime.now(timezone.utc).isoformat(), "workflowRunId": run_id,
