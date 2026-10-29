@@ -105,7 +105,9 @@ sql = '''SELECT json_build_object('clinicId','11111111-1111-1111-1111-1111111111
  'doctors',(SELECT coalesce(json_agg(json_build_object('id',"Id",'name',"Name",'crm',"Crm")),'[]'::json)
  FROM "Doctors" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111' AND "DeletedAt" IS NOT NULL),
  'products',(SELECT coalesce(json_agg(json_build_object('id',"Id",'name',"Name")),'[]'::json)
- FROM "Products" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111' AND "DeletedAt" IS NOT NULL));'''
+ FROM "Products" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111' AND "DeletedAt" IS NOT NULL),
+ 'appointmentTypes',(SELECT coalesce(json_agg(json_build_object('id',"Id",'name',"Name")),'[]'::json)
+ FROM "AppointmentTypes" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111' AND "DeletedAt" IS NOT NULL));'''
 query = subprocess.run(["k3s", "kubectl", "-n", "healthmanager", "exec", "-i", "postgres-0", "--",
     "sh", "-c", 'exec psql -X -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d healthmanager'],
     input=sql.encode(), capture_output=True)
