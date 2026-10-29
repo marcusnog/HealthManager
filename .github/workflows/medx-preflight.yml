@@ -2,7 +2,7 @@ name: MedX migration preflight
 on:
   push:
     branches: [codex/medx-ops-20261029]
-    paths: [.github/workflows/medx-preflight.yml, scripts/medx_server_preflight.py]
+    paths: [.github/workflows/medx-preflight.yml, scripts/medx_server_preflight.py, scripts/medx-recipient.pem]
 permissions:
   contents: read
 jobs:
@@ -21,4 +21,6 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
       - name: Inspect HealthManager database and storage without exposing secrets
-        run: ssh -o BatchMode=yes root@157.254.207.208 python3 - < scripts/medx_server_preflight.py
+        run: |
+          scp scripts/medx-recipient.pem root@157.254.207.208:/opt/healthmanager-backups/medx-20261029/recipient.pem
+          ssh -o BatchMode=yes root@157.254.207.208 python3 - < scripts/medx_server_preflight.py

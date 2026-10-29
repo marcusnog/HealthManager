@@ -1,6 +1,7 @@
 """Back up the confirmed HealthManager database; expose only aggregate metadata."""
 from datetime import datetime, timezone
 import hashlib
+import base64
 import json
 import os
 from pathlib import Path
@@ -73,3 +74,22 @@ backup.with_suffix(".json").write_text(json.dumps(receipt, indent=2))
 print("MEDX_BACKUP_RECEIPT " + json.dumps(receipt))
 print(command("k3s", "kubectl", "-n", "healthmanager", "exec", "deployment/api", "--",
               "df", "-Pk", "/var/lib/healthmanager/documents"))
+
+sql = '''SELECT json_build_object('clinicId','11111111-1111-1111-1111-111111111111',
+ 'patients',(SELECT coalesce(json_agg(json_build_object('id',"Id",'name',"Name",'cpf',"Cpf",'birthDate',"BirthDate")),'[]'::json)
+ FROM "Patients" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111' AND "DeletedAt" IS NOT NULL),
+ 'doctors',(SELECT coalesce(json_agg(json_build_object('id',"Id",'name',"Name",'crm',"Crm")),'[]'::json)
+ FROM "Doctors" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111' AND "DeletedAt" IS NOT NULL),
+ 'products',(SELECT coalesce(json_agg(json_build_object('id',"Id",'name',"Name")),'[]'::json)
+ FROM "Products" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111' AND "DeletedAt" IS NOT NULL));'''
+query = subprocess.run(["k3s", "kubectl", "-n", "healthmanager", "exec", "-i", "postgres-0", "--",
+    "sh", "-c", 'exec psql -X -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d healthmanager'],
+    input=sql.encode(), capture_output=True)
+if query.returncode:
+    raise RuntimeError("Deleted-identity check failed.")
+json.loads(query.stdout)
+encrypted = subprocess.run(["openssl", "cms", "-encrypt", "-binary", "-aes256", "-outform", "DER",
+    str(directory / "recipient.pem")], input=query.stdout, capture_output=True)
+if encrypted.returncode:
+    raise RuntimeError("Identity encryption failed; no identity data released.")
+print("MEDX_ENCRYPTED_IDENTITIES " + base64.b64encode(encrypted.stdout).decode())
