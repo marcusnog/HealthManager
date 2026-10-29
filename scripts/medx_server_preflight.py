@@ -97,7 +97,10 @@ print("MEDX_ENCRYPTED_IDENTITIES " + base64.b64encode(encrypted.stdout).decode()
 # Resolve the existing documents PVC; read only this tenant's migration-prefixed files.
 pvc = json.loads(command("k3s", "kubectl", "-n", "healthmanager", "get", "pvc", "documents", "-o", "json"))
 pv = json.loads(command("k3s", "kubectl", "get", "pv", pvc["spec"]["volumeName"], "-o", "json"))
-root = Path(pv["spec"]["hostPath"]["path"]).resolve()
+volume = pv["spec"].get("hostPath") or pv["spec"].get("local")
+if not volume:
+    raise RuntimeError("Documents volume is not a local filesystem; use download verification.")
+root = Path(volume["path"]).resolve()
 sql = '''SELECT coalesce(json_agg(json_build_object('documentId',"Id",'patientId',"PatientId",'fileName',"FileName",'size',"SizeInBytes",'path',"StoragePath")),'[]'::json)
 FROM "PatientDocuments" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111'
 AND "DeletedAt" IS NULL AND "FileName" LIKE 'medx16925-%';'''
