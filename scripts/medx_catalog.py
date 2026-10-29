@@ -83,6 +83,24 @@ def exam_candidate(row, subscription):
         "fields": [{"label": "Resultado", "type": "Text", "unit": unit if len(unit) <= 30 else None}]}}
 
 
+def appointment_type_candidate(row, active, deleted, subscription):
+    identifier = source_id(row.get("Id do Diagnóstico-QP"))
+    name = text(row.get("Diagnóstico-QP"))
+    result = {"sourceKey": f"medx:{subscription}:Diagnostico-QP:{identifier}", "resource": "appointment-types",
+              "status": "held", "sourceDurationMinutes": row.get("Tempo")}
+    if identifier is None or not name or len(name) > 100:
+        return result | {"reason": "invalid_appointment_type"}
+    normalized = normalized_name(name)
+    if any(normalized_name(r["name"]) == normalized for r in deleted):
+        return result | {"reason": "deleted_appointment_type"}
+    found = [r for r in active if normalized_name(r["name"]) == normalized]
+    if len(found) == 1:
+        return result | {"status": "linked_existing", "targetId": found[0]["id"]}
+    if found:
+        return result | {"reason": "ambiguous_appointment_type"}
+    return result | {"status": "create", "payload": {"name": name}}
+
+
 def table(stage, manifest, name):
     info = next(t for t in manifest["tables"] if t["name"] == name)
     path = stage / info["path"]
@@ -108,6 +126,8 @@ def rows(api, resource):
 
 def matches(item, candidate):
     payload = candidate["payload"]
+    if candidate["resource"] == "appointment-types":
+        return item["name"] == payload["name"]
     if candidate["resource"] == "clinical-catalog":
         return (all(item.get(k) == payload[k] for k in ("kind", "content", "title", "folder"))
                 and item.get("ownerUserId") is None and len(item.get("fields", [])) == len(payload["fields"])
@@ -117,7 +137,7 @@ def matches(item, candidate):
     return all(item.get(k) == payload[k] for k in keys)
 
 
-def run(stage, api, apply, include_documents=False):
+def run(stage, api, apply, include_documents=False, include_appointment_types=False):
     manifest = json.loads((stage / "manifest.json").read_text(encoding="utf-8"))
     receipt = json.loads((stage / "server-backup-receipt.json").read_text(encoding="utf-8"))
     deleted = json.loads((stage / "deleted-identities.json").read_text(encoding="utf-8"))
@@ -132,6 +152,10 @@ def run(stage, api, apply, include_documents=False):
         raise ValueError("Catalog destination changed.")
     write_json(path, identity)
     current = {resource: rows(api, resource) for resource in ("doctors", "products", "clinical-catalog")}
+    if include_appointment_types:
+        if "appointmentTypes" not in deleted:
+            raise ValueError("Deleted appointment types must be checked first.")
+        current["appointment-types"] = rows(api, "appointment-types")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     write_json(directory / ("before-" + stamp + ".json"), current)
     subscription = manifest["subscription"]
@@ -142,6 +166,9 @@ def run(stage, api, apply, include_documents=False):
     candidates += [exam_candidate(r, subscription) for r in table(stage, manifest, "Exames_modelo.json")]
     if include_documents:
         candidates += document_candidates(table(stage, manifest, "Autodocs.json"), subscription)
+    if include_appointment_types:
+        candidates += [appointment_type_candidate(r, current["appointment-types"], deleted["appointmentTypes"], subscription)
+                       for r in table(stage, manifest, "Diagnóstico-QP.json")]
     journal = directory / "journal.ndjson"
     events = [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines()] if journal.exists() else []
     previous = {e["sourceKey"]: e for e in events}
@@ -214,7 +241,8 @@ if __name__ == "__main__":
     parser.add_argument("--email", required=True)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--include-document-templates", action="store_true")
+    parser.add_argument("--include-appointment-types", action="store_true")
     args = parser.parse_args()
     password = os.environ.get("HEALTHMANAGER_IMPORT_PASSWORD") or getpass.getpass("HealthManager password: ")
     api = Api(args.base_url, args.email, password, args.clinic_id, args.clinic_name)
-    print(json.dumps(run(args.stage, api, args.apply, args.include_document_templates)), flush=True)
+    print(json.dumps(run(args.stage, api, args.apply, args.include_document_templates, args.include_appointment_types)), flush=True)

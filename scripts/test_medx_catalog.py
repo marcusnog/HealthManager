@@ -4,11 +4,20 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from medx_catalog import doctor_candidate, procedure_candidate, exam_candidate, run
+from medx_catalog import doctor_candidate, procedure_candidate, exam_candidate, appointment_type_candidate, run
 from medx_prepare import sha256, write_json
 
 
 class CatalogTests(unittest.TestCase):
+    def test_appointment_types_preserve_duration_without_changing_target_schema(self):
+        row = {"Id do Diagnóstico-QP": -10, "Diagnóstico-QP": "Retorno", "Tempo": 40}
+        created = appointment_type_candidate(row, [], [], "1")
+        self.assertEqual({"name": "Retorno"}, created["payload"])
+        self.assertEqual(40, created["sourceDurationMinutes"])
+        existing = [{"id": "type", "name": "RETORNO"}]
+        self.assertEqual("linked_existing", appointment_type_candidate(row, existing, [], "1")["status"])
+        self.assertEqual("deleted_appointment_type", appointment_type_candidate(row, [], existing, "1")["reason"])
+
     def doctor(self):
         return {"Id do Usuário": -1, "Nome Completo": "Maria Clara Silva", "Número do Conselho": "22061",
                 "Conselho Profissional": "CRM", "Ativo": True, "Agenda": True, "Email": "source@example.invalid"}

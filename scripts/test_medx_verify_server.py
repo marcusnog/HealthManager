@@ -16,8 +16,17 @@ class ServerVerificationTests(unittest.TestCase):
             reconcile([event], [])
         with self.assertRaises(ValueError):
             reconcile([event], [file, file])
-        with self.assertRaises(ValueError):
-            reconcile([event | {"status": "intent"}], [file])
+        self.assertEqual("created", reconcile([event | {"status": "intent"}], [file])[0]["status"])
+
+    def test_uncertain_upload_requires_unique_source_bytes_and_patient_match(self):
+        event = {"sourceKey": "source", "status": "intent", "source": {"size": 10},
+                 "targetPatientId": "patient", "fileName": "file.pdf", "sha256": "digest"}
+        file = {"documentId": "doc", "patientId": "patient", "fileName": "file.pdf", "size": 10, "sha256": "digest"}
+        self.assertEqual("doc", reconcile([event], [file])[0]["documentId"])
+        for files in ([], [file | {"sha256": "different"}], [file | {"patientId": "other"}],
+                      [file, file | {"documentId": "duplicate"}]):
+            with self.assertRaises(ValueError):
+                reconcile([event], files)
 
 
 if __name__ == "__main__":
