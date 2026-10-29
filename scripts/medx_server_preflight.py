@@ -59,16 +59,18 @@ assert counts["clinicName"] == "Clinica Piloto" and counts["activePatients"] >= 
 # Temporary key permits only forwarding to the existing web/API service, never a shell.
 service = json.loads(command("k3s", "kubectl", "-n", "healthmanager", "get", "service", "web", "-o", "json"))
 service_ip = service["spec"]["clusterIP"]
-assert ipaddress.ip_address(service_ip).is_private and any(p["port"] == 80 for p in service["spec"]["ports"])
+ports = service["spec"]["ports"]
+assert ipaddress.ip_address(service_ip).is_private and len(ports) == 1 and ports[0]["protocol"] == "TCP"
+service_port = ports[0]["port"]
 key = Path("/opt/healthmanager-backups/medx-20261029/tunnel.pub").read_text().strip()
 assert key.startswith("ssh-ed25519 ") and " medx-import-" in key and "\n" not in key
 authorized = Path("/root/.ssh/authorized_keys")
 lines = authorized.read_text().splitlines() if authorized.exists() else []
 lines = [line for line in lines if key.split()[1] not in line.split()]
-lines.append(f'restrict,port-forwarding,permitopen="{service_ip}:80",command="false" ' + key)
+lines.append(f'restrict,port-forwarding,permitopen="{service_ip}:{service_port}",command="false" ' + key)
 authorized.write_text("\n".join(lines) + "\n")
 authorized.chmod(0o600)
-print("MEDX_TUNNEL " + json.dumps({"host": "157.254.207.208", "serviceIp": service_ip, "servicePort": 80,
+print("MEDX_TUNNEL " + json.dumps({"host": "157.254.207.208", "serviceIp": service_ip, "servicePort": service_port,
     "hostKey": Path("/etc/ssh/ssh_host_ed25519_key.pub").read_text().strip()}))
 
 os.umask(0o077)
