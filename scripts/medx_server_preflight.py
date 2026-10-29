@@ -31,6 +31,10 @@ raw = command("k3s", "kubectl", "-n", "healthmanager", "exec", "deployment/api",
 connection = dict(part.split("=", 1) for part in raw.strip().split(";") if "=" in part)
 print(json.dumps({"database": {k: connection.get(k) for k in ("Host", "Port", "Database")}}))
 print(command("df", "-h", "/opt"))
+print(command("uptime"))
+metrics = subprocess.run(["k3s", "kubectl", "-n", "healthmanager", "top", "pods"], capture_output=True, text=True)
+if metrics.returncode == 0:
+    print(metrics.stdout)
 
 assert connection.get("Host") == "postgres.healthmanager.svc.cluster.local"
 assert connection.get("Database") == "healthmanager"
