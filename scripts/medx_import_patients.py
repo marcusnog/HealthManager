@@ -58,7 +58,15 @@ class Api:
         url = urlsplit(self.base)
         if not url.hostname or url.username or url.password or url.query or url.fragment:
             raise ValueError("Invalid API URL.")
-        self.connection = http.client.HTTPSConnection(url.hostname, url.port or 443, timeout=45)
+        tunnel = os.environ.get("HEALTHMANAGER_SSH_TUNNEL_PORT")
+        if tunnel:
+            port = int(tunnel)
+            if not 1 <= port <= 65535:
+                raise ValueError("Invalid loopback SSH tunnel port.")
+            self.connection = http.client.HTTPConnection("127.0.0.1", port, timeout=45)
+        else:
+            self.connection = http.client.HTTPSConnection(url.hostname, url.port or 443, timeout=45)
+        self.host_header = url.netloc
         self.base_path = url.path
         self.credentials = {"email": email, "password": password}
         self.clinic_id, self.clinic_name = clinic_id, clinic_name
@@ -71,7 +79,7 @@ class Api:
         self.connection.timeout = 120 if content_type.startswith("multipart/") else 45
         if self.connection.sock:
             self.connection.sock.settimeout(self.connection.timeout)
-        headers = {"Content-Type": content_type, "X-Clinic-Id": self.clinic_id}
+        headers = {"Content-Type": content_type, "X-Clinic-Id": self.clinic_id, "Host": self.host_header}
         if self.token:
             headers["Authorization"] = "Bearer " + self.token
         self.connection.request("POST" if body is not None else "GET", self.base_path + path,

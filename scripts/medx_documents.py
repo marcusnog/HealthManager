@@ -182,13 +182,13 @@ def run(stage, source, api, password, seven_zip, limit, workers, verify_on_serve
     def group(candidates):
         if stop.is_set():
             return
-        if not hasattr(local, "client"):
-            local.client = Api(api.base, api.credentials["email"], api.credentials["password"], api.clinic_id, api.clinic_name)
-            local.last_login = time.monotonic()
-            with mutex:
-                clients.append(local.client)
-        client = local.client
         try:
+            if not hasattr(local, "client"):
+                local.client = Api(api.base, api.credentials["email"], api.credentials["password"], api.clinic_id, api.clinic_name)
+                local.last_login = time.monotonic()
+                with mutex:
+                    clients.append(local.client)
+            client = local.client
             documents = client.request("/patients/" + candidates[0]["targetPatientId"] + "/documents")
             for candidate in candidates:
                 if stop.is_set() or (directory / "pause.request").exists():
