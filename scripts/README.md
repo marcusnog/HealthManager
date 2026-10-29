@@ -43,7 +43,7 @@ Após obter um backup verificado do banco e as identidades excluídas do tenant,
 
 `medx_catalog.py` prepara profissionais, procedimentos como itens de aplicação e modelos de exames. Usa os mesmos argumentos de destino do importador de pacientes; `--apply` executa o plano. Não cria contas de acesso, não altera os cadastros anteriores e não converte referências clínicas em limites automáticos. O único percentual financeiro atribuído a novos médicos é o padrão do sistema (100% clínica), que deve ser revisto antes de utilizar o profissional em cobranças. Os modelos indicam que as referências importadas precisam de revisão clínica.
 
-`medx_documents.py` recebe os mesmos argumentos de destino, `--stage`, `--source` (ZIPs), `--limit` e `--workers` (1 a 8). Copia os PDFs/JPEGs/PNGs originais para os pacientes comprovados pelo journal e pela API. Exige backup recente e armazenamento persistente previamente conferido. Verifica hash do ZIP, CRC/tamanho do membro, limite multipart e hash do download após cada envio. A senha do backup vem do prompt ou de `MEDX_BACKUP_PASSWORD`.
+`medx_documents.py` recebe os mesmos argumentos de destino, `--stage`, `--source` (ZIPs), `--limit` e `--workers` (1 a 32). Copia os PDFs/JPEGs/PNGs originais para os pacientes comprovados pelo journal e pela API. Exige backup recente e armazenamento persistente previamente conferido. Verifica hash do ZIP, CRC/tamanho do membro, limite multipart e hash do download após cada envio. A senha do backup vem do prompt ou de `MEDX_BACKUP_PASSWORD`.
 
 Os arquivos recebem prefixo MedX; data/autoria impressas no original permanecem intactas. A data de inclusão no HealthManager é a da importação. Isso não cria um prontuário nativo, não atribui autoria a um médico do destino e não produz nova assinatura.
 
@@ -58,3 +58,5 @@ Para pausar um lote, crie `document-import/pause.request` no staging. O importad
 Quando o endereço público limitar a carga, `HEALTHMANAGER_SSH_TUNNEL_PORT` permite usar um encaminhamento SSH previamente verificado, ligado somente a `127.0.0.1`. Fixe a chave pública do VPS em `known_hosts`, restrinja a chave temporária ao serviço web/API confirmado e proíba comandos. A identidade HTTPS canônica e a validação da clínica permanecem iguais nos journals. Não desative verificação de certificados; remova o encaminhamento e revogue a chave temporária ao terminar.
 
 `--include-appointment-types` importa os nomes de tipos de agendamento após consultar os excluídos. A duração original fica no mapeamento privado, pois o tipo no destino não possui esse campo. Não cria consultas nem interpreta códigos de status.
+
+A cópia limita os arquivos em trânsito a cerca de 8 MiB no total; um arquivo maior ocupa o limite sozinho. Isso permite concorrência para arquivos pequenos sem enfileirar dezenas de arquivos grandes na conexão. Cada intenção continua durável antes do POST.
