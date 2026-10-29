@@ -15,6 +15,29 @@ public sealed class ClinicalWorkspaceEndpointsTests
     private static Task<HttpClient> Doctor(ApiTestFactory f) => f.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
     private static Task<HttpClient> Admin(ApiTestFactory f) => f.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
 
+    [Theory]
+    [InlineData(600, 600)]
+    [InlineData(1001, 1000)]
+    public async Task Catalog_SupportsImportedLibraries_WhileBoundingResultsAndPreservingVisibility(int sharedCount, int expectedCount)
+    {
+        await using var factory = new ApiTestFactory();
+        using var admin = await Admin(factory);
+        var clinicId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        await factory.WithDbContextAsync(async db =>
+        {
+            db.ClinicalCatalogItems.AddRange(Enumerable.Range(0, sharedCount).Select(index =>
+                new ClinicalCatalogItem { ClinicId = clinicId, Kind = "Document", Folder = "Importados", Title = $"Modelo {index:D4}" }));
+            db.ClinicalCatalogItems.AddRange(
+                new ClinicalCatalogItem { ClinicId = clinicId, Kind = "Document", Folder = "Importados", Title = "Privado", OwnerUserId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc") },
+                new ClinicalCatalogItem { ClinicId = clinicId, Kind = "Document", Folder = "Importados", Title = "Excluido", DeletedAt = DateTimeOffset.UtcNow },
+                new ClinicalCatalogItem { ClinicId = Guid.Parse("22222222-2222-2222-2222-222222222222"), Kind = "Document", Folder = "Importados", Title = "Outra clinica" });
+            await db.SaveChangesAsync();
+        });
+
+        var items = await admin.GetFromJsonAsync<ClinicalCatalogResponse[]>("/clinical-catalog?kind=Document&search=Importados");
+        items!.Should().HaveCount(expectedCount).And.OnlyContain(item => item.Title.StartsWith("Modelo "));
+    }
+
     [Fact]
     public async Task PatientScreen_AllowsClinicalWorkspace_ButNotScheduleOrCatalogManagement()
     {

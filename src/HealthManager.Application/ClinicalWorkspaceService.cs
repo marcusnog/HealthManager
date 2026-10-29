@@ -42,7 +42,7 @@ public sealed class ClinicalWorkspaceService(IApplicationDbContext db, ITenantPr
         var query = Catalog().AsNoTracking();
         if (!string.IsNullOrEmpty(kind)) query = query.Where(x => x.Kind == kind);
         if (!string.IsNullOrWhiteSpace(search)) { var term = search.Trim().ToLower(); query = query.Where(x => x.Title.ToLower().Contains(term) || x.Folder.ToLower().Contains(term)); }
-        return (await query.OrderBy(x => x.Folder).ThenBy(x => x.Title).Take(500).ToListAsync(ct)).Select(CatalogResponse).ToArray();
+        return (await query.OrderBy(x => x.Folder).ThenBy(x => x.Title).Take(1000).ToListAsync(ct)).Select(CatalogResponse).ToArray();
     }
 
     public async Task<ClinicalCatalogResponse> SaveCatalogAsync(Guid? id, SaveClinicalCatalogRequest request, CancellationToken ct)
