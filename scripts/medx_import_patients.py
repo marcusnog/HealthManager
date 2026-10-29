@@ -68,6 +68,9 @@ class Api:
         return json.loads(self.request_bytes(path, json.dumps(data).encode() if data is not None else None))
 
     def request_bytes(self, path, body=None, content_type="application/json"):
+        self.connection.timeout = 120 if content_type.startswith("multipart/") else 45
+        if self.connection.sock:
+            self.connection.sock.settimeout(self.connection.timeout)
         headers = {"Content-Type": content_type, "X-Clinic-Id": self.clinic_id}
         if self.token:
             headers["Authorization"] = "Bearer " + self.token

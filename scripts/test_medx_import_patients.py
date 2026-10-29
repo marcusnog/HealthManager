@@ -143,6 +143,16 @@ class ImportTests(unittest.TestCase):
                 Api("https://example.invalid/backend", "email", "password", "clinic", "Clinic")
             self.assertEqual(1, connection.request.call_count)
 
+    def test_large_upload_timeout_is_bounded_and_reset_for_reads(self):
+        api = object.__new__(Api)
+        api.connection = Mock()
+        api.connection.getresponse.return_value = Mock(status=200, read=Mock(return_value=b"{}"))
+        api.base_path, api.clinic_id, api.token = "/backend", "clinic", "token"
+        api.request_bytes("/upload", b"file", "multipart/form-data; boundary=test")
+        api.connection.sock.settimeout.assert_called_with(120)
+        api.request_bytes("/read")
+        api.connection.sock.settimeout.assert_called_with(45)
+
 
 if __name__ == "__main__":
     unittest.main()
