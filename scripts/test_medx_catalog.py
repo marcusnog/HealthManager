@@ -4,11 +4,34 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from medx_catalog import doctor_candidate, procedure_candidate, exam_candidate, appointment_type_candidate, run
+from medx_catalog import doctor_candidate, procedure_candidate, exam_candidate, appointment_type_candidate, expense_category_candidates, run
 from medx_prepare import sha256, write_json
 
 
 class CatalogTests(unittest.TestCase):
+    def test_expense_categories_require_explicit_parent_type_and_preserve_group(self):
+        groups = [{"Id do Grupo": 0, "Grupo": "Administrativo", "Tipo": "Despesas"},
+                  {"Id do Grupo": 1, "Grupo": "Consultas", "Tipo": "Receitas"}]
+        rows = [{"Id do subgrupo": -1, "Id do grupo": 0, "Subgrupo": "Material"},
+                {"Id do subgrupo": 2, "Id do grupo": 1, "Subgrupo": "Consulta"},
+                {"Id do subgrupo": 3, "Id do grupo": 99, "Subgrupo": "Sem grupo"}]
+        result = expense_category_candidates(rows, groups, [], [], "1")
+        self.assertEqual({"name": "Material"}, result[0]["payload"])
+        self.assertEqual("Administrativo", result[0]["sourceGroupName"])
+        self.assertEqual(["create", "held", "held"], [r["status"] for r in result])
+
+    def test_expense_categories_hold_duplicate_and_deleted_names(self):
+        groups = [{"Id do Grupo": 1, "Tipo": "Despesas"}]
+        row = {"Id do subgrupo": 1, "Id do grupo": 1, "Subgrupo": "Material"}
+        existing = [{"id": "category", "name": "MATERIAL"}]
+        self.assertEqual("linked_existing", expense_category_candidates([row], groups, existing, [], "1")[0]["status"])
+        self.assertEqual("deleted_expense_category", expense_category_candidates([row], groups, existing, existing, "1")[0]["reason"])
+        duplicate = row | {"Id do subgrupo": 2, "Subgrupo": " MATERIAL "}
+        self.assertTrue(all(r["status"] == "held" for r in expense_category_candidates([row, duplicate], groups, [], [], "1")))
+        self.assertTrue(all(r["status"] == "held" for r in expense_category_candidates([row, row], groups, [], [], "1")))
+        with self.assertRaisesRegex(ValueError, "duplicate financial group"):
+            expense_category_candidates([row], groups + groups, [], [], "1")
+
     def test_appointment_types_preserve_duration_without_changing_target_schema(self):
         row = {"Id do Diagnóstico-QP": -10, "Diagnóstico-QP": "Retorno", "Tempo": 40}
         created = appointment_type_candidate(row, [], [], "1")
@@ -64,7 +87,7 @@ class CatalogTests(unittest.TestCase):
         class FakeApi:
             base, clinic_id, clinic_name = "https://example.invalid", "clinic", "Clinic"
             def __init__(self):
-                self.data = {"doctors": [], "products": [], "clinical-catalog": []}
+                self.data = {"doctors": [], "products": [], "clinical-catalog": [], "expense-categories": []}
                 self.posts = 0
             def request(self, path, payload=None):
                 resource = path.split("?", 1)[0].strip("/")
@@ -81,7 +104,9 @@ class CatalogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             stage = Path(folder)
             tables = []
-            for name, rows in [("Usuários.json", [self.doctor()]), ("Procedimentos.json", [self.procedure()]), ("Exames_modelo.json", [self.exam()])]:
+            for name, rows in [("Usuários.json", [self.doctor()]), ("Procedimentos.json", [self.procedure()]), ("Exames_modelo.json", [self.exam()]),
+                               ("Grupos.json", [{"Id do Grupo": 1, "Tipo": "Despesas"}]),
+                               ("Subgrupos.json", [{"Id do subgrupo": 1, "Id do grupo": 1, "Subgrupo": "Material"}])]:
                 write_json(stage / name, rows)
                 tables.append({"name": name, "path": name, "sha256": sha256(stage / name)})
             write_json(stage / "manifest.json", {"subscription": "1", "tables": tables})
@@ -93,6 +118,12 @@ class CatalogTests(unittest.TestCase):
             summary = run(stage, api, True)
             self.assertEqual(3, api.posts)
             self.assertTrue(all(key.endswith(":matched") for key in summary))
+            with self.assertRaisesRegex(ValueError, "Deleted expense categories"):
+                run(stage, api, True, include_expense_categories=True)
+            write_json(stage / "deleted-identities.json", {"clinicId": "clinic", "doctors": [], "products": [], "expenseCategories": []})
+            self.assertEqual(1, run(stage, api, True, include_expense_categories=True)["expense-categories:created"])
+            self.assertEqual(1, run(stage, api, True, include_expense_categories=True)["expense-categories:matched"])
+            self.assertEqual(4, api.posts)
 
 
 if __name__ == "__main__":

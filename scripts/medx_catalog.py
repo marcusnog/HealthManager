@@ -101,6 +101,39 @@ def appointment_type_candidate(row, active, deleted, subscription):
     return result | {"status": "create", "payload": {"name": name}}
 
 
+def expense_category_candidates(subgroups, groups, active, deleted, subscription):
+    parents = {source_id(g.get("Id do Grupo")): g for g in groups}
+    if None in parents or len(parents) != len(groups):
+        raise ValueError("Invalid or duplicate financial group IDs.")
+    identifiers = Counter(source_id(r.get("Id do subgrupo")) for r in subgroups)
+    names = Counter(normalized_name(text(r.get("Subgrupo"))) for r in subgroups
+                    if parents.get(source_id(r.get("Id do grupo")), {}).get("Tipo") == "Despesas")
+    results = []
+    for row in subgroups:
+        identifier, name = source_id(row.get("Id do subgrupo")), text(row.get("Subgrupo"))
+        parent = parents.get(source_id(row.get("Id do grupo")), {})
+        result = {"sourceKey": f"medx:{subscription}:Subgrupos:{identifier}", "resource": "expense-categories",
+                  "status": "held", "sourceGroupId": row.get("Id do grupo"), "sourceGroupName": parent.get("Grupo")}
+        normalized = normalized_name(name)
+        found = [r for r in active if normalized_name(r["name"]) == normalized]
+        if identifier is None or identifiers[identifier] != 1 or not name or len(name) > 100:
+            result["reason"] = "invalid_or_duplicate_expense_category"
+        elif parent.get("Tipo") != "Despesas":
+            result["reason"] = "not_explicit_expense_group"
+        elif names[normalized] != 1:
+            result["reason"] = "duplicate_source_expense_name"
+        elif any(normalized_name(r["name"]) == normalized for r in deleted):
+            result["reason"] = "deleted_expense_category"
+        elif len(found) == 1:
+            result.update(status="linked_existing", targetId=found[0]["id"])
+        elif found:
+            result["reason"] = "ambiguous_expense_category"
+        else:
+            result.update(status="create", payload={"name": name})
+        results.append(result)
+    return results
+
+
 def table(stage, manifest, name):
     info = next(t for t in manifest["tables"] if t["name"] == name)
     path = stage / info["path"]
@@ -126,7 +159,7 @@ def rows(api, resource):
 
 def matches(item, candidate):
     payload = candidate["payload"]
-    if candidate["resource"] == "appointment-types":
+    if candidate["resource"] in ("appointment-types", "expense-categories"):
         return item["name"] == payload["name"]
     if candidate["resource"] == "clinical-catalog":
         return (all(item.get(k) == payload[k] for k in ("kind", "content", "title", "folder"))
@@ -137,7 +170,7 @@ def matches(item, candidate):
     return all(item.get(k) == payload[k] for k in keys)
 
 
-def run(stage, api, apply, include_documents=False, include_appointment_types=False):
+def run(stage, api, apply, include_documents=False, include_appointment_types=False, include_expense_categories=False):
     manifest = json.loads((stage / "manifest.json").read_text(encoding="utf-8"))
     receipt = json.loads((stage / "server-backup-receipt.json").read_text(encoding="utf-8"))
     deleted = json.loads((stage / "deleted-identities.json").read_text(encoding="utf-8"))
@@ -156,6 +189,10 @@ def run(stage, api, apply, include_documents=False, include_appointment_types=Fa
         if "appointmentTypes" not in deleted:
             raise ValueError("Deleted appointment types must be checked first.")
         current["appointment-types"] = rows(api, "appointment-types")
+    if include_expense_categories:
+        if "expenseCategories" not in deleted:
+            raise ValueError("Deleted expense categories must be checked first.")
+        current["expense-categories"] = rows(api, "expense-categories")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     write_json(directory / ("before-" + stamp + ".json"), current)
     subscription = manifest["subscription"]
@@ -169,6 +206,9 @@ def run(stage, api, apply, include_documents=False, include_appointment_types=Fa
     if include_appointment_types:
         candidates += [appointment_type_candidate(r, current["appointment-types"], deleted["appointmentTypes"], subscription)
                        for r in table(stage, manifest, "Diagnóstico-QP.json")]
+    if include_expense_categories:
+        candidates += expense_category_candidates(table(stage, manifest, "Subgrupos.json"),
+            table(stage, manifest, "Grupos.json"), current["expense-categories"], deleted["expenseCategories"], subscription)
     journal = directory / "journal.ndjson"
     events = [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines()] if journal.exists() else []
     previous = {e["sourceKey"]: e for e in events}
@@ -242,7 +282,9 @@ if __name__ == "__main__":
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--include-document-templates", action="store_true")
     parser.add_argument("--include-appointment-types", action="store_true")
+    parser.add_argument("--include-expense-categories", action="store_true")
     args = parser.parse_args()
     password = os.environ.get("HEALTHMANAGER_IMPORT_PASSWORD") or getpass.getpass("HealthManager password: ")
     api = Api(args.base_url, args.email, password, args.clinic_id, args.clinic_name)
-    print(json.dumps(run(args.stage, api, args.apply, args.include_document_templates, args.include_appointment_types)), flush=True)
+    print(json.dumps(run(args.stage, api, args.apply, args.include_document_templates, args.include_appointment_types,
+                         args.include_expense_categories)), flush=True)

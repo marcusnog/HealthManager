@@ -59,4 +59,6 @@ Quando o endereço público limitar a carga, `HEALTHMANAGER_SSH_TUNNEL_PORT` per
 
 `--include-appointment-types` importa os nomes de tipos de agendamento após consultar os excluídos. A duração original fica no mapeamento privado, pois o tipo no destino não possui esse campo. Não cria consultas nem interpreta códigos de status.
 
+`--include-expense-categories` importa somente subgrupos de pais explicitamente classificados como `Despesas`, após consultar categorias ativas e excluídas. Nomes duplicados ou ambíguos ficam pendentes; o grupo original permanece no mapeamento privado. Não cria lançamentos, pagamentos ou saldos.
+
 A cópia limita os arquivos em trânsito a cerca de 8 MiB no total; um arquivo maior ocupa o limite sozinho. Isso permite concorrência para arquivos pequenos sem enfileirar dezenas de arquivos grandes na conexão. Cada intenção continua durável antes do POST.
