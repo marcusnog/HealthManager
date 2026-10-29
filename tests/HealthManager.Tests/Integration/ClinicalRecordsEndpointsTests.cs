@@ -33,11 +33,13 @@ public sealed class ClinicalRecordsEndpointsTests
         history.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
-    public async Task Doctor_ShouldSaveReadAndClearFreeText_WithoutChangingLegacyFields()
+    [Theory]
+    [InlineData("henrique.lima@clinicaaurora.com")]
+    [InlineData("admin@clinicaaurora.com")]
+    public async Task Staff_ShouldSaveReadAndClearFreeText_WithoutChangingLegacyFields(string email)
     {
         await using var factory = new ApiTestFactory();
-        using var client = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
+        using var client = await factory.CreateAuthenticatedClientAsync(email, "ChangeMe123!");
         var url = $"/appointments/{AppointmentId}/clinical-record";
         var created = await client.PostAsJsonAsync(url, new
         {
@@ -53,7 +55,8 @@ public sealed class ClinicalRecordsEndpointsTests
         saved.GetProperty("content").GetString().Should().Be("Revisado");
         saved.GetProperty("prescription").GetString().Should().Be("");
         saved.GetProperty("chiefComplaint").GetString().Should().Be("Queixa anterior");
-        await client.PostAsync($"{url}/finalize", null);
+        using var doctor = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
+        (await doctor.PostAsync($"{url}/finalize", null)).EnsureSuccessStatusCode();
         var rejected = await client.PatchAsJsonAsync(url, new { content = "Alteracao", prescription = "Alteracao" });
         rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -164,7 +167,7 @@ public sealed class ClinicalRecordsEndpointsTests
     }
 
     [Fact]
-    public async Task Admin_ShouldNotCreateClinicalRecord()
+    public async Task Admin_ShouldCreateDraft_PreservingDoctor_WithoutFinalizationPermission()
     {
         await using var factory = new ApiTestFactory();
         using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
@@ -174,7 +177,11 @@ public sealed class ClinicalRecordsEndpointsTests
             chiefComplaint = "Tentativa sem medico"
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var record = await response.Content.ReadFromJsonAsync<ClinicalRecordHttpResponse>();
+        record!.DoctorId.Should().Be(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"));
+        (await client.PostAsync($"/appointments/{AppointmentId}/clinical-record/finalize", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.PostAsJsonAsync($"/appointments/{AppointmentId}/clinical-record/addendum", new { content = "Adendo" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -187,6 +194,53 @@ public sealed class ClinicalRecordsEndpointsTests
         var response = await client.PostAsJsonAsync($"/appointments/{AppointmentId}/clinical-record/addendum", new { content = "Correcao" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory]
+    [InlineData(UserRole.Secretary)]
+    [InlineData(UserRole.Doctor)]
+    public async Task OtherStaff_ShouldNotCreateOrEditClinicalContent(UserRole role)
+    {
+        await using var factory = new ApiTestFactory();
+        await factory.WithDbContextAsync(async db =>
+        {
+            var owner = await db.Users.SingleAsync(x => x.Id == DoctorUserId);
+            db.Users.Add(new User { ClinicId = owner.ClinicId, Name = "Outro usuario",
+                Email = "outro@clinicaaurora.com", PasswordHash = owner.PasswordHash, Role = role });
+            if (role == UserRole.Doctor)
+                db.Doctors.Add(new Doctor { ClinicId = owner.ClinicId, Name = "Outro medico", Email = "outro@clinicaaurora.com", Crm = "CRM-SP-123456" });
+            await db.SaveChangesAsync();
+        });
+        using var client = await factory.CreateAuthenticatedClientAsync("outro@clinicaaurora.com", "ChangeMe123!");
+        var url = $"/appointments/{AppointmentId}/clinical-record";
+        (await client.PostAsJsonAsync(url, new { content = "Texto", prescription = "Receita" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        using var admin = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        (await admin.PostAsJsonAsync(url, new { content = "Texto" })).EnsureSuccessStatusCode();
+        (await client.PatchAsJsonAsync(url, new { content = "Alterado", prescription = "Receita" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.PostAsJsonAsync($"/appointments/{AppointmentId}/clinical-entries", new HealthManager.Application.CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Receita", "Texto", null))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Admin_ShouldNotWriteAnotherClinicsClinicalContent()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        await factory.SeedSecondClinicPatientAsync();
+        var foreignAppointmentId = Guid.NewGuid();
+        var foreignClinicId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        await factory.WithDbContextAsync(async db =>
+        {
+            var appointment = new Appointment { Id = foreignAppointmentId, ClinicId = foreignClinicId,
+                PatientId = Guid.Parse("99999999-9999-9999-9999-999999999999"), DoctorId = Guid.NewGuid() };
+            db.Appointments.Add(appointment);
+            db.ClinicalRecords.Add(new ClinicalRecord { ClinicId = foreignClinicId, AppointmentId = appointment.Id,
+                PatientId = appointment.PatientId, DoctorId = appointment.DoctorId, Content = "Privado" });
+            await db.SaveChangesAsync();
+        });
+        var url = $"/appointments/{foreignAppointmentId}/clinical-record";
+        (await client.PostAsJsonAsync(url, new { content = "Texto" })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PatchAsJsonAsync(url, new { prescription = "Receita" })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PostAsJsonAsync($"/appointments/{foreignAppointmentId}/clinical-entries", new HealthManager.Application.CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Receita", "Texto", null))).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

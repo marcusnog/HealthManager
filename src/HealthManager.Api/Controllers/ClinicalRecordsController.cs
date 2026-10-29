@@ -18,7 +18,7 @@ public sealed class ClinicalRecordsController(ClinicalRecordService service) : C
     }
 
     [HttpPost]
-    [Authorize(Policy = "DoctorOnly")]
+    [Authorize(Policy = "ClinicAdminOrDoctor")]
     public async Task<ActionResult<ClinicalRecordResponse>> Create(Guid appointmentId, [FromBody] CreateClinicalRecordRequest request, CancellationToken ct)
     {
         var response = await service.CreateAsync(appointmentId, request, ct);
@@ -26,7 +26,7 @@ public sealed class ClinicalRecordsController(ClinicalRecordService service) : C
     }
 
     [HttpPatch]
-    [Authorize(Policy = "DoctorOnly")]
+    [Authorize(Policy = "ClinicAdminOrDoctor")]
     public async Task<ActionResult<ClinicalRecordResponse>> Update(Guid appointmentId, [FromBody] UpdateClinicalRecordRequest request, CancellationToken ct)
         => Ok(await service.UpdateAsync(appointmentId, request, ct));
 

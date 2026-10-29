@@ -46,10 +46,12 @@ public sealed class ClinicalWorkspaceEndpointsTests
         (await admin.DeleteAsync($"/clinical-catalog/{shared.Id}?revision={shared.Revision}")).StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
-    [Fact]
-    public async Task Documents_AreSnapshots_Idempotent_AndFinalizationBlocksNewEntries()
+    [Theory]
+    [InlineData("henrique.lima@clinicaaurora.com")]
+    [InlineData("admin@clinicaaurora.com")]
+    public async Task Documents_AreSnapshots_Idempotent_AndFinalizationBlocksNewEntries(string email)
     {
-        await using var f = new ApiTestFactory(); using var doctor = await Doctor(f);
+        await using var f = new ApiTestFactory(); using var doctor = await f.CreateAuthenticatedClientAsync(email, "ChangeMe123!");
         (await doctor.PostAsJsonAsync($"/appointments/{Appointment}/clinical-record", new { chiefComplaint = "Acompanhamento" })).EnsureSuccessStatusCode();
         var template = await (await doctor.PostAsJsonAsync("/clinical-catalog", Model())).Content.ReadFromJsonAsync<ClinicalCatalogResponse>();
         var request = new CreateClinicalEntryRequest(Guid.NewGuid(), "Document", template!.Id, "Orientações", "Paciente: {{paciente}}", null, "DigitalMock");
@@ -62,18 +64,21 @@ public sealed class ClinicalWorkspaceEndpointsTests
         (await doctor.PutAsJsonAsync($"/clinical-catalog/{template.Id}", Model() with { Content = "Alterado", Revision = template.Revision })).EnsureSuccessStatusCode();
         var entries = await doctor.GetFromJsonAsync<ClinicalEntryResponse[]>($"/appointments/{Appointment}/clinical-entries");
         entries!.Should().ContainSingle().Which.Content.Should().Be(entry.Content);
-        (await doctor.PostAsync($"/appointments/{Appointment}/clinical-record/finalize", null)).EnsureSuccessStatusCode();
+        var correction = await doctor.PostAsJsonAsync($"/appointments/{Appointment}/clinical-entries", request with { ClientRequestId = Guid.NewGuid(), CorrectsEntryId = entry.Id, Content = "Corrigido" });
+        correction.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var owner = await Doctor(f);
+        (await owner.PostAsync($"/appointments/{Appointment}/clinical-record/finalize", null)).EnsureSuccessStatusCode();
         (await doctor.PostAsJsonAsync($"/appointments/{Appointment}/clinical-entries", request with { ClientRequestId = Guid.NewGuid() })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await doctor.PostAsJsonAsync($"/appointments/{Appointment}/clinical-entries", request)).StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     [Fact]
-    public async Task Entries_RejectCrossTenantPatients_AndAdminWrites()
+    public async Task Entries_RejectCrossTenantPatients_AndWritesWithoutDraft()
     {
         await using var f = new ApiTestFactory(); using var doctor = await Doctor(f); using var admin = await Admin(f);
         await f.SeedSecondClinicPatientAsync();
         (await doctor.GetAsync("/patients/99999999-9999-9999-9999-999999999999/clinical-entries")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await admin.PostAsJsonAsync($"/appointments/{Appointment}/clinical-entries", new CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Teste", "Texto", null))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await admin.PostAsJsonAsync($"/appointments/{Appointment}/clinical-entries", new CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Teste", "Texto", null))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         await f.WithDbContextAsync(async db => { db.ClinicalCatalogItems.Add(new ClinicalCatalogItem { ClinicId = Guid.Parse("22222222-2222-2222-2222-222222222222"), Title = "Segredo" }); await db.SaveChangesAsync(); });
         (await admin.GetFromJsonAsync<ClinicalCatalogResponse[]>("/clinical-catalog"))!.Should().NotContain(x => x.Title == "Segredo");
     }

@@ -32,7 +32,7 @@ public sealed class ClinicalEntriesController(ClinicalWorkspaceService service) 
     [HttpGet("patients/{patientId:guid}/clinical-entries")]
     public async Task<ActionResult<PagedResult<ClinicalEntryResponse>>> History(Guid patientId, CancellationToken ct, int page = 1, int pageSize = 50, string? kind = null) => Ok(await service.ListPatientAsync(patientId, page, pageSize, kind, ct));
     [HttpPost("appointments/{appointmentId:guid}/clinical-entries")]
-    [Authorize(Policy = "DoctorOnly")]
+    [Authorize(Policy = "ClinicAdminOrDoctor")]
     public async Task<ActionResult<ClinicalEntryResponse>> Create(Guid appointmentId, CreateClinicalEntryRequest request, CancellationToken ct)
     {
         var result = await service.CreateEntryAsync(appointmentId, request, ct);

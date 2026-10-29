@@ -146,7 +146,7 @@ public sealed class ClinicalWorkspaceService(IApplicationDbContext db, ITenantPr
     }
     private async Task<Appointment> AppointmentAsync(Guid id, bool write, CancellationToken ct)
     {
-        if (write && tenant.Role != UserRole.Doctor) throw new ForbiddenAccessException("Somente o médico responsável pode registrar conteúdo clínico.");
+        if (write && tenant.Role is not (UserRole.Admin or UserRole.Doctor)) throw new ForbiddenAccessException("Somente o administrador ou o médico responsável pode registrar conteúdo clínico.");
         var appointment = await db.Appointments.Include(x => x.Patient).Include(x => x.Doctor).FirstOrDefaultAsync(x => x.ClinicId == Clinic && x.Id == id, ct) ?? throw new KeyNotFoundException("Consulta não encontrada.");
         if (tenant.Role == UserRole.Doctor && await DoctorIdAsync(ct) != appointment.DoctorId) throw new ForbiddenAccessException("Consulta de outro profissional.");
         return appointment;

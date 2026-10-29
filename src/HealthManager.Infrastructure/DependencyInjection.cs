@@ -111,6 +111,7 @@ services.AddAuthorization(options =>
             options.AddPolicy("ClinicAdminOrSecretary", policy => policy.RequireRole(UserRole.Admin.ToString(), UserRole.Secretary.ToString()));
             options.AddPolicy("ClinicAdmin", policy => policy.RequireRole(UserRole.Admin.ToString()));
             options.AddPolicy("ClinicStaff", policy => policy.RequireRole(UserRole.Admin.ToString(), UserRole.Secretary.ToString(), UserRole.Doctor.ToString()));
+            options.AddPolicy("ClinicAdminOrDoctor", policy => policy.RequireRole(UserRole.Admin.ToString(), UserRole.Doctor.ToString()));
             options.AddPolicy("DoctorOnly", policy => policy.RequireRole(UserRole.Doctor.ToString()));
             options.AddPolicy("PatientPortal", policy => policy.RequireRole(UserRole.Patient.ToString()));
 

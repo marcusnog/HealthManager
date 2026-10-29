@@ -144,8 +144,8 @@ TenantSettings:
 
 ClinicalRecords:
   GET /appointments/{appointmentId}/clinical-record: "-> ClinicalRecordResponse [ClinicStaff]"
-  POST /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan?, content?, prescription? } -> 201 ClinicalRecordResponse [DoctorOnly]"
-  PATCH /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan?, content?, prescription? } -> ClinicalRecordResponse [DoctorOnly]"
+  POST /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan?, content?, prescription? } -> 201 ClinicalRecordResponse [ClinicAdminOrDoctor]"
+  PATCH /appointments/{appointmentId}/clinical-record: "{ chiefComplaint?, history?, physicalExam?, assessment?, plan?, content?, prescription? } -> ClinicalRecordResponse [ClinicAdminOrDoctor]"
   POST /appointments/{appointmentId}/clinical-record/finalize: "-> ClinicalRecordResponse [DoctorOnly]"
   POST /appointments/{appointmentId}/clinical-record/addendum: "{ content } -> 201 ClinicalRecordAddendumResponse [DoctorOnly]"
   GET /appointments/{appointmentId}/clinical-record/addendums: "-> ClinicalRecordAddendumResponse[] [ClinicStaff]"
@@ -196,5 +196,5 @@ ClinicalWorkspace:
   PUT /clinical-catalog/{id}: "SaveClinicalCatalogRequest (revision required) -> ClinicalCatalogResponse [Admin/Doctor; shared+own; conflict 409]"
   DELETE /clinical-catalog/{id}: "?revision -> 204 (soft delete; conflict 409) [Admin/Doctor; shared+own]"
   GET /appointments/{appointmentId}/clinical-entries: "-> ClinicalEntryResponse[] (appointment entries) [ClinicStaff; owning Doctor]"
-  POST /appointments/{appointmentId}/clinical-entries: "CreateClinicalEntryRequest -> 201 ClinicalEntryResponse [DoctorOnly; owner; Draft]"
+  POST /appointments/{appointmentId}/clinical-entries: "CreateClinicalEntryRequest -> 201 ClinicalEntryResponse [ClinicAdminOrDoctor; Admin or owning Doctor; Draft]"
   GET /patients/{patientId}/clinical-entries: "?page=1,pageSize=50,kind? -> PagedResult<ClinicalEntryResponse> [ClinicStaff; Doctor own entries only]"

@@ -149,7 +149,7 @@ There is no global `/api` prefix or API versioning. Major route groups are:
 | Auth/provisioning | `/auth/*`, `/internal/clinics/*` | Anonymous/JWT or `PlatformAdminOnly` |
 | Patients/portal | `/patients/*`, `/portal/*` | `ClinicStaff`, Admin/Secretary, Doctor, or `PatientPortal` by action |
 | Scheduling | `/doctors`, `/appointments`, `/appointment-types`, availability and catalog routes | Clinic role policies |
-| Clinical records | `/appointments/{id}/clinical-record*` | Staff read; Doctor write/finalize/addendum |
+| Clinical records | `/appointments/{id}/clinical-record*` | Staff read; Admin/owning Doctor create/edit drafts; owning Doctor finalize/addendum |
 | Finance | `/financial/*`, `/expense-categories` | Granular `permission` claims |
 | Checkout | `/payment-intents`, `/checkout`, `/portal/checkout` | Clinic staff/admin or patient portal |
 | Integrations | `/tenant/integration/*`, `/whatsapp/*`, `/webhooks/payments/*` | Admin/staff or anonymous webhook validation |

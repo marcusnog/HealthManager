@@ -8,12 +8,12 @@ catalog:
 events:
   kinds: [Document, ExamOrder, ExamResult, Anamnesis, Questionnaire, Nutrition, Summary]
   immutable: "Entries are append-only snapshots. Template edits/deletion never affect existing entries. Corrections are new entries with CorrectsEntryId referencing the same appointment and kind."
-  access: "Admin/Secretary read clinic entries; Doctor reads/writes only own appointments. Personal catalog entries cannot be used by another user."
+  access: "Admin reads/writes clinic entries; Secretary reads clinic entries; Doctor reads/writes only own appointments. Personal catalog entries cannot be used by another user."
   access_errors: "Missing doctor linkage and ownership/role denials return HTTP 403, preserving the authenticated session. HTTP 401 is reserved for missing/invalid authentication."
-  write: "DoctorOnly, owning doctor, Draft clinical record required. No new entries/corrections after finalization; use existing clinical record addendum instead. No implicit appointment completion."
+  write: "ClinicAdminOrDoctor, clinic Admin or owning Doctor, Draft clinical record required. No new entries/corrections after finalization; use existing clinical record addendum instead. No implicit appointment completion."
   summary: "Summary is a structured clinical event; latest visible Summary for this patient is shown alongside its date/author, preserving history. Doctors see only their own entries."
   forms: "Catalog fields are snapshotted at submission; reject unknown fields, enforce required/type/ranges, max 100 values each max 10000 chars. UI derives weighted sum from answered fields with explicit weight (Boolean true=1,false=0); absent answers not scored. Alerts display only explicit clinician-configured numeric bounds; no diagnostic interpretation or seeded medical thresholds."
-  documents: "Doctor reviews content before saving immutable document. SignatureMode Paper or DigitalMock. Paper includes signature area; DigitalMock always carries an explicit simulation watermark, no legal validity, no Signed state, no external provider call. Mock explicitly requested by user."
+  documents: "Admin or owning Doctor reviews content before saving immutable document. SignatureMode Paper or DigitalMock. Paper includes signature area; DigitalMock always carries an explicit simulation watermark, no legal validity, no Signed state, no external provider call. Mock explicitly requested by user."
   idempotency: "ClientRequestId is required, unique per clinic+appointment. Retry returns the existing entry only when author matches; no duplicate events."
 integrations:
   digital_signature: "User authorized DigitalMock only; never represent it as a real digital signature."

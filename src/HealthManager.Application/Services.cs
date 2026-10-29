@@ -1714,8 +1714,8 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
             ?? throw new KeyNotFoundException("Consulta nao encontrada.");
 
         var doctorId = await ResolveDoctorIdAsync(cancellationToken);
-        if (doctorId is null || appointment.DoctorId != doctorId)
-            throw new ForbiddenAccessException("Apenas o medico responsavel pode criar o atendimento.");
+        if (tenantProvider.Role != UserRole.Admin && (tenantProvider.Role != UserRole.Doctor || doctorId is null || appointment.DoctorId != doctorId))
+            throw new ForbiddenAccessException("Apenas o administrador ou o medico responsavel pode criar o atendimento.");
 
         if (await dbContext.ClinicalRecords.AnyAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken))
             throw new InvalidOperationException("Atendimento ja existe para esta consulta.");
@@ -1755,8 +1755,8 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
             throw new InvalidOperationException("Atendimento finalizado nao pode ser alterado.");
 
         var doctorId = await ResolveDoctorIdAsync(cancellationToken);
-        if (doctorId is null || record.DoctorId != doctorId)
-            throw new ForbiddenAccessException("Apenas o medico responsavel pode editar o atendimento.");
+        if (tenantProvider.Role != UserRole.Admin && (tenantProvider.Role != UserRole.Doctor || doctorId is null || record.DoctorId != doctorId))
+            throw new ForbiddenAccessException("Apenas o administrador ou o medico responsavel pode editar o atendimento.");
 
         if (request.ChiefComplaint is not null) record.ChiefComplaint = request.ChiefComplaint;
         if (request.History is not null) record.History = request.History;
