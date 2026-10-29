@@ -4,6 +4,7 @@ import hashlib
 import base64
 import json
 import os
+import ipaddress
 from pathlib import Path
 import subprocess
 
@@ -36,6 +37,7 @@ metrics = subprocess.run(["k3s", "kubectl", "-n", "healthmanager", "top", "pods"
 if metrics.returncode == 0:
     print(metrics.stdout)
 
+
 assert connection.get("Host") == "postgres.healthmanager.svc.cluster.local"
 assert connection.get("Database") == "healthmanager"
 clinic_id = "11111111-1111-1111-1111-111111111111"
@@ -53,6 +55,22 @@ if query.returncode:
     raise RuntimeError("Tenant aggregate check failed; no backup or import performed.")
 counts = json.loads(query.stdout)
 assert counts["clinicName"] == "Clinica Piloto" and counts["activePatients"] >= 2034
+
+# Temporary key permits only forwarding to the existing web/API service, never a shell.
+service = json.loads(command("k3s", "kubectl", "-n", "healthmanager", "get", "service", "web", "-o", "json"))
+service_ip = service["spec"]["clusterIP"]
+assert ipaddress.ip_address(service_ip).is_private and any(p["port"] == 80 for p in service["spec"]["ports"])
+key = Path("/opt/healthmanager-backups/medx-20261029/tunnel.pub").read_text().strip()
+assert key.startswith("ssh-ed25519 ") and " medx-import-" in key and "\n" not in key
+authorized = Path("/root/.ssh/authorized_keys")
+lines = authorized.read_text().splitlines() if authorized.exists() else []
+lines = [line for line in lines if key.split()[1] not in line.split()]
+lines.append(f'restrict,port-forwarding,permitopen="{service_ip}:80",command="false" ' + key)
+authorized.write_text("\n".join(lines) + "\n")
+authorized.chmod(0o600)
+print("MEDX_TUNNEL " + json.dumps({"host": "157.254.207.208", "serviceIp": service_ip, "servicePort": 80,
+    "hostKey": Path("/etc/ssh/ssh_host_ed25519_key.pub").read_text().strip()}))
+
 os.umask(0o077)
 directory = Path("/opt/healthmanager-backups/medx-20261029")
 directory.mkdir(parents=True, exist_ok=True)
