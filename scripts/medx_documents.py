@@ -189,7 +189,8 @@ def run(stage, source, api, password, seven_zip, limit, workers, verify_on_serve
         try:
             documents = client.request("/patients/" + candidates[0]["targetPatientId"] + "/documents")
             for candidate in candidates:
-                if stop.is_set():
+                if stop.is_set() or (directory / "pause.request").exists():
+                    stop.set()
                     return
                 if time.monotonic() - local.last_login > 900:
                     client.login()
@@ -231,8 +232,8 @@ if __name__ == "__main__":
     parser.add_argument("--verify-on-server", action="store_true")
     parser.add_argument("--seven-zip", type=Path, default=Path(r"C:\Program Files\7-Zip\7z.exe"))
     args = parser.parse_args()
-    if args.limit < 1 or not 1 <= args.workers <= 8:
-        parser.error("Positive limit and 1..8 workers required.")
+    if args.limit < 1 or not 1 <= args.workers <= 16:
+        parser.error("Positive limit and 1..16 workers required.")
     credential = os.environ.get("HEALTHMANAGER_IMPORT_PASSWORD") or getpass.getpass("HealthManager password: ")
     password = os.environ.get("MEDX_BACKUP_PASSWORD") or getpass.getpass("Backup password: ")
     api = Api(args.base_url, args.email, credential, args.clinic_id, args.clinic_name)

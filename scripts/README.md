@@ -43,7 +43,7 @@ Após obter um backup verificado do banco e as identidades excluídas do tenant,
 
 `medx_catalog.py` prepara profissionais, procedimentos como itens de aplicação e modelos de exames. Usa os mesmos argumentos de destino do importador de pacientes; `--apply` executa o plano. Não cria contas de acesso, não altera os cadastros anteriores e não converte referências clínicas em limites automáticos. O único percentual financeiro atribuído a novos médicos é o padrão do sistema (100% clínica), que deve ser revisto antes de utilizar o profissional em cobranças. Os modelos indicam que as referências importadas precisam de revisão clínica.
 
-`medx_documents.py` recebe os mesmos argumentos de destino, `--stage`, `--source` (ZIPs), `--limit` e `--workers` (1 a 8). Copia os PDFs/JPEGs/PNGs originais para os pacientes comprovados pelo journal e pela API. Exige backup recente e armazenamento persistente previamente conferido. Verifica hash do ZIP, CRC/tamanho do membro, limite multipart e hash do download após cada envio. A senha do backup vem do prompt ou de `MEDX_BACKUP_PASSWORD`.
+`medx_documents.py` recebe os mesmos argumentos de destino, `--stage`, `--source` (ZIPs), `--limit` e `--workers` (1 a 16). Copia os PDFs/JPEGs/PNGs originais para os pacientes comprovados pelo journal e pela API. Exige backup recente e armazenamento persistente previamente conferido. Verifica hash do ZIP, CRC/tamanho do membro, limite multipart e hash do download após cada envio. A senha do backup vem do prompt ou de `MEDX_BACKUP_PASSWORD`.
 
 Os arquivos recebem prefixo MedX; data/autoria impressas no original permanecem intactas. A data de inclusão no HealthManager é a da importação. Isso não cria um prontuário nativo, não atribui autoria a um médico do destino e não produz nova assinatura.
 
@@ -52,3 +52,5 @@ Arquivos referenciados por mais de um paciente, formatos não suportados e resul
 Com `--verify-on-server`, o envio fica marcado como `uploaded` até a conferência independente dos bytes persistidos. Execute `medx_verify_server.py` com o relatório criptografado do servidor para promover apenas arquivos com identidade, tamanho e SHA-256 conferidos. Não execute essa reconciliação durante um lote ativo.
 
 `medx_catalog.py --include-document-templates` inclui modelos explicitamente compartilhados e de HTML simples. Mantém a hierarquia de pastas e a proveniência; retém modelos privados, ricos, com placeholders ou acima dos limites. Aplique somente após disponibilizar o limite de catálogo de 1000 itens. A formatação convertida deve ser revisada antes do uso clínico.
+
+Para pausar um lote, crie `document-import/pause.request` no staging. O importador termina as requisições em curso e para antes do próximo arquivo; espere o processo encerrar e confira que não há intenções pendentes. Remova esse arquivo somente ao retomar. A verificação de relatórios criptografados também requer o pacote Python `cryptography`.
