@@ -93,3 +93,37 @@ encrypted = subprocess.run(["openssl", "cms", "-encrypt", "-binary", "-aes256", 
 if encrypted.returncode:
     raise RuntimeError("Identity encryption failed; no identity data released.")
 print("MEDX_ENCRYPTED_IDENTITIES " + base64.b64encode(encrypted.stdout).decode())
+
+# Resolve the existing documents PVC; read only this tenant's migration-prefixed files.
+pvc = json.loads(command("k3s", "kubectl", "-n", "healthmanager", "get", "pvc", "documents", "-o", "json"))
+pv = json.loads(command("k3s", "kubectl", "get", "pv", pvc["spec"]["volumeName"], "-o", "json"))
+root = Path(pv["spec"]["hostPath"]["path"]).resolve()
+sql = '''SELECT coalesce(json_agg(json_build_object('documentId',"Id",'patientId',"PatientId",'fileName',"FileName",'size',"SizeInBytes",'path',"StoragePath")),'[]'::json)
+FROM "PatientDocuments" WHERE "ClinicId"='11111111-1111-1111-1111-111111111111'
+AND "DeletedAt" IS NULL AND "FileName" LIKE 'medx16925-%';'''
+query = subprocess.run(["k3s", "kubectl", "-n", "healthmanager", "exec", "-i", "postgres-0", "--",
+    "sh", "-c", 'exec psql -X -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d healthmanager'],
+    input=sql.encode(), capture_output=True)
+if query.returncode:
+    raise RuntimeError("Document inventory query failed.")
+inventory = json.loads(query.stdout)
+verified = []
+for row in inventory:
+    expected = f"clinics/{clinic_id}/patients/{row['patientId']}/{row['fileName']}"
+    path = (root / row["path"]).resolve()
+    if row["path"] != expected or not path.is_relative_to(root) or not path.is_file():
+        raise RuntimeError("Document storage path or file is inconsistent.")
+    if path.stat().st_size != row["size"]:
+        raise RuntimeError("Document byte count differs from database.")
+    with path.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    verified.append({k: v for k, v in row.items() if k != "path"} | {"sha256": digest})
+for offset in range(0, len(verified), 100):
+    payload = json.dumps({"clinicId": clinic_id, "offset": offset, "total": len(verified),
+                          "files": verified[offset:offset + 100]}).encode()
+    encrypted = subprocess.run(["openssl", "cms", "-encrypt", "-binary", "-aes256", "-outform", "DER",
+        str(directory / "recipient.pem")], input=payload, capture_output=True)
+    if encrypted.returncode:
+        raise RuntimeError("Integrity report encryption failed.")
+    print("MEDX_ENCRYPTED_FILE_HASHES " + base64.b64encode(encrypted.stdout).decode())
+print("MEDX_VERIFIED_FILE_COUNT " + str(len(verified)))
