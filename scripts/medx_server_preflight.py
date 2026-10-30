@@ -69,11 +69,10 @@ assert key.startswith("ssh-ed25519 ") and " medx-import-" in key and "\n" not in
 authorized = Path("/root/.ssh/authorized_keys")
 lines = authorized.read_text().splitlines() if authorized.exists() else []
 lines = [line for line in lines if key.split()[1] not in line.split()]
-lines.append(f'restrict,port-forwarding,permitopen="{service_ip}:{service_port}",command="false" ' + key)
 authorized.write_text("\n".join(lines) + "\n")
 authorized.chmod(0o600)
-print("MEDX_TUNNEL " + json.dumps({"host": "157.254.207.208", "serviceIp": service_ip, "servicePort": service_port,
-    "hostKey": Path("/etc/ssh/ssh_host_ed25519_key.pub").read_text().strip()}))
+assert all(key.split()[1] not in line.split() for line in authorized.read_text().splitlines())
+print("MEDX_TUNNEL_REVOKED")
 
 os.umask(0o077)
 directory = Path("/opt/healthmanager-backups/medx-20261029")
