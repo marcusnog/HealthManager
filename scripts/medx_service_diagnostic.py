@@ -74,6 +74,7 @@ if pods.get("exitCode") == 0:
             if namespace != "healthmanager":
                 continue
             execute = base[:-1]
+            print(json.dumps({"tailscaleVersion": command(base + ["version"]), "image": container["image"]}))
             print(json.dumps({"proxyHealth": command(execute + ["wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:8081/backend/health"])}))
             print(json.dumps({"tailscaleDeployment": {
                 "volumes": pod["spec"].get("volumes"), "mounts": container.get("volumeMounts"),
