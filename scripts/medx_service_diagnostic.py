@@ -1,6 +1,7 @@
 """Read-only service and public-access diagnostics; never print credentials or patient data."""
 import json
 import subprocess
+import socket
 
 
 def command(args):
@@ -14,6 +15,15 @@ def command(args):
 
 
 state = command(["tailscale", "status", "--json"])
+public_host = "healthmanager.tailafcfbf.ts.net"
+addresses = sorted({item[4][0] for item in socket.getaddrinfo(public_host, 443, socket.AF_INET, socket.SOCK_STREAM)})
+print(json.dumps({"publicIPv4": addresses}))
+for address in addresses:
+    print(json.dumps({"publicRelay": address, "probe": command([
+        "curl", "-sS", "-o", "/dev/null", "--resolve", f"{public_host}:443:{address}",
+        "--connect-timeout", "4", "--max-time", "8", "-w",
+        "http=%{http_code} connect=%{time_connect} tls=%{time_appconnect} total=%{time_total}",
+        f"https://{public_host}/backend/health"])}))
 if state.get("exitCode") == 0:
     value = json.loads(state["output"])
     state = {"backendState": value.get("BackendState"), "online": value.get("Self", {}).get("Online"),
