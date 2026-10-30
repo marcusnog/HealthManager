@@ -1297,6 +1297,7 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DeletedAt")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DestinationBank")
@@ -1309,6 +1310,7 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("OwnerSettledAt")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("PaidAt")
@@ -1318,6 +1320,7 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("ProfessionalPaidAt")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("ProfessionalPayableAmount")
@@ -1462,6 +1465,7 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("OriginalAmount")
+                        .IsConcurrencyToken()
                         .HasColumnType("numeric");
 
                     b.Property<Guid?>("PatientId")
@@ -1471,9 +1475,11 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("ReceivedAmount")
+                        .IsConcurrencyToken()
                         .HasColumnType("numeric");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("UpdatedAt")

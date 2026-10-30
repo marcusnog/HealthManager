@@ -53,6 +53,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         modelBuilder.Entity<ClinicalEntry>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<ClinicalCatalogItem>().Property(x => x.Revision).IsConcurrencyToken();
         modelBuilder.Entity<ClinicalRecord>().Property(x => x.UpdatedAt).IsConcurrencyToken();
+        modelBuilder.Entity<Receivable>().Property(x => x.ReceivedAmount).IsConcurrencyToken();
+        modelBuilder.Entity<Receivable>().Property(x => x.OriginalAmount).IsConcurrencyToken();
+        modelBuilder.Entity<Receivable>().Property(x => x.Status).IsConcurrencyToken();
+        modelBuilder.Entity<Payment>().Property(x => x.DeletedAt).IsConcurrencyToken();
+        modelBuilder.Entity<Payment>().Property(x => x.ProfessionalPaidAt).IsConcurrencyToken();
+        modelBuilder.Entity<Payment>().Property(x => x.OwnerSettledAt).IsConcurrencyToken();
         modelBuilder.Entity<ClinicalCatalogItem>().HasIndex(x => new { x.ClinicId, x.Kind, x.OwnerUserId });
         modelBuilder.Entity<ClinicalCatalogItem>().HasOne<User>().WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<ClinicalEntry>().HasIndex(x => new { x.ClinicId, x.AppointmentId, x.ClientRequestId }).IsUnique();

@@ -26,6 +26,7 @@ public sealed class PatientsController(PatientService patientService, PatientPor
         => Ok(await patientService.UpdateAsync(id, request, cancellationToken));
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "ClinicAdmin")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         await patientService.DeleteAsync(id, cancellationToken);

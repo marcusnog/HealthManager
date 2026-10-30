@@ -36,6 +36,14 @@ public sealed class FinancialController(
         return CreatedAtAction(nameof(CreateManualReceivable), new { id = response.Id }, response);
     }
 
+    [HttpDelete("payments/{id:guid}")]
+    [Authorize(Policy = "FinanceReceivablesManage")]
+    public async Task<IActionResult> DeletePayment(Guid id, CancellationToken cancellationToken)
+    {
+        await financialService.DeletePaymentAsync(id, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("expenses")]
     [Authorize(Policy = "FinancePayablesView")]
     public async Task<ActionResult<PagedResult<ExpenseResponse>>> ListExpenses([FromQuery] ExpenseQuery query, CancellationToken cancellationToken)

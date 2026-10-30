@@ -15,7 +15,7 @@ Patients:
   GET /patients: "?page,pageSize,search,sortBy,sortDirection,email,healthInsurance -> PagedResult<PatientResponse> [ClinicAdminOrSecretary]"
   POST /patients: "{ identification (cpf optional; sex: Masculino|Feminino|Prefiro não informar), insurance/marketing, contacts (phone optional), address, complementary data, notes } -> 201 PatientResponse [ClinicAdminOrSecretary]"
   PATCH /patients/{id}: "{ all editable patient fields; phone optional; cpf remains immutable } -> PatientResponse [ClinicAdminOrSecretary]"
-  DELETE /patients/{id}: "-> 204 (soft delete, audit logged) [ClinicAdminOrSecretary]"
+  DELETE /patients/{id}: "-> 204 (soft delete, audit logged); 400 when a non-cancelled receivable has outstanding balance [ClinicAdmin]"
   POST /patients/{id}/access-token/regenerate: "-> new Guid (regenerates patientAccessToken) [ClinicAdminOrSecretary]"
   GET /address/cep/{cep}: "-> CepAddressResponse via ViaCEP [ClinicAdminOrSecretary]"
   # Documents:
@@ -51,6 +51,7 @@ AppointmentTypes:
   DELETE /appointment-types/{id}: "-> 204 (soft delete; rejected while in use) [ClinicAdminOrSecretary]"
 
 Financial:
+  DELETE /financial/payments/{id}: "-> 204 (soft delete, audit and balance recalculation); 400 if settled, 409 on concurrent changes [FinanceReceivablesManage]"
   # Policies: FinanceCategoriesView/Manage, FinanceReceivablesView/Manage, FinancePayablesView/Manage,
   # FinanceSummaryView, FinanceSettlements — permissions carried as JWT 'permission' claims.
   # View policies accept view or manage permission; Manage policies require manage only.

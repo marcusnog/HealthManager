@@ -274,6 +274,11 @@ public sealed class PatientService(
             .FirstOrDefaultAsync(x => x.Id == patientId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
             ?? throw new KeyNotFoundException("Paciente nao encontrado.");
 
+        if (await dbContext.Receivables.AnyAsync(x => x.ClinicId == clinicId && x.DeletedAt == null &&
+                x.Status != ReceivableStatus.Cancelled && x.OriginalAmount > x.ReceivedAmount &&
+                (x.PatientId == patientId || (x.Appointment != null && x.Appointment.PatientId == patientId)), cancellationToken))
+            throw new InvalidOperationException("Nao e possivel excluir paciente com pagamento pendente. Quite ou cancele as contas em aberto primeiro.");
+
         patient.DeletedAt = DateTimeOffset.UtcNow;
         patient.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -1418,6 +1423,38 @@ public sealed class FinancialService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new PaymentResponse(payment.Id, payment.ReceivableId, payment.Amount, payment.PaymentMethod, payment.PaidAt, payment.Status, DestinationBank: payment.DestinationBank, FundsRecipient: payment.FundsRecipient, ClinicRevenueAmount: payment.ClinicRevenueAmount, ProfessionalPayableAmount: payment.ProfessionalPayableAmount);
+    }
+
+    public async Task DeletePaymentAsync(Guid paymentId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var payment = await dbContext.Payments
+            .FirstOrDefaultAsync(x => x.Id == paymentId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Pagamento nao encontrado.");
+        if (payment.ProfessionalPaidAt != null || payment.OwnerSettledAt != null)
+            throw new InvalidOperationException("Nao e possivel excluir pagamento com repasse ou acerto ja realizado.");
+        if (payment.Status != PaymentStatus.Paid)
+            throw new InvalidOperationException("Somente pagamentos recebidos podem ser excluidos.");
+        var receivable = await dbContext.Receivables
+            .FirstOrDefaultAsync(x => x.Id == payment.ReceivableId && x.ClinicId == clinicId && x.DeletedAt == null, cancellationToken)
+            ?? throw new KeyNotFoundException("Conta a receber nao encontrada.");
+        if (receivable.ReceivedAmount < payment.Amount)
+            throw new InvalidOperationException("Saldo recebido inconsistente. Revise os pagamentos antes de excluir.");
+
+        var now = DateTimeOffset.UtcNow;
+        payment.DeletedAt = payment.UpdatedAt = now;
+        receivable.ReceivedAmount -= payment.Amount;
+        if (receivable.Status != ReceivableStatus.Cancelled)
+            receivable.Status = receivable.ReceivedAmount >= receivable.OriginalAmount ? ReceivableStatus.Paid
+                : receivable.ReceivedAmount > 0 ? ReceivableStatus.Partial : ReceivableStatus.Pending;
+        receivable.UpdatedAt = now;
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            ClinicId = clinicId, UserId = tenantProvider.UserId,
+            Action = "payment.deleted", EntityName = nameof(Payment), EntityId = payment.Id,
+            PayloadJson = JsonSerializer.Serialize(new { payment.ReceivableId, payment.Amount })
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     internal static void ApplySplit(Payment payment, Receivable receivable)

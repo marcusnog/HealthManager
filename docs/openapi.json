@@ -10,6 +10,40 @@
     }
   ],
   "paths": {
+    "/financial/payments/{id}": {
+      "delete": {
+        "operationId": "payments_delete",
+        "description": "Soft delete an unsettled payment and recalculate the receivable balance. Requires FinanceReceivablesManage. Does not refund a gateway charge.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Payment deleted"
+          },
+          "400": {
+            "description": "Settled payment or inconsistent balance"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Payment not found"
+          },
+          "409": {
+            "description": "Concurrent update"
+          }
+        }
+      }
+    },
     "/appointments/{id}/status": {
       "patch": {
         "operationId": "AppointmentsUpdateStatus",
@@ -302,6 +336,7 @@
         }
       },
       "delete": {
+        "description": "ClinicAdmin only. Rejects patients with outstanding non-cancelled receivables.",
         "operationId": "patients_delete",
         "parameters": [
           {

@@ -117,9 +117,9 @@
   clinicId: Guid
   appointmentId: Guid? (FK Appointment, nullable for manual receivable)
   patientId: Guid? (FK Patient; patient associated with a manual payment, same clinic)
-  originalAmount: decimal
-  receivedAmount: decimal (sum of payments)
-  status: ReceivableStatus (Pending|Partial|Paid|Cancelled)
+  originalAmount: decimal (optimistic concurrency token)
+  receivedAmount: decimal (sum of active payments; optimistic concurrency token)
+  status: ReceivableStatus (Pending|Partial|Paid|Cancelled; optimistic concurrency token)
   dueDate: DateTimeOffset (UTC)
   description: string?
   professionalId: Guid? (FK Doctor; snapshot from appointment)
@@ -129,6 +129,7 @@
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
 - Payment:
+  # DeletedAt is also an optimistic concurrency token.
   id: Guid (auto)
   clinicId: Guid
   receivableId: Guid (FK Receivable)
@@ -140,8 +141,8 @@
   fundsRecipient: FundsRecipient (Clinic|Owner)
   clinicRevenueAmount: decimal (recognized clinic revenue)
   professionalPayableAmount: decimal (liability, never expense)
-  professionalPaidAt: DateTimeOffset? (liability settlement)
-  ownerSettledAt: DateTimeOffset? (cash received from CEO; never new revenue)
+  professionalPaidAt: DateTimeOffset? (liability settlement; optimistic concurrency token)
+  ownerSettledAt: DateTimeOffset? (cash received from CEO; never new revenue; optimistic concurrency token)
   notes: string?
   # Inherited: CreatedAt, UpdatedAt, DeletedAt
 
