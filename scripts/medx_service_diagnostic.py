@@ -61,3 +61,17 @@ if pods.get("exitCode") == 0:
                          "healthWarningCount": len(value.get("Health") or [])}
             print(json.dumps({"pod": name, "namespace": namespace, "state": state,
                               "funnel": command(base + ["funnel", "status"])}))
+            if namespace != "healthmanager":
+                continue
+            execute = base[:-1]
+            print(json.dumps({"proxyHealth": command(execute + ["wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:8081/backend/health"])}))
+            print(json.dumps({"tailscaleDeployment": {
+                "volumes": pod["spec"].get("volumes"), "mounts": container.get("volumeMounts"),
+                "safeEnvironment": [e for e in container.get("env", []) if e["name"] in
+                    ("TS_STATE_DIR", "TS_KUBE_SECRET", "TS_USERSPACE", "TS_SERVE_CONFIG")],
+                "containerNames": [c["name"] for c in pod["spec"]["containers"]]}}))
+            netcheck = command(base + ["netcheck", "--format=json"])
+            if netcheck.get("exitCode") == 0:
+                values = json.loads(netcheck["output"])
+                netcheck = {k: values.get(k) for k in ("UDP", "IPv4", "IPv6", "PreferredDERP", "DERPLatency")}
+            print(json.dumps({"network": netcheck}))
