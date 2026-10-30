@@ -20,5 +20,5 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
-      - name: Restart only the persistent HealthManager Funnel proxy
+      - name: Refresh only the existing HealthManager Funnel registration
         run: ssh -o BatchMode=yes root@157.254.207.208 python3 - < scripts/medx_recover_access.py
