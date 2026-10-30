@@ -1,0 +1,24 @@
+name: HealthManager access diagnostic
+on:
+  push:
+    branches: [codex/medx-ops-20261029]
+    paths: [.github/workflows/medx-service-check.yml, scripts/medx_service_diagnostic.py]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure existing production access
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Read-only service and Tailscale check
+        run: ssh -o BatchMode=yes root@157.254.207.208 python3 - < scripts/medx_service_diagnostic.py
