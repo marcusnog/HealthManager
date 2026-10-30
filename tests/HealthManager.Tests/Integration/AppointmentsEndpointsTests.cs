@@ -8,6 +8,39 @@ namespace HealthManager.Tests.Integration;
 
 public sealed class AppointmentsEndpointsTests
 {
+    [Theory]
+    [InlineData("2026-05-08T23:30:00Z", HttpStatusCode.Created)]
+    [InlineData("2026-05-08T23:45:00Z", HttpStatusCode.BadRequest)]
+    public async Task CreateAppointment_ShouldRespectConfiguredClosingTimeInClinicTimezone(string startAt, HttpStatusCode expectedStatus)
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        await factory.WithDbContextAsync(async db =>
+        {
+            var clinic = await db.Clinics.SingleAsync(x => x.Id == Guid.Parse("11111111-1111-1111-1111-111111111111"));
+            clinic.BusinessHoursJson = "{\"start\":\"08:00\",\"end\":\"21:00\"}";
+            await db.SaveChangesAsync();
+        });
+
+        var response = await client.PostAsJsonAsync("/appointments", new
+        {
+            patientId = "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            doctorId = "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            startAt,
+            durationMinutes = 30,
+            appointmentTypeId = "a7000001-0000-0000-0000-000000000001",
+            amount = 180
+        });
+
+        response.StatusCode.Should().Be(expectedStatus);
+        if (expectedStatus == HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+            problem!.Detail.Should().Contain("08:00 as 21:00, America/Sao_Paulo")
+                .And.Contain("08/05/2026 20:45 a 08/05/2026 21:15");
+        }
+    }
+
     [Fact]
     public async Task AppointmentType_ShouldBeCreatedAndUsedByAppointment()
     {

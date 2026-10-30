@@ -1193,7 +1193,10 @@ public sealed class AppointmentService(
 
         if (localStart.TimeOfDay < startOfBusiness.ToTimeSpan() || localEnd.TimeOfDay > endOfBusiness.ToTimeSpan())
         {
-            throw new InvalidOperationException("Consulta fora do expediente da clinica.");
+            throw new InvalidOperationException(
+                $"Consulta fora do expediente da clinica ({startOfBusiness:HH:mm} as {endOfBusiness:HH:mm}, {clinic.Timezone}). " +
+                $"Horario solicitado: {localStart:dd/MM/yyyy HH:mm} a {localEnd:dd/MM/yyyy HH:mm}. " +
+                "Ajuste o inicio ou a duracao para que a consulta termine dentro do expediente.");
         }
     }
 
