@@ -54,3 +54,13 @@ Com `--verify-on-server`, o envio fica marcado como `uploaded` até a conferênc
 `medx_catalog.py --include-document-templates` inclui modelos explicitamente compartilhados e de HTML simples. Mantém a hierarquia de pastas e a proveniência; retém modelos privados, ricos, com placeholders ou acima dos limites. Aplique somente após disponibilizar o limite de catálogo de 1000 itens. A formatação convertida deve ser revisada antes do uso clínico.
 
 Para pausar um lote, crie `document-import/pause.request` no staging. O importador termina as requisições em curso e para antes do próximo arquivo; espere o processo encerrar e confira que não há intenções pendentes. Remova esse arquivo somente ao retomar. A verificação de relatórios criptografados também requer o pacote Python `cryptography`.
+
+Quando o endereço público limitar a carga, `HEALTHMANAGER_SSH_TUNNEL_PORT` permite usar um encaminhamento SSH previamente verificado, ligado somente a `127.0.0.1`. Fixe a chave pública do VPS em `known_hosts`, restrinja a chave temporária ao serviço web/API confirmado e proíba comandos. A identidade HTTPS canônica e a validação da clínica permanecem iguais nos journals. Não desative verificação de certificados; remova o encaminhamento e revogue a chave temporária ao terminar.
+
+`--include-appointment-types` importa os nomes de tipos de agendamento após consultar os excluídos. A duração original fica no mapeamento privado, pois o tipo no destino não possui esse campo. Não cria consultas nem interpreta códigos de status.
+
+`--include-expense-categories` importa somente subgrupos de pais explicitamente classificados como `Despesas`, após consultar categorias ativas e excluídas. Nomes duplicados ou ambíguos ficam pendentes; o grupo original permanece no mapeamento privado. Não cria lançamentos, pagamentos ou saldos.
+
+`medx_repair_exam_units.py` corrige unidades importadas sem o denominador original (`Peso/Volume`). Usa os mesmos argumentos de destino e `--apply`, exige os snapshots privados originais e atualiza somente modelos ainda intactos, com revisão otimista. Registra antes/depois e reconcilia respostas perdidas sem repetir atualizações incertas. Não converte resultados nem altera referências clínicas.
+
+A cópia limita os arquivos em trânsito a cerca de 8 MiB no total; um arquivo maior ocupa o limite sozinho. Isso permite concorrência para arquivos pequenos sem enfileirar dezenas de arquivos grandes na conexão. Cada intenção continua durável antes do POST.
