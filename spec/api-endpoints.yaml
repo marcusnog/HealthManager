@@ -202,4 +202,4 @@ ClinicalWorkspace:
 
 CommissionSettings:
   GET /financial/commission-settings: "-> CommissionSettings { appointmentSale, completedAppointment, productReferral } [ClinicAdmin]"
-  PUT /financial/commission-settings: "CommissionSettings (each rule: enabled, mode, value, basis) -> CommissionSettings [ClinicAdmin]"
+  PUT /financial/commission-settings: "CommissionSettings (each rule: enabled, mode, value, basis, professionalId?) -> CommissionSettings [ClinicAdmin]"

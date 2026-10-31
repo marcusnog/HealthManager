@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HealthManager.Application;
 
-public sealed record CommissionRule(bool Enabled, [Required] string Mode, decimal Value, [Required] string Basis);
+public sealed record CommissionRule(bool Enabled, [Required] string Mode, decimal Value, [Required] string Basis, Guid? ProfessionalId = null);
 public sealed record CommissionSettings(
     [Required] CommissionRule AppointmentSale,
     [Required] CommissionRule CompletedAppointment,
@@ -29,6 +29,15 @@ public sealed class CommissionSettingsService(IApplicationDbContext dbContext, I
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         var clinic = await dbContext.Clinics.SingleOrDefaultAsync(x => x.Id == clinicId, ct)
             ?? throw new KeyNotFoundException("Clinica nao encontrada.");
+        foreach (var rule in new[] { settings.AppointmentSale, settings.CompletedAppointment, settings.ProductReferral })
+        {
+            if (rule.Enabled && rule.ProfessionalId is null)
+                throw new InvalidOperationException("Selecione o profissional que receberá a comissão.");
+            if (rule.Enabled && rule.ProfessionalId is Guid professionalId && !await dbContext.Users.AnyAsync(
+                x => x.Id == professionalId && x.ClinicId == clinicId && x.IsActive && x.DeletedAt == null &&
+                    (x.Role == UserRole.Doctor || x.Role == UserRole.Secretary), ct))
+                throw new InvalidOperationException("Selecione um médico ou recepcionista ativo da clínica.");
+        }
         var previous = Read(clinic);
         clinic.CommissionSettingsJson = JsonSerializer.Serialize(settings);
         clinic.UpdatedAt = DateTimeOffset.UtcNow;

@@ -6387,6 +6387,7 @@
           "basis"
         ],
         "properties": {
+          "professionalId": { "type": "string", "format": "uuid", "nullable": true },
           "enabled": {
             "type": "boolean"
           },
