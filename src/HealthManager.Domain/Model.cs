@@ -78,6 +78,7 @@ public sealed class Clinic : Entity
     public string Slug { get; set; } = string.Empty;
     public string Timezone { get; set; } = "America/Sao_Paulo";
     public string BusinessHoursJson { get; set; } = "{\"start\":\"08:00\",\"end\":\"18:00\"}";
+    public string? CommissionSettingsJson { get; set; }
     public string? Cnpj { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }

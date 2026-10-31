@@ -3506,6 +3506,58 @@
         },
         "operationId": "clinicalEntriesHistory"
       }
+    },
+    "/financial/commission-settings": {
+      "get": {
+        "operationId": "commissionSettingsGet",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommissionSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "commissionSettingsUpdate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommissionSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommissionSettings"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6325,6 +6377,62 @@
           }
         },
         "additionalProperties": false
+      },
+      "CommissionRule": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "mode",
+          "value",
+          "basis"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "Fixed",
+              "Percentage"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "format": "decimal",
+            "minimum": 0,
+            "maximum": 1000000,
+            "multipleOf": 0.01
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "Deposit",
+              "Consultation",
+              "ProductSale",
+              "ProductReceived"
+            ]
+          }
+        }
+      },
+      "CommissionSettings": {
+        "type": "object",
+        "required": [
+          "appointmentSale",
+          "completedAppointment",
+          "productReferral"
+        ],
+        "properties": {
+          "appointmentSale": {
+            "$ref": "#/components/schemas/CommissionRule"
+          },
+          "completedAppointment": {
+            "$ref": "#/components/schemas/CommissionRule"
+          },
+          "productReferral": {
+            "$ref": "#/components/schemas/CommissionRule"
+          }
+        }
       }
     }
   }

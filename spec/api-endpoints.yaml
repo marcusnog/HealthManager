@@ -199,3 +199,7 @@ ClinicalWorkspace:
   GET /appointments/{appointmentId}/clinical-entries: "-> ClinicalEntryResponse[] (appointment entries) [ClinicStaff; owning Doctor]"
   POST /appointments/{appointmentId}/clinical-entries: "CreateClinicalEntryRequest -> 201 ClinicalEntryResponse [ClinicAdminOrDoctor; Admin or owning Doctor; Draft]"
   GET /patients/{patientId}/clinical-entries: "?page=1,pageSize=50,kind? -> PagedResult<ClinicalEntryResponse> [ClinicStaff; Doctor own entries only]"
+
+CommissionSettings:
+  GET /financial/commission-settings: "-> CommissionSettings { appointmentSale, completedAppointment, productReferral } [ClinicAdmin]"
+  PUT /financial/commission-settings: "CommissionSettings (each rule: enabled, mode, value, basis) -> CommissionSettings [ClinicAdmin]"

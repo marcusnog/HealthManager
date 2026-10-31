@@ -9,6 +9,7 @@
   name: string
   timezone: string (default America/Sao_Paulo)
   businessHoursJson: string (JSON `{start, end}`)
+  commissionSettingsJson: string? (serialized CommissionSettings; null returns disabled defaults)
   cnpj: string?
   email: string?
   phone: string?

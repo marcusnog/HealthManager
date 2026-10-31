@@ -171,6 +171,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.Property<string>("Cnpj")
                         .HasColumnType("text");
 
+                    b.Property<string>("CommissionSettingsJson")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
