@@ -148,10 +148,39 @@ class ImportTests(unittest.TestCase):
         api.connection = Mock()
         api.connection.getresponse.return_value = Mock(status=200, read=Mock(return_value=b"{}"))
         api.base_path, api.clinic_id, api.token = "/backend", "clinic", "token"
+        api.host_header = "example.invalid"
         api.request_bytes("/upload", b"file", "multipart/form-data; boundary=test")
         api.connection.sock.settimeout.assert_called_with(120)
         api.request_bytes("/read")
         api.connection.sock.settimeout.assert_called_with(45)
+
+    def test_explicit_ssh_tunnel_uses_loopback_and_keeps_canonical_identity(self):
+        response = Mock(status=200)
+        response.read.side_effect = [json.dumps({"accessToken": "token", "user": {"clinicId": "clinic", "role": "Admin"}}).encode(),
+                                     json.dumps({"id": "clinic", "name": "Clinic"}).encode()]
+        connection = Mock()
+        connection.getresponse.return_value = response
+        with patch.dict("os.environ", {"HEALTHMANAGER_SSH_TUNNEL_PORT": "38443"}), patch("medx_import_patients.http.client.HTTPConnection", return_value=connection) as constructor:
+            api = Api("https://example.invalid/backend", "email", "password", "clinic", "Clinic")
+            constructor.assert_called_once_with("127.0.0.1", 38443, timeout=45)
+            self.assertEqual("https://example.invalid/backend", api.base)
+            self.assertEqual("example.invalid", connection.request.call_args.kwargs["headers"]["Host"])
+
+    def test_put_preserves_revision_payload_and_tenant_headers(self):
+        api = object.__new__(Api)
+        api.connection = Mock()
+        api.connection.getresponse.return_value = Mock(status=200, read=Mock(return_value=b"{}"))
+        api.base_path, api.clinic_id, api.token, api.host_header = "/backend", "clinic", "token", "example.invalid"
+        api.put("/clinical-catalog/exam", {"revision": "original"})
+        call = api.connection.request.call_args
+        self.assertEqual(("PUT", "/backend/clinical-catalog/exam"), call.args)
+        self.assertEqual({"revision": "original"}, json.loads(call.kwargs["body"]))
+        self.assertEqual("clinic", call.kwargs["headers"]["X-Clinic-Id"])
+
+    def test_invalid_tunnel_ports_are_rejected_before_connection(self):
+        for port in ("0", "65536", "remote:80"):
+            with patch.dict("os.environ", {"HEALTHMANAGER_SSH_TUNNEL_PORT": port}), self.assertRaises(ValueError):
+                Api("https://example.invalid/backend", "email", "password", "clinic", "Clinic")
 
 
 if __name__ == "__main__":

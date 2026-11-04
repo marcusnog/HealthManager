@@ -22,7 +22,14 @@ def reconcile(events, files):
     pending = []
     for event in latest.values():
         if event["status"] == "intent":
-            raise ValueError("Unresolved upload intent; reconcile API outcome first.")
+            size = event.get("bytes", event.get("source", {}).get("size"))
+            found = [f for f in files if f["patientId"] == event["targetPatientId"] and f["fileName"] == event["fileName"]]
+            if (len(found) != 1 or found[0]["size"] != size or found[0]["sha256"] != event["sha256"]
+                or event.get("documentId") and event["documentId"] != found[0]["documentId"]):
+                raise ValueError("Unresolved upload intent; no unique matching persisted file. Do not retry.")
+            pending.append(event | {"status": "created", "documentId": found[0]["documentId"], "bytes": size,
+                                   "verification": "server-filesystem-sha256-reconciled-intent"})
+            continue
         if event["status"] not in ("uploaded", "created", "matched"):
             continue
         actual = by_id.get(event["documentId"])
