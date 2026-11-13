@@ -1,0 +1,33 @@
+# Observation inventory only; DO NOT apply or enable Argo CD sync.
+# Specs stay owned by existing deploys. Argo health reads LIVE controller status.
+# Sync is denied by AppProject and read-only Kubernetes RBAC.
+# shortcut: add/rename entries when components change; scheduled Job failures are not aggregated.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredns
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: local-path-provisioner
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: svclb-traefik-61162540
+  namespace: kube-system

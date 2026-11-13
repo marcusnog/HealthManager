@@ -1,0 +1,75 @@
+# Observation inventory only; DO NOT apply or enable Argo CD sync.
+# Specs stay owned by existing deploys. Argo health reads LIVE controller status.
+# Sync is denied by AppProject and read-only Kubernetes RBAC.
+# shortcut: add/rename entries when components change; scheduled Job failures are not aggregated.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obs-grafana
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obs-kube-state-metrics
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obs-operator
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-healthmanager
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-playground
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: alertmanager-obs-alertmanager
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: loki
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus-obs-prometheus
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tempo
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: alloy
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: obs-prometheus-node-exporter
+  namespace: observability

@@ -1,0 +1,21 @@
+# Observation inventory only; DO NOT apply or enable Argo CD sync.
+# Specs stay owned by existing deploys. Argo health reads LIVE controller status.
+# Sync is denied by AppProject and read-only Kubernetes RBAC.
+# shortcut: add/rename entries when components change; scheduled Job failures are not aggregated.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartloc-api
+  namespace: smart-loc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartloc-web
+  namespace: smart-loc
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: smart-loc
