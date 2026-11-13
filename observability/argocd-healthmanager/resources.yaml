@@ -1,0 +1,34 @@
+# Observation inventory only; DO NOT kubectl apply or enable Argo CD sync.
+# Workload specs stay owned by the existing deploy pipeline.
+# observe-healthmanager ignores /spec and metadata drift; health uses LIVE status.
+# Sync remains denied by the project and read-only Kubernetes RBAC.
+# shortcut: this inventory covers these five controllers; add entries when introducing a new component.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: healthmanager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: healthmanager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: healthmanager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthmanager-tailscale
+  namespace: healthmanager
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: healthmanager
