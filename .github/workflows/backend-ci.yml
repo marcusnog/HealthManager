@@ -30,6 +30,12 @@ jobs:
       - name: Test
         run: dotnet test HealthManager.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory ./TestResults
 
+      - name: Verify worker ASP.NET runtime
+        shell: bash
+        run: |
+          docker build -f Dockerfile.worker -t healthmanager-worker:ci .
+          docker run --rm --network none --entrypoint dotnet healthmanager-worker:ci --list-runtimes | grep -E '^Microsoft\.AspNetCore\.App 10\.'
+
       - name: Restore dotnet tools
         run: dotnet tool restore
 
