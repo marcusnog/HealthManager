@@ -35,6 +35,11 @@ public sealed class ClinicalRecordsController(ClinicalRecordService service) : C
     public async Task<ActionResult<ClinicalRecordResponse>> Finalize(Guid appointmentId, CancellationToken ct)
         => Ok(await service.FinalizeAsync(appointmentId, ct));
 
+    [HttpPost("reopen")]
+    [Authorize(Policy = "DoctorOnly")]
+    public async Task<ActionResult<ClinicalRecordResponse>> Reopen(Guid appointmentId, CancellationToken ct)
+        => Ok(await service.ReopenAsync(appointmentId, ct));
+
     [HttpPost("addendum")]
     [Authorize(Policy = "DoctorOnly")]
     public async Task<ActionResult<ClinicalRecordAddendumResponse>> AddAddendum(Guid appointmentId, [FromBody] CreateAddendumRequest request, CancellationToken ct)

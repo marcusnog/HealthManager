@@ -1687,6 +1687,40 @@
         }
       }
     },
+    "/appointments/{appointmentId}/clinical-record/reopen": {
+      "post": {
+        "operationId": "clinical_record_reopen",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "403": { "description": "Authenticated user lacks clinical access or linked doctor; session remains valid." },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/appointments/{appointmentId}/clinical-record/addendum": {
       "post": {
         "operationId": "clinical_record_add_addendum",

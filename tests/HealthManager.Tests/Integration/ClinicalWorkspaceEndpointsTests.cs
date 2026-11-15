@@ -96,14 +96,42 @@ public sealed class ClinicalWorkspaceEndpointsTests
     }
 
     [Fact]
-    public async Task Entries_RejectCrossTenantPatients_AndWritesWithoutDraft()
+    public async Task Entries_RejectCrossTenantPatients_AndHideForeignCatalog()
     {
         await using var f = new ApiTestFactory(); using var doctor = await Doctor(f); using var admin = await Admin(f);
         await f.SeedSecondClinicPatientAsync();
         (await doctor.GetAsync("/patients/99999999-9999-9999-9999-999999999999/clinical-entries")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await admin.PostAsJsonAsync($"/appointments/{Appointment}/clinical-entries", new CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Teste", "Texto", null))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         await f.WithDbContextAsync(async db => { db.ClinicalCatalogItems.Add(new ClinicalCatalogItem { ClinicId = Guid.Parse("22222222-2222-2222-2222-222222222222"), Title = "Segredo" }); await db.SaveChangesAsync(); });
         (await admin.GetFromJsonAsync<ClinicalCatalogResponse[]>("/clinical-catalog"))!.Should().NotContain(x => x.Title == "Segredo");
+    }
+
+    [Theory]
+    [InlineData("henrique.lima@clinicaaurora.com")]
+    [InlineData("admin@clinicaaurora.com")]
+    public async Task FirstDocument_CreatesDraftOnlyForValidRequests_AndRetryPreservesIt(string email)
+    {
+        await using var f = new ApiTestFactory();
+        using var client = await f.CreateAuthenticatedClientAsync(email, "ChangeMe123!");
+        var url = $"/appointments/{Appointment}";
+        var request = new CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Receituário", "", null);
+        (await client.PostAsJsonAsync($"{url}/clinical-entries", request)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await client.GetAsync($"{url}/clinical-record")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        request = request with { Content = "Orientações" };
+        var response = await client.PostAsJsonAsync($"{url}/clinical-entries", request);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var entry = (await response.Content.ReadFromJsonAsync<ClinicalEntryResponse>())!;
+        var json = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
+        var record = (await client.GetFromJsonAsync<ClinicalRecordResponse>($"{url}/clinical-record", json))!;
+        record.Status.Should().Be(ClinicalRecordStatus.Draft);
+        record.PatientId.Should().Be(Guid.Parse(Patient));
+        record.DoctorId.Should().Be(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"));
+        (await client.PatchAsJsonAsync($"{url}/clinical-record", new { content = "Evolução posterior" })).EnsureSuccessStatusCode();
+        var retry = await client.PostAsJsonAsync($"{url}/clinical-entries", request);
+        (await retry.Content.ReadFromJsonAsync<ClinicalEntryResponse>())!.Id.Should().Be(entry.Id);
+        await f.WithDbContextAsync(async db => {
+            (await db.ClinicalRecords.SingleAsync(x => x.AppointmentId == Guid.Parse(Appointment))).Content.Should().Be("Evolução posterior");
+            (await db.ClinicalEntries.IgnoreQueryFilters().CountAsync()).Should().Be(1);
+        });
     }
 
     [Fact]

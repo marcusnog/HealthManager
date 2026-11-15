@@ -13,6 +13,45 @@ public sealed class ClinicalRecordsEndpointsTests
     private static readonly Guid DoctorUserId = Guid.Parse("a1a2a3a4-a1a2-a1a2-a1a2-a1a2a3a4a5a6");
 
     [Fact]
+    public async Task Owner_CanReopenEditAndFinalize_PreservingSnapshotAddendumsAndDocuments()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
+        var url = $"/appointments/{AppointmentId}/clinical-record";
+        (await client.PostAsync($"{url}/reopen", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PostAsJsonAsync(url, new { content = "Original", prescription = "Receita original", chiefComplaint = "Queixa" })).EnsureSuccessStatusCode();
+        (await client.PostAsync($"{url}/reopen", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var entryUrl = $"/appointments/{AppointmentId}/clinical-entries";
+        var entry = new HealthManager.Application.CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Receita", "Documento original", null);
+        (await client.PostAsJsonAsync(entryUrl, entry)).EnsureSuccessStatusCode();
+        var json = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
+        var finalized = await client.PostAsync($"{url}/finalize", null);
+        finalized.EnsureSuccessStatusCode();
+        var snapshot = (await finalized.Content.ReadFromJsonAsync<HealthManager.Application.ClinicalRecordResponse>(json))!;
+        (await client.PostAsJsonAsync($"{url}/addendum", new { content = "Adendo original" })).EnsureSuccessStatusCode();
+        var reopened = await client.PostAsync($"{url}/reopen", null);
+        reopened.EnsureSuccessStatusCode();
+        var draft = (await reopened.Content.ReadFromJsonAsync<HealthManager.Application.ClinicalRecordResponse>(json))!;
+        draft.Status.Should().Be(ClinicalRecordStatus.Draft);
+        draft.FinalizedAt.Should().BeNull();
+        draft.Content.Should().Be(snapshot.Content);
+        draft.Prescription.Should().Be(snapshot.Prescription);
+        (await client.PostAsync($"{url}/reopen", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await client.PatchAsJsonAsync(url, new { content = "Revisado" })).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync(entryUrl, entry with { ClientRequestId = Guid.NewGuid(), Content = "Novo documento" })).EnsureSuccessStatusCode();
+        (await client.PostAsync($"{url}/finalize", null)).EnsureSuccessStatusCode();
+        await factory.WithDbContextAsync(async db => {
+            var audit = await db.AuditLogs.SingleAsync(x => x.Action == "clinical_record.reopened");
+            audit.UserId.Should().Be(DoctorUserId);
+            audit.ClinicId.Should().Be(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+            audit.EntityId.Should().Be(snapshot.Id);
+            System.Text.Json.JsonSerializer.Deserialize<HealthManager.Application.ClinicalRecordResponse>(audit.PayloadJson).Should().BeEquivalentTo(snapshot);
+            (await db.ClinicalRecordAddendums.SingleAsync()).Content.Should().Be("Adendo original");
+            (await db.ClinicalEntries.IgnoreQueryFilters().CountAsync()).Should().Be(2);
+        });
+    }
+
+    [Fact]
     public async Task UnlinkedDoctor_ShouldReceiveForbidden_AndKeepValidSession()
     {
         await using var factory = new ApiTestFactory();
@@ -181,6 +220,7 @@ public sealed class ClinicalRecordsEndpointsTests
         var record = await response.Content.ReadFromJsonAsync<ClinicalRecordHttpResponse>();
         record!.DoctorId.Should().Be(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"));
         (await client.PostAsync($"/appointments/{AppointmentId}/clinical-record/finalize", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.PostAsync($"/appointments/{AppointmentId}/clinical-record/reopen", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await client.PostAsJsonAsync($"/appointments/{AppointmentId}/clinical-record/addendum", new { content = "Adendo" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -217,6 +257,9 @@ public sealed class ClinicalRecordsEndpointsTests
         using var admin = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
         (await admin.PostAsJsonAsync(url, new { content = "Texto" })).EnsureSuccessStatusCode();
         (await client.PatchAsJsonAsync(url, new { content = "Alterado", prescription = "Receita" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        using var owner = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
+        (await owner.PostAsync($"{url}/finalize", null)).EnsureSuccessStatusCode();
+        (await client.PostAsync($"{url}/reopen", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await client.PostAsJsonAsync($"/appointments/{AppointmentId}/clinical-entries", new HealthManager.Application.CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Receita", "Texto", null))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -240,6 +283,8 @@ public sealed class ClinicalRecordsEndpointsTests
         var url = $"/appointments/{foreignAppointmentId}/clinical-record";
         (await client.PostAsJsonAsync(url, new { content = "Texto" })).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await client.PatchAsJsonAsync(url, new { prescription = "Receita" })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        using var doctor = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
+        (await doctor.PostAsync($"{url}/reopen", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await client.PostAsJsonAsync($"/appointments/{foreignAppointmentId}/clinical-entries", new HealthManager.Application.CreateClinicalEntryRequest(Guid.NewGuid(), "Document", null, "Receita", "Texto", null))).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 

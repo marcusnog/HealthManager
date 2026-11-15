@@ -1838,6 +1838,31 @@ public sealed class ClinicalRecordService(IApplicationDbContext dbContext, ITena
         return ToResponse(record);
     }
 
+    public async Task<ClinicalRecordResponse> ReopenAsync(Guid appointmentId, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        var record = await dbContext.ClinicalRecords
+            .Include(x => x.Patient).Include(x => x.Doctor)
+            .FirstOrDefaultAsync(x => x.AppointmentId == appointmentId && x.ClinicId == clinicId, cancellationToken)
+            ?? throw new KeyNotFoundException("Atendimento nao encontrado.");
+        var doctorId = await ResolveDoctorIdAsync(cancellationToken);
+        if (tenantProvider.Role != UserRole.Doctor || doctorId is null || record.DoctorId != doctorId)
+            throw new ForbiddenAccessException("Apenas o medico responsavel pode reabrir o atendimento.");
+        if (record.Status != ClinicalRecordStatus.Finalized)
+            throw new InvalidOperationException("Apenas prontuarios finalizados podem ser reabertos.");
+
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            ClinicId = clinicId, UserId = tenantProvider.UserId, Action = "clinical_record.reopened",
+            EntityName = nameof(ClinicalRecord), EntityId = record.Id,
+            PayloadJson = JsonSerializer.Serialize(ToResponse(record))
+        });
+        record.Status = ClinicalRecordStatus.Draft;
+        record.FinalizedAt = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToResponse(record);
+    }
+
     public async Task<ClinicalRecordAddendumResponse> AddAddendumAsync(Guid appointmentId, CreateAddendumRequest request, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);

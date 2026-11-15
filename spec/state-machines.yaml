@@ -90,16 +90,17 @@ ClinicalRecordStatus:
     Draft:
       transitions: [Finalized]
     Finalized:
-      transitions: []
+      transitions: [Draft]
   invariant:
     - One record per appointment (appointmentId unique)
     - The clinic Admin or owning doctor can write to Draft
-    - Finalization is irreversible; corrections use addendum
+    - Only the owning doctor can explicitly reopen Finalized to Draft; audit preserves the finalized content and timestamp, existing entries and addendums remain intact
     - Secretary can read but not write clinical content; finalization and addendums remain owning-doctor-only
   api_endpoints:
     POST /appointments/{id}/clinical-record: create Draft
     PATCH /appointments/{id}/clinical-record: update Draft fields
     POST /appointments/{id}/clinical-record/finalize: Draft -> Finalized
+    POST /appointments/{id}/clinical-record/reopen: Finalized -> Draft (owning doctor, audited)
     POST /appointments/{id}/clinical-record/addendum: addendum to Finalized record
 
 PaymentIntentStatus:

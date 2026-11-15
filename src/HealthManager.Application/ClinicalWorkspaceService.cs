@@ -103,8 +103,8 @@ public sealed class ClinicalWorkspaceService(IApplicationDbContext db, ITenantPr
         var existing = await db.ClinicalEntries.AsNoTracking().FirstOrDefaultAsync(x => x.ClinicId == Clinic && x.AppointmentId == appointmentId && x.ClientRequestId == request.ClientRequestId, ct);
         if (existing is not null) { if (existing.AuthorId != User) throw new ForbiddenAccessException(); return EntryResponse(existing); }
         var record = await db.ClinicalRecords.FirstOrDefaultAsync(x => x.ClinicId == Clinic && x.AppointmentId == appointmentId, ct);
-        if (record is null || record.Status != ClinicalRecordStatus.Draft)
-            throw new InvalidOperationException("Crie um prontuário em rascunho antes de registrar. Prontuários finalizados aceitam somente adendos.");
+        if (record is not null && record.Status != ClinicalRecordStatus.Draft)
+            throw new InvalidOperationException("Reabra o prontuário antes de registrar novos documentos ou utilize um adendo.");
         if (!EntryKinds.Contains(request.Kind)) throw new InvalidOperationException("Tipo de registro inválido.");
         Text(request.Title, 200, true); Text(request.Content, 30000);
         if (request.SignatureMode is not ("Paper" or "DigitalMock") || request.Kind != "Document" && request.SignatureMode != "Paper") throw new InvalidOperationException("Forma de assinatura inválida.");
@@ -133,6 +133,12 @@ public sealed class ClinicalWorkspaceService(IApplicationDbContext db, ITenantPr
             Title = request.Title.Trim(), Content = content, FieldsJson = JsonSerializer.Serialize(fields), ValuesJson = JsonSerializer.Serialize(values),
             SignatureMode = request.SignatureMode, CorrectsEntryId = request.CorrectsEntryId, PatientName = appointment.Patient.Name,
             DoctorName = appointment.Doctor.Name, DoctorCrm = appointment.Doctor.Crm, ClinicName = clinic.Name };
+        if (record is null)
+        {
+            record = new ClinicalRecord { ClinicId = Clinic, AppointmentId = appointment.Id,
+                PatientId = appointment.PatientId, DoctorId = appointment.DoctorId };
+            db.ClinicalRecords.Add(record);
+        }
         record.UpdatedAt = DateTimeOffset.UtcNow;
         db.ClinicalEntries.Add(entry); Audit("clinical_entry.created", entry.Id);
         await db.SaveChangesAsync(ct);
