@@ -2,6 +2,7 @@
 import argparse
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import getpass
 import hashlib
@@ -17,6 +18,25 @@ import zlib
 from medx_import_patients import Api
 from medx_journal import DurableJournal
 from medx_prepare import sha256, write_json
+
+
+class UploadBudget:
+    def __init__(self, limit):
+        self.limit, self.used = limit, 0
+        self.condition = threading.Condition()
+
+    @contextmanager
+    def hold(self, size):
+        weight = min(size, self.limit)
+        with self.condition:
+            self.condition.wait_for(lambda: self.used + weight <= self.limit)
+            self.used += weight
+        try:
+            yield
+        finally:
+            with self.condition:
+                self.used -= weight
+                self.condition.notify_all()
 
 
 def document_plan(links, mappings, subscription):
@@ -169,6 +189,7 @@ def run(stage, source, api, password, seven_zip, limit, workers, verify_on_serve
     mutex, stop = threading.Lock(), threading.Event()
     local, clients = threading.local(), []
     totals = Counter()
+    upload_budget = UploadBudget(8 * 1024 * 1024)
     writer = DurableJournal(journal)
     def event(value):
         writer.append(value)
@@ -182,13 +203,13 @@ def run(stage, source, api, password, seven_zip, limit, workers, verify_on_serve
     def group(candidates):
         if stop.is_set():
             return
-        if not hasattr(local, "client"):
-            local.client = Api(api.base, api.credentials["email"], api.credentials["password"], api.clinic_id, api.clinic_name)
-            local.last_login = time.monotonic()
-            with mutex:
-                clients.append(local.client)
-        client = local.client
         try:
+            if not hasattr(local, "client"):
+                local.client = Api(api.base, api.credentials["email"], api.credentials["password"], api.clinic_id, api.clinic_name)
+                local.last_login = time.monotonic()
+                with mutex:
+                    clients.append(local.client)
+            client = local.client
             documents = client.request("/patients/" + candidates[0]["targetPatientId"] + "/documents")
             for candidate in candidates:
                 if stop.is_set() or (directory / "pause.request").exists():
@@ -204,7 +225,13 @@ def run(stage, source, api, password, seven_zip, limit, workers, verify_on_serve
                     event(candidate | {"status": "held", "reason": "file_signature_mismatch",
                         "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)})
                     continue
-                copy_one(client, candidate, data, documents, previous.get(candidate["sourceKey"]), event, verify_on_server)
+                with upload_budget.hold(len(data)):
+                    if stop.is_set():
+                        return
+                    if time.monotonic() - local.last_login > 900:
+                        client.login()
+                        local.last_login = time.monotonic()
+                    copy_one(client, candidate, data, documents, previous.get(candidate["sourceKey"]), event, verify_on_server)
         except Exception:
             stop.set()
             raise

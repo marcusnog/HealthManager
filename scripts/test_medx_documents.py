@@ -1,11 +1,30 @@
 import hashlib
 import json
 import unittest
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
-from medx_documents import content_type, copy_one, document_plan, multipart
+from medx_documents import UploadBudget, content_type, copy_one, document_plan, multipart
 
 
 class DocumentTests(unittest.TestCase):
+    def test_large_uploads_wait_for_byte_budget_and_failures_release_it(self):
+        budget = UploadBudget(10)
+        entered = threading.Event()
+        def upload():
+            with budget.hold(4):
+                entered.set()
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with budget.hold(7):
+                future = pool.submit(upload)
+                self.assertFalse(entered.wait(0.05))
+            future.result(timeout=5)
+        self.assertTrue(entered.is_set())
+        with self.assertRaises(RuntimeError), budget.hold(20):
+            self.assertEqual(10, budget.used)
+            raise RuntimeError("upload failed")
+        self.assertEqual(0, budget.used)
+
     def link(self, patient="1", history="2"):
         return {"sourcePatientId": patient, "sourceHistoryId": history, "fileName": "original.pdf",
                 "issues": [], "sourceFiles": [{"archive": "backup.zip", "size": 10, "crc32": 1}]}
