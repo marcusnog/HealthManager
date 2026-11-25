@@ -13,6 +13,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
     public DbSet<ClinicalCatalogItem> ClinicalCatalogItems => Set<ClinicalCatalogItem>();
     public DbSet<ClinicalEntry> ClinicalEntries => Set<ClinicalEntry>();
+    public DbSet<PatientCareRecord> PatientCareRecords => Set<PatientCareRecord>();
     public DbSet<ReportSourceRecord> ReportSourceRecords => Set<ReportSourceRecord>();
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<User> Users => Set<User>();
@@ -50,6 +51,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        var care = modelBuilder.Entity<PatientCareRecord>();
+        care.HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || x.ClinicId == TenantClinicId));
+        care.Property(x => x.Revision).IsConcurrencyToken();
+        care.HasIndex(x => new { x.ClinicId, x.PatientId, x.Source });
+        care.HasIndex(x => new { x.ClinicId, x.Source, x.Date });
+        care.HasIndex(x => x.PaymentId).IsUnique();
+        care.HasIndex(x => x.ReceivableId).IsUnique();
+        care.HasIndex(x => new { x.AppointmentId, x.Source }).HasFilter("\"Source\" IN ('horarios', 'servicos')").IsUnique();
+        care.HasIndex(x => new { x.ApplicationId, x.Source }).HasFilter("\"Source\" = 'etapas'").IsUnique();
+        care.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+        care.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+        care.HasOne(x => x.Appointment).WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
+        care.HasOne(x => x.Payment).WithMany().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
+        care.HasOne(x => x.Receivable).WithMany().HasForeignKey(x => x.ReceivableId).OnDelete(DeleteBehavior.Restrict);
+        care.HasOne(x => x.Application).WithMany().HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Restrict);
+        care.HasOne(x => x.Contract).WithMany().HasForeignKey(x => x.ContractId).OnDelete(DeleteBehavior.Restrict);
         var source = modelBuilder.Entity<ReportSourceRecord>();
         source.HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || x.ClinicId == TenantClinicId));
         source.Property(x => x.Reference).HasMaxLength(120);

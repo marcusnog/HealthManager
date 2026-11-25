@@ -428,6 +428,21 @@
   clinicName: string (snapshot)
   # Entity timestamps inherited; no update/delete endpoint
 
+- PatientCareRecord:
+  id: guid
+  clinicId: guid
+  patientId: guid
+  source: string (ten operational sources in patient-care.md)
+  date: date (operational day in clinic timezone)
+  appointmentId: guid?
+  doctorId: guid?
+  paymentId: guid?
+  receivableId: guid?
+  applicationId: guid?
+  contractId: guid? (same patient's programas record)
+  fieldsJson: string (validated operational details specific to source)
+  revision: int (optimistic concurrency)
+
 - ReportSourceRecord:
   id: Guid
   clinicId: Guid

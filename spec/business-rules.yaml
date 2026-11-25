@@ -202,6 +202,9 @@ clinical_workspace:
   specification: "See clinical-workspace.yaml. Clinical catalog shared Admin/Doctor; personal only owning Doctor. Clinical entries immutable, tenant isolated, owning Doctor writes in Draft only."
   screens: "New clinical-settings screen for Admin/Doctor. Catalog reads allowed from agenda/dashboard/pacientes; edits require clinical-settings. Appointment clinical-record (including addendum) and clinical-entries endpoints also accept pacientes screen access to support opening an existing record directly from the patient list. Other appointment operations still require agenda/dashboard. Patient clinical history and document list/download/upload also accept agenda/dashboard grants; document deletion remains pacientes-only."
 
+patient_care:
+  rules: "spec/patient-care.md defines the operational origins of the twenty reports. Structured entries can link only to eligible CRM rows belonging to the same clinic and patient. Editing requires the current revision. Financial references do not create or alter payments."
+
 reports:
   catalog: "spec/reports.json defines each title, purpose, calculation and supplementary source."
   access: "Clinic Admin only. Results and source records belong exclusively to the authenticated clinic."

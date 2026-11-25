@@ -10,6 +10,137 @@
     }
   ],
   "paths": {
+      "/patients/{patientId}/care/{source}": {
+        "get": {
+          "tags": [
+            "PatientCare"
+          ],
+          "operationId": "patient_care_read",
+          "security": [
+            {
+              "bearerAuth": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "patientId",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            {
+              "name": "source",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/CareWorkspace"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Invalid care record or link"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Patient or source unavailable"
+            },
+            "409": {
+              "description": "Conflicting revision or existing link"
+            }
+          }
+        }
+      },
+      "/patients/{patientId}/care/{source}/{id}": {
+        "put": {
+          "tags": [
+            "PatientCare"
+          ],
+          "operationId": "patient_care_save",
+          "security": [
+            {
+              "bearerAuth": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "patientId",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            {
+              "name": "source",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/CareItem"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Invalid care record or link"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Patient or source unavailable"
+            },
+            "409": {
+              "description": "Conflicting revision or existing link"
+            }
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareInput"
+                }
+              }
+            }
+          }
+        }
+      },
     "/reports": {
       "get": {
         "tags": [
@@ -3829,6 +3960,151 @@
   },
   "components": {
     "schemas": {
+        "CareInput": {
+          "type": "object",
+          "required": [
+            "revision",
+            "fields",
+            "links"
+          ],
+          "properties": {
+            "revision": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "nullable": true
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "links": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        },
+        "CareItem": {
+          "type": "object",
+          "required": [
+            "id",
+            "revision",
+            "date",
+            "fields",
+            "links"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "revision": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "date": {
+              "type": "string",
+              "format": "date"
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "links": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        },
+        "CareChoice": {
+          "type": "object",
+          "required": [
+            "id",
+            "label"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "label": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "nullable": true
+            }
+          }
+        },
+        "CareLink": {
+          "type": "object",
+          "required": [
+            "key",
+            "required",
+            "options"
+          ],
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CareChoice"
+              }
+            }
+          }
+        },
+        "CareWorkspace": {
+          "type": "object",
+          "required": [
+            "today",
+            "fields",
+            "links",
+            "records"
+          ],
+          "properties": {
+            "today": {
+              "type": "string",
+              "format": "date"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SourceField"
+              }
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CareLink"
+              }
+            },
+            "records": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CareItem"
+              }
+            }
+          }
+        },
       "ReportDirectory": {
         "type": "object",
         "required": [

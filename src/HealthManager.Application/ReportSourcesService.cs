@@ -87,7 +87,7 @@ public sealed class ReportSourcesService(IApplicationDbContext db, ITenantProvid
     private static DateOnly? ParseDate(string value) => DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
         DateTimeStyles.None, out var date) && date.Year is >= 1900 and <= 9998 ? date : null;
 
-    private static string? Normalize(SourceField field, string value)
+    internal static string? Normalize(SourceField field, string value)
     {
         if (value.Length is 0 or > 200 || value.Any(char.IsControl)) return null;
         switch (field.Type)

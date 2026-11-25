@@ -30,6 +30,8 @@ public sealed class ReportsService(IApplicationDbContext db, ITenantProvider ten
                 query = query.Where(x => x.Date >= from);
             var records = await query.Select(x => new { x.Date, x.ValuesJson, x.Reference }).ToListAsync(ct);
             var lines = records.Select(x => new SourceLine(x.Date, JsonSerializer.Deserialize<Dictionary<string, string>>(x.ValuesJson)!, x.Reference)).ToList();
+            if (report.Source != "vendas")
+                lines.AddRange(await PatientCareReport.ReadAsync(db, clinic, report.Source, from, to, await Zone(clinic, ct), ct));
             return new(lines.Count == 0 ? [] : Calculate(id, lines, from, to));
         }
         var zone = await Zone(clinic, ct);

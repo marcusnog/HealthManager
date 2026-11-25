@@ -15,6 +15,10 @@ O acesso inicial é do administrador da clínica porque os grupos reúnem inform
 
 Consultas em grupo ocupam o tempo do médico uma vez. Cada participante conta na produtividade. A receita por hora usa a receita da clínica efetivamente recebida até o encerramento do período. O LTV acumula recebimentos identificados de toda a clínica. Venda de tratamento e recebimento são fatos distintos.
 
+## Registro na ficha do paciente
+
+Os vinte relatórios de reserva, fila, pontualidade, indicações, programas, cronograma, interrupções e insumos leem os registros de **Pacientes → Acompanhamento**. O [plano e mapa de origens](patient-care.md) descreve os vínculos com as consultas, contas a receber, pagamentos e aplicações. O CSV continua disponível para o histórico legado.
+
 ## Fontes complementares
 
 O CSV usa UTF-8, separador ponto e vírgula e cabeçalho conforme o modelo da tela. Cada linha representa um registro operacional. A coluna `referencia` identifica a linha na fonte. Repetir a referência em uma nova importação substitui os campos dessa linha. Referências entre pacientes e profissionais devem ser consistentes. Usar identificadores internos em vez de CPF. Valores monetários admitem duas casas decimais e datas usam AAAA-MM-DD.

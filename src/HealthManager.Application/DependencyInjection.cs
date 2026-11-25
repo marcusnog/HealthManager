@@ -23,6 +23,7 @@ services.AddScoped<ProductService>();
         services.AddScoped<PackageService>();
         services.AddScoped<PatientApplicationService>();
         services.AddScoped<ReportsService>();
+        services.AddScoped<PatientCareService>();
         services.AddScoped<ReportSourcesService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<WhatsAppWebhookService>();
