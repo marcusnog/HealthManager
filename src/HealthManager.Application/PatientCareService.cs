@@ -7,7 +7,7 @@ namespace HealthManager.Application;
 
 public sealed record CareInput(int Revision, DateOnly? Date, Dictionary<string, string> Fields, Dictionary<string, Guid> Links);
 public sealed record CareItem(Guid Id, int Revision, DateOnly Date, Dictionary<string, string> Fields, Dictionary<string, Guid> Links);
-public sealed record CareChoice(Guid Id, string Label, DateOnly? Date = null);
+public sealed record CareChoice(Guid Id, string Label, DateOnly? Date = null, Guid? AppointmentId = null);
 public sealed record CareLink(string Key, bool Required, List<CareChoice> Options);
 public sealed record CareWorkspace(DateOnly Today, SourceField[] Fields, List<CareLink> Links, List<CareItem> Records);
 
@@ -67,7 +67,7 @@ public sealed class PatientCareService(IApplicationDbContext db, ITenantProvider
     {
         List<CareLink> links = [];
         string Time(DateTimeOffset value) => TimeZoneInfo.ConvertTime(value, zone).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
-        if (source is "horarios" or "indicacoes" or "servicos")
+        if (source is "reservas" or "horarios" or "indicacoes" or "servicos")
         {
             var appointments = await db.Appointments.Where(x => x.ClinicId == Clinic && x.PatientId == patient)
                 .OrderByDescending(x => x.StartAt).Select(x => new { x.Id, x.StartAt, x.Doctor!.Name }).ToListAsync(ct);
@@ -75,14 +75,21 @@ public sealed class PatientCareService(IApplicationDbContext db, ITenantProvider
         }
         if (source == "programas")
             links.Add(new("medico", true, await db.Doctors.Where(x => x.ClinicId == Clinic).OrderBy(x => x.Name)
-                .Select(x => new CareChoice(x.Id, x.Name + " · " + x.Crm, null)).ToListAsync(ct)));
+                .Select(x => new CareChoice(x.Id, x.Name + " · " + x.Crm, null, null)).ToListAsync(ct)));
         if (source == "reservas")
         {
             var payments = await db.Payments.Where(x => x.ClinicId == Clinic && x.Status == PaymentStatus.Paid && x.Amount > 0 &&
-                x.Receivable!.Appointment!.PatientId == patient).OrderByDescending(x => x.PaidAt)
-                .Select(x => new { x.Id, x.PaidAt, x.Amount, x.Receivable!.Appointment!.StartAt }).ToListAsync(ct);
-            links.Add(new("pagamento", true, payments.Select(x => new CareChoice(x.Id,
-                $"{Time(x.PaidAt)} · R$ {x.Amount.ToString("F2", CultureInfo.GetCultureInfo("pt-BR"))} · consulta {Time(x.StartAt)}", Local(x.PaidAt, zone))).ToList()));
+                x.Receivable!.ClinicId == Clinic &&
+                (x.Receivable.PatientId == null || x.Receivable.PatientId == patient) &&
+                (x.Receivable.AppointmentId == null ? x.Receivable.PatientId == patient :
+                    x.Receivable.Appointment!.ClinicId == Clinic && x.Receivable.Appointment.PatientId == patient))
+                .OrderByDescending(x => x.PaidAt).Select(x => new { x.Id, x.PaidAt, x.Amount,
+                    x.Receivable!.AppointmentId, StartAt = (DateTimeOffset?)x.Receivable.Appointment!.StartAt }).ToListAsync(ct);
+            links.Insert(0, new("pagamento", true, payments.Select(x => {
+                var origin = x.StartAt.HasValue ? $"consulta {Time(x.StartAt.Value)}" : "avulso";
+                return new CareChoice(x.Id, $"{Time(x.PaidAt)} · R$ {x.Amount.ToString("F2", CultureInfo.GetCultureInfo("pt-BR"))} · {origin}",
+                    Local(x.PaidAt, zone), x.AppointmentId);
+            }).ToList()));
         }
         if (source is "servicos" or "parcelas" or "indicacoes")
         {
@@ -125,6 +132,14 @@ public sealed class PatientCareService(IApplicationDbContext db, ITenantProvider
             else if (link.Required) throw new InvalidOperationException("Selecione o vínculo obrigatório.");
         }
         Guid? Link(string key) => selected.GetValueOrDefault(key)?.Id;
+        var appointmentId = Link("consulta");
+        if (source == "reservas")
+        {
+            var origin = selected["pagamento"].AppointmentId;
+            if (origin.HasValue && appointmentId.HasValue && origin != appointmentId)
+                throw new InvalidOperationException("O pagamento pertence a outra consulta.");
+            appointmentId ??= origin ?? throw new InvalidOperationException("Selecione a consulta correspondente ao pagamento avulso.");
+        }
         var date = source switch {
             "horarios" => selected["consulta"].Date, "reservas" => selected["pagamento"].Date,
             "insumos" => selected["aplicacao"].Date, "parcelas" => selected["programa"].Date, _ => input.Date
@@ -176,7 +191,7 @@ public sealed class PatientCareService(IApplicationDbContext db, ITenantProvider
             }
             else
             {
-                var appointmentId = Link("consulta");
+
                 var scheduled = await db.Appointments.Where(x => x.ClinicId == Clinic && x.PatientId == patient && x.Id == appointmentId)
                     .Select(x => x.StartAt).SingleAsync(ct);
                 var local = TimeZoneInfo.ConvertTime(scheduled, zone);
@@ -184,7 +199,7 @@ public sealed class PatientCareService(IApplicationDbContext db, ITenantProvider
                 date = DateOnly.FromDateTime(local.DateTime);
             }
         }
-        row.AppointmentId = Link("consulta"); row.DoctorId = Link("medico"); row.PaymentId = Link("pagamento");
+        row.AppointmentId = appointmentId; row.DoctorId = Link("medico"); row.PaymentId = Link("pagamento");
         row.ReceivableId = Link("titulo"); row.ContractId = Link("programa"); row.ApplicationId = Link("aplicacao");
         row.Date = date.Value;
         row.FieldsJson = JsonSerializer.Serialize(values);

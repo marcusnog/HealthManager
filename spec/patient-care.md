@@ -4,7 +4,7 @@ O administrador registra os fatos abaixo em Pacientes → Acompanhamento. A secr
 
 | Fluxo | Reaproveitar do CRM | Registrar no atendimento | Relatórios |
 |---|---|---|---|
-| Reserva | Pagamento recebido de consulta, paciente, valor e data | Identificar aquele pagamento como sinal | Novos agendamentos |
+| Reserva | Pagamento recebido, paciente, valor e data | Marcar o pagamento como sinal. Para um pagamento avulso, selecionar uma consulta da mesma ficha. Para um pagamento de consulta, preservar a consulta de origem. Cada pagamento só pode ser marcado uma vez. A conciliação preserva o título, o recebimento e os saldos | Novos agendamentos |
 | Fila | Paciente | Entrada e saída | Demanda reprimida |
 | Atendimento | Consulta e horário agendado | Chegada e início real | Pontualidade |
 | Indicação | Paciente, consulta de origem e contrato de acompanhamento quando houver | Tratamento indicado, data da indicação. Um contrato vinculado fornece a data da conversão. Para outras modalidades, registrar a data de contratação confirmada | Conversão pós-consulta, Conversão de prescrições |

@@ -10,6 +10,52 @@ namespace HealthManager.Tests.Integration;
 public class PatientCareEndpointsTests
 {
     [Fact]
+    public async Task Standalone_deposit_requires_same_patient_visit_and_preserves_the_ledger()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var clinic = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var patient = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        var visit = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        var bill = new Receivable { ClinicId = clinic, PatientId = patient, OriginalAmount = 60, ReceivedAmount = 60, Status = ReceivableStatus.Paid };
+        var paid = new Payment { ClinicId = clinic, ReceivableId = bill.Id, Amount = 60, PaidAt = new DateTimeOffset(2026, 11, 6, 12, 0, 0, TimeSpan.Zero) };
+        var otherPatient = new Patient { ClinicId = clinic, Name = "Outro cadastro" };
+        var otherVisit = new Appointment { ClinicId = clinic, PatientId = otherPatient.Id };
+        var otherBill = new Receivable { ClinicId = clinic, PatientId = otherPatient.Id };
+        var otherPayment = new Payment { ClinicId = clinic, ReceivableId = otherBill.Id, Amount = 60 };
+        await factory.WithDbContextAsync(async db => {
+            db.AddRange(bill, paid, otherPatient, otherVisit, otherBill, otherPayment);
+            await db.SaveChangesAsync();
+        });
+        var path = $"/patients/{patient}/care/reservas";
+        var workspace = await client.GetFromJsonAsync<CareWorkspace>(path);
+        var options = workspace!.Links.Single(x => x.Key == "pagamento").Options;
+        options.Single(x => x.Id == paid.Id).AppointmentId.Should().BeNull();
+        options.Should().NotContain(x => x.Id == otherPayment.Id);
+        Task<HttpResponseMessage> Save(Guid payment, Guid? appointment)
+        {
+            Dictionary<string, Guid> links = new() { ["pagamento"] = payment };
+            if (appointment.HasValue) links["consulta"] = appointment.Value;
+            return client.PutAsJsonAsync(path + "/" + Guid.NewGuid(), new CareInput(0, null, [], links));
+        }
+        (await Save(paid.Id, null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Save(paid.Id, otherVisit.Id)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Save(otherPayment.Id, visit)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Save(paid.Id, visit)).EnsureSuccessStatusCode();
+        (await Save(paid.Id, visit)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await client.GetFromJsonAsync<CareWorkspace>(path))!.Records.Single().Links["consulta"].Should().Be(visit);
+        var report = await client.GetFromJsonAsync<ReportResult>("/reports/novos-agendamentos?from=2026-11-06&to=2026-11-06");
+        report!.Rows.Single().Metrics.Select(m => m.Value).Should().Equal(1m, 60m);
+        await factory.WithDbContextAsync(async db => {
+            var original = await db.Receivables.SingleAsync(x => x.Id == bill.Id);
+            original.AppointmentId.Should().BeNull();
+            original.ReceivedAmount.Should().Be(60);
+            original.OriginalAmount.Should().Be(60);
+            (await db.Payments.Where(p => p.ReceivableId == bill.Id).SingleAsync()).Id.Should().Be(paid.Id);
+        });
+    }
+
+    [Fact]
     public async Task Native_patient_workflows_supply_twenty_reports_without_imports()
     {
         await using var factory = new ApiTestFactory();

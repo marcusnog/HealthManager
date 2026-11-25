@@ -4061,6 +4061,11 @@
               "type": "string",
               "format": "date",
               "nullable": true
+            },
+            "appointmentId": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
             }
           }
         },

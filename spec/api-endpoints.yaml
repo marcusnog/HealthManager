@@ -207,7 +207,7 @@ CommissionSettings:
   PUT /financial/commission-settings: "CommissionSettings (each rule: enabled, mode, value, basis, professionalId?) -> CommissionSettings [ClinicAdmin]"
 
 PatientCare:
-  GET /patients/{patientId}/care/{source}: "Patient-scoped structured care records, form choices, field definitions and clinic-local date [ClinicAdminOrSecretary, pacientes; Secretary only espera/horarios]"
+  GET /patients/{patientId}/care/{source}: "Patient-scoped structured care records, form choices, field definitions and clinic-local date. Deposit payment choices include appointmentId when already assigned. Standalone payments require an explicit same-patient appointment on save [ClinicAdminOrSecretary, pacientes; Secretary only espera/horarios]"
   PUT /patients/{patientId}/care/{source}/{id}: "Create or revise a structured care record, validates related CRM records, same patient and clinic, optimistic revision [same access as GET]"
 
 Reports:
