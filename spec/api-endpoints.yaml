@@ -211,6 +211,7 @@ PatientCare:
   PUT /patients/{patientId}/care/{source}/{id}: "Create or revise a structured care record, validates related CRM records, same patient and clinic, optimistic revision [same access as GET]"
 
 Reports:
+  POST /reports/evidence/search: "Read-only ClinicAdmin keyword search. Tenant-scoped cursor batches of patient records or attachments. Returns matching source and patient references, a short excerpt, inspected count, unreadable file count and next cursor. Search words are sent in the body."
   GET /reports: "Catalogue deserialized from spec/reports.json, source layouts, clinic-local today [ClinicAdmin]"
   GET /reports/{id}: "?from,to (inclusive ISO dates, <= 366 days) -> ReportResult with named numeric metrics per group, null if undefined [ClinicAdmin]"
   GET /reports/sources/{source}: "?from,to,page -> source records in CSV format (100 per page) for review and correction [ClinicAdmin]"

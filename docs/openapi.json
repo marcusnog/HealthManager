@@ -141,6 +141,47 @@
           }
         }
       },
+    "/reports/evidence/search": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "reports_search_evidence",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evidence batch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidencePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid search"
+          },
+          "403": {
+            "description": "Clinic administrator required"
+          }
+        }
+      }
+    },
     "/reports": {
       "get": {
         "tags": [
@@ -3973,7 +4014,85 @@
     }
   },
   "components": {
-    "schemas": {
+      "schemas": {
+        "EvidenceRequest": {
+          "type": "object",
+          "properties": {
+            "terms": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "after": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          "required": [
+            "terms",
+            "source"
+          ]
+        },
+        "EvidencePage": {
+          "type": "object",
+          "properties": {
+            "inspected": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "manual": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "next": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            },
+            "hits": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/EvidenceHit"
+              }
+            }
+          },
+          "required": [
+            "inspected",
+            "manual",
+            "hits"
+          ]
+        },
+        "EvidenceHit": {
+          "type": "object",
+          "properties": {
+            "patientId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "patient": {
+              "type": "string"
+            },
+            "recordId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "origin": {
+              "type": "string"
+            },
+            "excerpt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "patientId",
+            "patient",
+            "recordId",
+            "origin",
+            "excerpt"
+          ]
+        },
         "CareInput": {
           "type": "object",
           "required": [

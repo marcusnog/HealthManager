@@ -15,6 +15,10 @@ O administrador registra os fatos abaixo em Pacientes → Acompanhamento. A secr
 | Interrupção | Paciente | Protocolo e data do abandono declarado | Abandono de tratamento |
 | Insumos | Aplicação e dia da execução | Material efetivamente consumido, unidade e quantidade | Consumo de insumos |
 
+## Busca de evidências
+
+Em Relatórios, o administrador pode buscar até quatro palavras ou expressões alternativas. A busca percorre as fichas da própria clínica e os documentos anexados em lotes. O resultado identifica o paciente, a origem e o registro para conferência na ficha. A busca de documentos inclui nome e texto extraível de PDFs. Anexos sem texto legível, indisponíveis ou acima do limite de leitura aparecem na contagem de revisão manual. A busca é somente leitura. O administrador confere a fonte e o conteúdo antes de reconciliar qualquer fato nos relatórios.
+
 ## Implementação e histórico
 
 1. Vincular entidades da mesma clínica e paciente. Manter cadastro, edição com revisão e seleção por nome/data na ficha. Uma consulta tem uma aferição de horários, um pagamento tem uma marcação de sinal e um título pertence a um único contrato. Uma execução pode atender uma etapa.

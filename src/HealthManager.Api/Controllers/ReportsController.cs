@@ -12,6 +12,12 @@ public sealed class ReportsController(ReportsService reports, ReportSourcesServi
     [HttpGet]
     public Task<ReportDirectory> Directory(CancellationToken ct) => reports.DirectoryAsync(ct);
 
+    [HttpPost("evidence/search")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [RequestSizeLimit(2048)]
+    public Task<EvidencePage> SearchEvidence(EvidenceRequest input, [FromServices] EvidenceSearchService search, CancellationToken ct) =>
+        search.SearchAsync(input, ct);
+
     [HttpGet("{id}")]
     public Task<ReportResult> Run(string id, [FromQuery] DateOnly from, [FromQuery] DateOnly to, CancellationToken ct) =>
         reports.RunAsync(id, from, to, ct);
