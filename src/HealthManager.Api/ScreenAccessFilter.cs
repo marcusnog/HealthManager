@@ -29,6 +29,7 @@ public sealed class ScreenAccessFilter : IAuthorizationFilter
             "appointments" when path.Contains("/clinical-record") || path.EndsWith("/clinical-entries") => ["agenda", "dashboard", "pacientes"],
             "appointments" => ["agenda", "dashboard"],
             "patients" when read && !path.Contains('/') => ["pacientes", "agenda", "dashboard", "financeiro"],
+            "patients" when read && path.Split('/') is [_, var id] && Guid.TryParse(id, out _) => ["pacientes", "agenda", "dashboard"],
             "patients" => ["pacientes"],
             "doctors" when read => ["medicos", "agenda", "dashboard", "agenda-medicos", "especialidades", "financeiro-repasses"],
             "doctors" => ["medicos"],

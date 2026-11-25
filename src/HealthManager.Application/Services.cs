@@ -168,6 +168,16 @@ public sealed class PatientService(
     ITenantProvider tenantProvider,
     IStorageService storageService)
 {
+    public async Task<PatientRegistrationResponse> GetRegistrationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var clinicId = TenantGuard.RequireClinicId(tenantProvider);
+        return await dbContext.Patients.AsNoTracking()
+            .Where(p => p.Id == id && p.ClinicId == clinicId && p.DeletedAt == null)
+            .Select(p => new PatientRegistrationResponse(p.Id, p.Name, p.Cpf, p.Phone, p.Email))
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new KeyNotFoundException("Paciente não encontrado.");
+    }
+
     public async Task<PagedResult<PatientResponse>> ListAsync(PatientQuery query, CancellationToken cancellationToken)
     {
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);

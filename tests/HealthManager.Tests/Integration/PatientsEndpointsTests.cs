@@ -9,6 +9,35 @@ namespace HealthManager.Tests.Integration;
 public sealed class PatientsEndpointsTests
 {
     [Fact]
+    public async Task GetRegistration_ShouldReturnOnlyRegistrationFieldsForAnActivePatientOfTheClinic()
+    {
+        await using var factory = new ApiTestFactory();
+        await factory.SeedSecondClinicPatientAsync();
+        await factory.WithDbContextAsync(async db =>
+        {
+            var doctor = await db.Users.SingleAsync(u => u.Email == "henrique.lima@clinicaaurora.com");
+            doctor.ScreenAccessJson = """["agenda"]""";
+            await db.SaveChangesAsync();
+        });
+        using var client = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
+        var id = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+
+        var record = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/patients/{id}");
+        record.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("id", "name", "cpf", "phone", "email");
+        record.GetProperty("id").GetGuid().Should().Be(id);
+        record.GetProperty("name").GetString().Should().Be("Ana Martins");
+
+        (await client.GetAsync("/patients/99999999-9999-9999-9999-999999999999")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        await factory.WithDbContextAsync(async db =>
+        {
+            var patient = await db.Patients.IgnoreQueryFilters().SingleAsync(p => p.Id == id);
+            patient.DeletedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        });
+        (await client.GetAsync($"/patients/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task ListPatients_ShouldOnlyReturnCurrentClinicPatients()
     {
         await using var factory = new ApiTestFactory();

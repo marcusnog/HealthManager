@@ -663,6 +663,20 @@
       }
     },
     "/patients/{id}": {
+      "get": {
+        "operationId": "patients_getRegistration",
+        "summary": "Read the current clinic patient's registration details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PatientRegistrationResponse" } } }
+          },
+          "404": { "description": "Patient not found in the current clinic" }
+        }
+      },
       "patch": {
         "operationId": "patients_update",
         "parameters": [
@@ -4705,6 +4719,17 @@
           "storagePath": {
             "type": "string"
           }
+        }
+      },
+      "PatientRegistrationResponse": {
+        "type": "object",
+        "required": ["id", "name", "cpf", "phone"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "cpf": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string", "nullable": true }
         }
       },
       "PatientResponse": {

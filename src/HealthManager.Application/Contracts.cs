@@ -92,6 +92,7 @@ public sealed record CreatePatientDocumentRequest(
 
 public sealed record DownloadPatientDocumentResult(Stream Content, string ContentType, string FileName);
 public sealed record PatientDocumentResponse(Guid Id, string FileName, string ContentType, long SizeInBytes, string StoragePath);
+public sealed record PatientRegistrationResponse(Guid Id, string Name, string Cpf, string Phone, string? Email);
 public sealed record PatientResponse(Guid Id, string Name, string Cpf, DateOnly? BirthDate, string Phone, string? Email, string? HealthInsurance, Guid? HealthInsuranceId, string? HealthInsuranceName, string? Notes, Guid PatientAccessToken, PatientDetails? Details = null);
 
 public sealed record DoctorQuery(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null);

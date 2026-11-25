@@ -10,6 +10,10 @@ namespace HealthManager.Api.Controllers;
 [Route("patients")]
 public sealed class PatientsController(PatientService patientService, PatientPortalService portalService, ClinicalRecordService clinicalRecordService) : ControllerBase
 {
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<PatientRegistrationResponse>> GetRegistration(Guid id, CancellationToken cancellationToken)
+        => Ok(await patientService.GetRegistrationAsync(id, cancellationToken));
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<PatientResponse>>> List([FromQuery] PatientQuery query, CancellationToken cancellationToken)
         => Ok(await patientService.ListAsync(query, cancellationToken));

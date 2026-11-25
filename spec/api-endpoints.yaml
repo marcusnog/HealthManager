@@ -12,6 +12,7 @@ Auth:
   POST /auth/change-password: "{ currentPassword, newPassword } -> 204 [Auth required]"
 
 Patients:
+  GET /patients/{id}: "-> PatientRegistrationResponse { id, name, cpf, phone, email }. Used by the appointment's registration shortcut. Returns 404 for missing, deleted or other-clinic patients. [ClinicStaff; screen pacientes, agenda or dashboard]"
   GET /patients: "?page,pageSize,search,sortBy,sortDirection,email,healthInsurance -> PagedResult<PatientResponse> [ClinicAdminOrSecretary]"
   POST /patients: "{ identification (cpf optional; sex: Masculino|Feminino|Prefiro não informar), insurance/marketing, contacts (phone optional), address, complementary data, notes } -> 201 PatientResponse [ClinicAdminOrSecretary]"
   PATCH /patients/{id}: "{ all editable patient fields; phone optional; cpf remains immutable } -> PatientResponse [ClinicAdminOrSecretary]"
