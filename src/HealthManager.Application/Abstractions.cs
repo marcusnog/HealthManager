@@ -39,6 +39,7 @@ public interface IApplicationDbContext
 {
     DbSet<ClinicalCatalogItem> ClinicalCatalogItems { get; }
     DbSet<ClinicalEntry> ClinicalEntries { get; }
+    DbSet<ReportSourceRecord> ReportSourceRecords { get; }
     DbSet<Clinic> Clinics { get; }
     DbSet<User> Users { get; }
     DbSet<Patient> Patients { get; }

@@ -37,6 +37,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("AppointmentTypeId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("ClinicId")
                         .HasColumnType("uuid");
 
@@ -61,6 +64,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("RescheduledAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Source")
                         .HasColumnType("integer");
 
@@ -69,6 +75,9 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("TracksRescheduling")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1538,6 +1547,50 @@ namespace HealthManager.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("HealthManager.Domain.ReportSourceRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ClinicId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId", "Source", "Date");
+
+                    b.HasIndex("ClinicId", "Source", "Reference")
+                        .IsUnique();
+
+                    b.ToTable("ReportSourceRecords");
                 });
 
             modelBuilder.Entity("HealthManager.Domain.Specialty", b =>

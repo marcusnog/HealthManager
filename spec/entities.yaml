@@ -94,6 +94,9 @@
 - Appointment:
   id: Guid (auto)
   clinicId: Guid
+  tracksRescheduling: bool (true for bookings created after reporting rollout, false for legacy rows)
+  rescheduledAt: DateTimeOffset? (last change to scheduled start, captured prospectively)
+  cancelledAt: DateTimeOffset? (set on cancellation, cleared on reactivation)
   appointmentGroupId: Guid? (shared by appointments created together; null for individual appointments)
   patientId: Guid (FK Patient)
   doctorId: Guid (FK Doctor)
@@ -424,3 +427,12 @@
   doctorCrm: string (snapshot)
   clinicName: string (snapshot)
   # Entity timestamps inherited; no update/delete endpoint
+
+- ReportSourceRecord:
+  id: Guid
+  clinicId: Guid
+  source: string (catalogue identifier in reports.json)
+  reference: string (stable source reference, max 120, unique per clinic and source)
+  date: DateOnly (local business event date)
+  valuesJson: string (validated fields from the source definition)
+  # Inherits timestamps and soft deletion. Clinic/source/date index supports report cohorts.

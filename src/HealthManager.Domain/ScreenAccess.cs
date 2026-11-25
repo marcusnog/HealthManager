@@ -4,12 +4,12 @@ namespace HealthManager.Domain;
 
 public static class ScreenAccess
 {
-    public static readonly string[] All = ["dashboard", "atendimento", "agenda", "tipos-consulta", "pacientes", "produtos-pacotes", "financeiro", "financeiro-pagar", "financeiro-repasses", "categorias-despesa", "medicos", "convenios", "especialidades", "agenda-medicos", "configuracoes", "usuarios", "clinical-settings"];
+    public static readonly string[] All = ["dashboard", "atendimento", "agenda", "tipos-consulta", "pacientes", "produtos-pacotes", "financeiro", "financeiro-pagar", "financeiro-repasses", "categorias-despesa", "medicos", "convenios", "especialidades", "agenda-medicos", "configuracoes", "usuarios", "clinical-settings", "relatorios"];
 
     public static string[] Available(UserRole role) => role switch
     {
         UserRole.Admin or UserRole.PlatformAdmin => All,
-        UserRole.Secretary => All.Except(["financeiro-repasses", "configuracoes", "usuarios", "clinical-settings"]).ToArray(),
+        UserRole.Secretary => All.Except(["financeiro-repasses", "configuracoes", "usuarios", "clinical-settings", "relatorios"]).ToArray(),
         UserRole.Doctor => ["dashboard", "agenda", "pacientes", "agenda-medicos", "financeiro", "clinical-settings"],
         _ => []
     };

@@ -24,6 +24,7 @@ public sealed class ScreenAccessFilter : IAuthorizationFilter
             "clinical-catalog" => ["clinical-settings"],
             "patients" when read && (path.EndsWith("/clinical-entries") || path.EndsWith("/clinical-records") || path.Contains("/documents")) => ["pacientes", "agenda", "dashboard"],
             "patients" when !read && path.EndsWith("/documents/upload") => ["pacientes", "agenda", "dashboard"],
+            "reports" => ["relatorios"],
             "dashboard" => ["dashboard"],
             "appointments" when path.Contains("/clinical-record") || path.EndsWith("/clinical-entries") => ["agenda", "dashboard", "pacientes"],
             "appointments" => ["agenda", "dashboard"],

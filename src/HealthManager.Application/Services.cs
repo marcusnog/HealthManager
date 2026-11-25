@@ -921,6 +921,7 @@ public sealed class AppointmentService(
 
                 appointment.DoctorId = targetDoctorId;
                 appointment.Doctor = await dbContext.Doctors.FirstAsync(x => x.Id == targetDoctorId && x.ClinicId == clinicId, cancellationToken);
+                if (appointment.StartAt != targetStartAt) appointment.RescheduledAt = DateTimeOffset.UtcNow;
                 appointment.StartAt = targetStartAt;
                 appointment.EndAt = targetEndAt;
 
@@ -1021,6 +1022,7 @@ public sealed class AppointmentService(
     public async Task<AppointmentResponse> CancelAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
         var (appointment, patient, doctor) = await FindAppointmentWithDetailsAsync(appointmentId, cancellationToken);
+        appointment.CancelledAt ??= DateTimeOffset.UtcNow;
         appointment.Status = AppointmentStatus.Cancelled;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -1144,6 +1146,7 @@ public sealed class AppointmentService(
                     : receivable.ReceivedAmount > 0 ? ReceivableStatus.Partial : ReceivableStatus.Pending;
             receivable.UpdatedAt = DateTimeOffset.UtcNow;
         }
+        appointment.CancelledAt = request.Status == AppointmentStatus.Cancelled ? DateTimeOffset.UtcNow : null;
         appointment.Status = request.Status;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;
         dbContext.AuditLogs.Add(new AuditLog
@@ -2501,6 +2504,8 @@ public sealed class PatientApplicationService(IApplicationDbContext dbContext, I
         var clinicId = TenantGuard.RequireClinicId(tenantProvider);
         await RequirePatient(clinicId, patientId, ct);
         var source = ParseSource(request.Source);
+        if (request.TreatmentClass is not null && request.TreatmentClass != (source == ApplicationBalanceSource.Package ? "Protocolo" : "Injetavel"))
+            throw new InvalidOperationException("Classificação incompatível com a origem da venda.");
 
         if (source == ApplicationBalanceSource.Package && request.PackageId.HasValue)
         {
@@ -2508,6 +2513,8 @@ public sealed class PatientApplicationService(IApplicationDbContext dbContext, I
                 .Include(x => x.Items)
                 .FirstOrDefaultAsync(x => x.Id == request.PackageId && x.ClinicId == clinicId && x.IsActive, ct)
                 ?? throw new KeyNotFoundException("Pacote nao encontrado.");
+            await ReportSourcesService.RecordSaleAsync(dbContext, tenantProvider, clinicId, patientId, request.TreatmentClass ?? "Pacote",
+                package.Name, package.Items.Sum(x => x.ApplicationCount), package.Price, ct);
             foreach (var item in package.Items)
                 await GrantUnits(clinicId, patientId, item.ProductId, source, package.Id, item.ApplicationCount, ct);
         }
@@ -2516,6 +2523,8 @@ public sealed class PatientApplicationService(IApplicationDbContext dbContext, I
             var product = await dbContext.Products
                 .FirstOrDefaultAsync(x => x.Id == request.ProductId && x.ClinicId == clinicId && x.IsActive, ct)
                 ?? throw new KeyNotFoundException("Produto nao encontrado.");
+            await ReportSourcesService.RecordSaleAsync(dbContext, tenantProvider, clinicId, patientId, request.TreatmentClass ?? "Individual",
+                product.Name, product.ApplicationCount, product.Price, ct);
             await GrantUnits(clinicId, patientId, product.Id, source, null, product.ApplicationCount, ct);
         }
         else

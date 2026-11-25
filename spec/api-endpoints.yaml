@@ -91,7 +91,7 @@ Packages:
 
 PatientApplications:
   GET /patients/{id}/applications/balance: "-> PatientApplicationBalanceResponse[] { product, source, package?, purchased, used, remaining } [ClinicStaff]"
-  POST /patients/{id}/applications/balance: "{ source: package|individual, packageId?, productId? } -> 201 PatientApplicationBalanceResponse[] (grants purchased units) [ClinicAdminOrSecretary]"
+  POST /patients/{id}/applications/balance: "{ source: package|individual, packageId?, productId? } -> 201 PatientApplicationBalanceResponse[] (grants purchased units) [ClinicAdminOrSecretary]" # Optional treatmentClass: Injetavel (individual) or Protocolo (package).
   GET /patients/{id}/applications: "-> PatientApplicationResponse[] (sessions, newest first) [ClinicStaff]"
   POST /patients/{id}/applications: "{ productId, quantity?, appliedAt?, doctorId?, notes?, balanceId? } -> 201 PatientApplicationResponse (consumes balance) [DoctorOnly]"
 
@@ -204,3 +204,9 @@ ClinicalWorkspace:
 CommissionSettings:
   GET /financial/commission-settings: "-> CommissionSettings { appointmentSale, completedAppointment, productReferral } [ClinicAdmin]"
   PUT /financial/commission-settings: "CommissionSettings (each rule: enabled, mode, value, basis, professionalId?) -> CommissionSettings [ClinicAdmin]"
+
+Reports:
+  GET /reports: "Catalogue deserialized from spec/reports.json, source layouts, clinic-local today [ClinicAdmin]"
+  GET /reports/{id}: "?from,to (inclusive ISO dates, <= 366 days) -> ReportResult with named numeric metrics per group, null if undefined [ClinicAdmin]"
+  GET /reports/sources/{source}: "?from,to,page -> source records in CSV format (100 per page) for review and correction [ClinicAdmin]"
+  POST /reports/sources/{source}/import: "{ csv } -> count of validated records upserted atomically by clinic, source and reference [ClinicAdmin]"

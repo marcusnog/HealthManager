@@ -201,3 +201,11 @@ user_management:
 clinical_workspace:
   specification: "See clinical-workspace.yaml. Clinical catalog shared Admin/Doctor; personal only owning Doctor. Clinical entries immutable, tenant isolated, owning Doctor writes in Draft only."
   screens: "New clinical-settings screen for Admin/Doctor. Catalog reads allowed from agenda/dashboard/pacientes; edits require clinical-settings. Appointment clinical-record (including addendum) and clinical-entries endpoints also accept pacientes screen access to support opening an existing record directly from the patient list. Other appointment operations still require agenda/dashboard. Patient clinical history and document list/download/upload also accept agenda/dashboard grants; document deletion remains pacientes-only."
+
+reports:
+  catalog: "spec/reports.json defines each title, purpose, calculation and supplementary source."
+  access: "Clinic Admin only. Results and source records belong exclusively to the authenticated clinic."
+  period: "Inclusive local dates, maximum 366 days. Monetary values in BRL. An undefined rate or unknown cost is null. An empty cohort is displayed separately."
+  sources: "Complementary CSV records use stable references per source and clinic. Import validates the entire batch before a single save. Reimport corrects the matching reference. Inputs affect reports only."
+  sales: "Granting an individual product or package automatically records one reporting sale, including the historical price, units, patient ID and collaborator. Supplementary sales use the same reference to enrich or correct attribution and cost."
+  treatment_class: "An optional treatmentClass on a grant identifies Injetavel for individual products or Protocolo for packages. Unclassified grants remain in general sales totals."

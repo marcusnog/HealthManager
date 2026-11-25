@@ -4,6 +4,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="../../spec/reports.json" LogicalName="Reports.Catalog" />
     <ProjectReference Include="..\HealthManager.Domain\HealthManager.Domain.csproj" />
   </ItemGroup>
 

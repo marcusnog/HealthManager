@@ -189,7 +189,7 @@ public sealed record PackageRequest([Required][StringLength(100)] string Name, [
 public sealed record PackageItemResponse(Guid ProductId, string ProductName, int ApplicationCount);
 public sealed record PackageResponse(Guid Id, string Name, decimal Price, bool IsActive, IReadOnlyList<PackageItemResponse> Items);
 
-public sealed record GrantApplicationBalanceRequest([Required] string Source, Guid? PackageId = null, Guid? ProductId = null);
+public sealed record GrantApplicationBalanceRequest([Required] string Source, Guid? PackageId = null, Guid? ProductId = null, string? TreatmentClass = null);
 public sealed record PatientApplicationBalanceResponse(Guid Id, Guid ProductId, string ProductName, string Source, Guid? PackageId, string? PackageName, int PurchasedUnits, int UsedUnits, int RemainingUnits);
 public sealed record PatientApplicationRequest([Required] Guid ProductId, [Range(1, int.MaxValue)] int Quantity = 1, DateTimeOffset? AppliedAt = null, Guid? DoctorId = null, string? Notes = null, Guid? BalanceId = null);
 public sealed record PatientApplicationResponse(Guid Id, Guid ProductId, string ProductName, int Quantity, DateTimeOffset AppliedAt, Guid? DoctorId, string? DoctorName, string? Notes);

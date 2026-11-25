@@ -166,6 +166,9 @@ public sealed class Doctor : TenantEntity
 
 public sealed class Appointment : TenantEntity
 {
+    public bool TracksRescheduling { get; set; } = true;
+    public DateTimeOffset? RescheduledAt { get; set; }
+    public DateTimeOffset? CancelledAt { get; set; }
     public Guid? AppointmentGroupId { get; set; }
     public Guid PatientId { get; set; }
     public Guid DoctorId { get; set; }

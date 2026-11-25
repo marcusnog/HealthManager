@@ -22,6 +22,8 @@ public static class DependencyInjection
 services.AddScoped<ProductService>();
         services.AddScoped<PackageService>();
         services.AddScoped<PatientApplicationService>();
+        services.AddScoped<ReportsService>();
+        services.AddScoped<ReportSourcesService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<WhatsAppWebhookService>();
         services.AddScoped<PatientPortalService>();

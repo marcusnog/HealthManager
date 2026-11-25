@@ -13,6 +13,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
     public DbSet<ClinicalCatalogItem> ClinicalCatalogItems => Set<ClinicalCatalogItem>();
     public DbSet<ClinicalEntry> ClinicalEntries => Set<ClinicalEntry>();
+    public DbSet<ReportSourceRecord> ReportSourceRecords => Set<ReportSourceRecord>();
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Patient> Patients => Set<Patient>();
@@ -49,6 +50,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        var source = modelBuilder.Entity<ReportSourceRecord>();
+        source.HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || x.ClinicId == TenantClinicId));
+        source.Property(x => x.Reference).HasMaxLength(120);
+        source.HasIndex(x => new { x.ClinicId, x.Source, x.Reference }).IsUnique();
+        source.HasIndex(x => new { x.ClinicId, x.Source, x.Date });
         modelBuilder.Entity<ClinicalCatalogItem>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<ClinicalEntry>().HasQueryFilter(x => x.DeletedAt == null && (BypassTenantFilter || x.ClinicId == TenantClinicId));
         modelBuilder.Entity<ClinicalCatalogItem>().Property(x => x.Revision).IsConcurrencyToken();

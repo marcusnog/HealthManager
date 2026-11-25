@@ -10,6 +10,239 @@
     }
   ],
   "paths": {
+    "/reports": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "reports_directory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDirectory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Clinic administrator required"
+          },
+          "404": {
+            "description": "Unknown report or source"
+          }
+        }
+      }
+    },
+    "/reports/{id}": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "reports_run",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Clinic administrator required"
+          },
+          "404": {
+            "description": "Unknown report or source"
+          }
+        }
+      }
+    },
+    "/reports/sources/{source}": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "reports_readSource",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourcePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Clinic administrator required"
+          },
+          "404": {
+            "description": "Unknown report or source"
+          }
+        }
+      }
+    },
+    "/reports/sources/{source}/import": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "reports_importSource",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Clinic administrator required"
+          },
+          "404": {
+            "description": "Unknown report or source"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCsv"
+              }
+            }
+          }
+        }
+      }
+    },
     "/financial/payments/{id}": {
       "delete": {
         "operationId": "payments_delete",
@@ -3596,6 +3829,196 @@
   },
   "components": {
     "schemas": {
+      "ReportDirectory": {
+        "type": "object",
+        "required": [
+          "reports",
+          "sources",
+          "today"
+        ],
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportDefinition"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceDefinition"
+            }
+          },
+          "today": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "ReportDefinition": {
+        "type": "object",
+        "required": [
+          "id",
+          "group",
+          "title",
+          "purpose",
+          "calculation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "calculation": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SourceField": {
+        "type": "object",
+        "required": [
+          "key",
+          "type",
+          "required"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        }
+      },
+      "SourceDefinition": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "fields",
+          "header"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceField"
+            }
+          },
+          "header": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReportCsv": {
+        "type": "object",
+        "required": [
+          "csv"
+        ],
+        "properties": {
+          "csv": {
+            "type": "string"
+          }
+        }
+      },
+      "SourcePage": {
+        "type": "object",
+        "required": [
+          "csv",
+          "hasMore"
+        ],
+        "properties": {
+          "csv": {
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReportMetric": {
+        "type": "object",
+        "required": [
+          "label",
+          "value",
+          "unit"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportRow": {
+        "type": "object",
+        "required": [
+          "label",
+          "metrics"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportMetric"
+            }
+          }
+        }
+      },
+      "ReportResult": {
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRow"
+            }
+          }
+        }
+      },
       "UpdateAppointmentStatusRequest": {
         "type": "object",
         "required": [
@@ -5954,6 +6377,11 @@
       "GrantApplicationBalanceRequest": {
         "type": "object",
         "properties": {
+          "treatmentClass": {
+            "type": "string",
+            "nullable": true,
+            "description": "Injetavel for individual products or Protocolo for packages."
+          },
           "source": {
             "type": "string",
             "nullable": true
