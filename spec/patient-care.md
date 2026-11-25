@@ -17,7 +17,7 @@ O administrador registra os fatos abaixo em Pacientes → Acompanhamento. A secr
 
 ## Busca de evidências
 
-Em Relatórios, o administrador pode buscar até quatro palavras ou expressões alternativas. A busca percorre as fichas da própria clínica e os documentos anexados em lotes. O resultado identifica o paciente, a origem e o registro para conferência na ficha. A busca de documentos inclui nome e texto extraível de PDFs. Anexos sem texto legível, indisponíveis ou acima do limite de leitura aparecem na contagem de revisão manual. A busca é somente leitura. O administrador confere a fonte e o conteúdo antes de reconciliar qualquer fato nos relatórios.
+Em Relatórios, o administrador pode buscar até quatro palavras ou expressões alternativas. A busca percorre as fichas da própria clínica e os documentos anexados em lotes. O resultado identifica o paciente, a origem e o registro para conferência na ficha. A busca inclui nome e texto extraível de PDFs. Imagens e PDFs sem texto passam por reconhecimento óptico local em português. Documentos indisponíveis, ilegíveis ou acima dos limites de processamento entram na contagem de revisão manual. O administrador confere a fonte e o conteúdo antes de reconciliar qualquer fato nos relatórios.
 
 ## Implementação e histórico
 

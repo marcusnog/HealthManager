@@ -78,15 +78,21 @@ public sealed class EvidenceSearchService(IApplicationDbContext db, ITenantProvi
         {
             ct.ThrowIfCancellationRequested();
             string? content = null;
-            if ((file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) || file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) &&
-                file.SizeInBytes is >= 0 and <= 16_777_216)
+            var pdf = file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) || file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+            var image = file.ContentType is "image/png" or "image/jpeg" || Path.GetExtension(file.FileName).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg";
+            if ((pdf || image) && file.SizeInBytes is >= 0 and <= 16_777_216)
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeout.CancelAfter(TimeSpan.FromSeconds(5));
+                timeout.CancelAfter(TimeSpan.FromSeconds(15));
                 try
                 {
                     await using var stream = await storage.DownloadPatientDocumentAsync(file.StoragePath, timeout.Token);
-                    content = await ExtractText(stream, timeout.Token);
+                    if (pdf) content = await RunTool("pdftotext", ["-q", "-enc", "UTF-8", "-", "-"], stream, timeout.Token);
+                    if (string.IsNullOrWhiteSpace(content) && stream.CanSeek)
+                    {
+                        stream.Position = 0;
+                        content = await Recognize(stream, pdf, timeout.Token);
+                    }
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested && ex is IOException or KeyNotFoundException or OperationCanceledException or UnauthorizedAccessException) { }
             }
@@ -99,11 +105,41 @@ public sealed class EvidenceSearchService(IApplicationDbContext db, ITenantProvi
         return new(inspected, manual, inspected < files.Count ? files[inspected - 1].Id : null, hits);
     }
 
-    private static async Task<string?> ExtractText(Stream input, CancellationToken ct)
+    private static readonly SemaphoreSlim OcrSlot = new(1);
+    private static async Task<string?> Recognize(Stream input, bool pdf, CancellationToken ct)
     {
-        var info = new ProcessStartInfo("pdftotext") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true,
+        await OcrSlot.WaitAsync(ct);
+        try
+        {
+            if (!pdf) return await RunTool("tesseract", ["stdin", "stdout", "-l", "por"], input, ct);
+            var dir = Directory.CreateTempSubdirectory("hm-ocr-");
+            try
+            {
+                var prefix = Path.Combine(dir.FullName, "page");
+                var rendered = await RunTool("pdftoppm", ["-q", "-f", "1", "-l", "9", "-scale-to", "1600", "-png", "-", prefix], input, ct);
+                var pages = dir.GetFiles("page-*.png").OrderBy(x => x.Name).ToArray();
+                if (rendered == null || pages.Length is 0 or > 8) return null;
+                var result = new StringBuilder();
+                foreach (var page in pages)
+                {
+                    await using var file = page.OpenRead();
+                    var text = await RunTool("tesseract", ["stdin", "stdout", "-l", "por"], file, ct);
+                    if (string.IsNullOrWhiteSpace(text)) return null;
+                    result.AppendLine(text);
+                }
+                return result.ToString();
+            }
+            finally { dir.Delete(recursive: true); }
+        }
+        finally { OcrSlot.Release(); }
+    }
+
+    private static async Task<string?> RunTool(string executable, string[] args, Stream input, CancellationToken ct)
+    {
+        var info = new ProcessStartInfo(executable) { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true,
             RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, CreateNoWindow = true };
-        foreach (var arg in new[] { "-q", "-enc", "UTF-8", "-", "-" }) info.ArgumentList.Add(arg);
+        foreach (var arg in args) info.ArgumentList.Add(arg);
+        info.Environment["OMP_THREAD_LIMIT"] = "1";
         using var proc = Process.Start(info) ?? throw new InvalidOperationException("Extrator de PDF indisponível.");
         using var onCancel = ct.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } });
         try
