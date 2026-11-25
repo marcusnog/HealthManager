@@ -4035,6 +4035,16 @@
             "source"
           ]
         },
+        "EvidenceDocument": {
+          "type": "object",
+          "properties": {
+            "patientId": { "type": "string", "format": "uuid" },
+            "patient": { "type": "string" },
+            "recordId": { "type": "string", "format": "uuid" },
+            "fileName": { "type": "string" }
+          },
+          "required": ["patientId", "patient", "recordId", "fileName"]
+        },
         "EvidencePage": {
           "type": "object",
           "properties": {
@@ -4051,6 +4061,10 @@
               "format": "uuid",
               "nullable": true
             },
+            "manualDocuments": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/EvidenceDocument" }
+            },
             "hits": {
               "type": "array",
               "items": {
@@ -4061,6 +4075,7 @@
           "required": [
             "inspected",
             "manual",
+            "manualDocuments",
             "hits"
           ]
         },

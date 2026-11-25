@@ -19,6 +19,8 @@ O administrador registra os fatos abaixo em Pacientes → Acompanhamento. A secr
 
 Em Relatórios, o administrador pode buscar até quatro palavras ou expressões alternativas. A busca percorre as fichas da própria clínica e os documentos anexados em lotes. O resultado identifica o paciente, a origem e o registro para conferência na ficha. A busca inclui nome e texto extraível de PDFs. Imagens e PDFs sem texto passam por reconhecimento óptico local em português. Documentos indisponíveis, ilegíveis ou acima dos limites de processamento entram na contagem de revisão manual. O administrador confere a fonte e o conteúdo antes de reconciliar qualquer fato nos relatórios.
 
+Cada lote identifica os originais pendentes por paciente, arquivo e referência do documento. A lista de revisão manual permite baixar o original com as permissões da ficha, mesmo quando o nome do anexo não contém os termos buscados.
+
 ## Implementação e histórico
 
 1. Vincular entidades da mesma clínica e paciente. Manter cadastro, edição com revisão e seleção por nome/data na ficha. Uma consulta tem uma aferição de horários, um pagamento tem uma marcação de sinal e um título pertence a um único contrato. Uma execução pode atender uma etapa.

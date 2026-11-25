@@ -8,7 +8,8 @@ namespace HealthManager.Application;
 
 public sealed record EvidenceRequest(string Terms, string Source, Guid? After = null);
 public sealed record EvidenceHit(Guid PatientId, string Patient, Guid RecordId, string Origin, string Excerpt);
-public sealed record EvidencePage(int Inspected, int Manual, Guid? Next, List<EvidenceHit> Hits);
+public sealed record EvidenceDocument(Guid PatientId, string Patient, Guid RecordId, string FileName);
+public sealed record EvidencePage(int Inspected, int Manual, Guid? Next, List<EvidenceHit> Hits, List<EvidenceDocument> ManualDocuments);
 
 public sealed class EvidenceSearchService(IApplicationDbContext db, ITenantProvider tenant, IStorageService storage)
 {
@@ -62,7 +63,7 @@ public sealed class EvidenceSearchService(IApplicationDbContext db, ITenantProvi
         foreach (var x in await db.PatientProductBalances.Where(x => x.ClinicId == clinic && ids.Contains(x.PatientId))
             .Select(x => new { x.PatientId, x.Id, Product = x.Product!.Name, Package = x.Package == null ? null : x.Package.Name }).ToListAsync(ct))
             Find(x.PatientId, x.Id, "Saldo contratado", x.Package + " " + x.Product);
-        return new(batch.Length, 0, patients.Count > size ? batch[^1].Id : null, hits);
+        return new(batch.Length, 0, patients.Count > size ? batch[^1].Id : null, hits, []);
     }
 
     private async Task<EvidencePage> Documents(Guid clinic, Guid? after, Matcher search, CancellationToken ct)
@@ -72,7 +73,8 @@ public sealed class EvidenceSearchService(IApplicationDbContext db, ITenantProvi
                 (after == null || x.Id.CompareTo(after.Value) > 0))
             .OrderBy(x => x.Id).Take(size + 1).Select(x => new { x.Id, x.PatientId, x.Patient!.Name, x.FileName, x.SizeInBytes, x.StoragePath, x.ContentType }).ToListAsync(ct);
         List<EvidenceHit> hits = [];
-        int inspected = 0, manual = 0;
+        List<EvidenceDocument> manualDocuments = [];
+        int inspected = 0;
         var timer = Stopwatch.StartNew();
         foreach (var file in files.Take(size))
         {
@@ -96,13 +98,14 @@ public sealed class EvidenceSearchService(IApplicationDbContext db, ITenantProvi
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested && ex is IOException or KeyNotFoundException or OperationCanceledException or UnauthorizedAccessException) { }
             }
-            if (string.IsNullOrWhiteSpace(content)) manual++;
+            if (string.IsNullOrWhiteSpace(content))
+                manualDocuments.Add(new(file.PatientId, file.Name, file.Id, file.FileName));
             if ((search.Excerpt(content) ?? search.Excerpt(file.FileName)) is { } excerpt)
                 hits.Add(new(file.PatientId, file.Name, file.Id, file.FileName, excerpt));
             inspected++;
             if (timer.Elapsed.TotalSeconds >= 3) break;
         }
-        return new(inspected, manual, inspected < files.Count ? files[inspected - 1].Id : null, hits);
+        return new(inspected, manualDocuments.Count, inspected < files.Count ? files[inspected - 1].Id : null, hits, manualDocuments);
     }
 
     private static readonly SemaphoreSlim OcrSlot = new(1);

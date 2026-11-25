@@ -31,6 +31,8 @@ public class EvidenceSearchTests
         records.Hits.Should().OnlyContain(x => x.PatientId == patient);
         var files = await Search("documentos");
         files.Manual.Should().BeGreaterThan(0);
+        files.ManualDocuments.Should().HaveCount(files.Manual);
+        files.ManualDocuments.Should().ContainSingle(x => x.PatientId == patient && x.FileName == "next.png");
         files.Hits.Should().ContainSingle(x => x.Origin == "next.png" && x.PatientId == patient);
         (await admin.PostAsJsonAsync("/reports/evidence/search", new EvidenceRequest("", "fichas"))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         using var doctor = await factory.CreateAuthenticatedClientAsync("henrique.lima@clinicaaurora.com", "ChangeMe123!");
