@@ -5,7 +5,7 @@
       "group": "Agenda",
       "title": "Novos agendamentos",
       "purpose": "Quantificar pacientes que contrataram uma reserva de data.",
-      "calculation": "Pacientes distintos com pagamento de reserva positivo no período e soma dos valores pagos. Cada linha identifica um pagamento de sinal.",
+      "calculation": "Pacientes distintos com pagamento de reserva positivo no período e soma dos valores pagos. O total é seguido pelos pagamentos, com paciente e data; referências importadas sem cadastro são identificadas como tal.",
       "source": "reservas"
     },
     {

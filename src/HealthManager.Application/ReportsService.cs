@@ -32,6 +32,20 @@ public sealed class ReportsService(IApplicationDbContext db, ITenantProvider ten
             var lines = records.Select(x => new SourceLine(x.Date, JsonSerializer.Deserialize<Dictionary<string, string>>(x.ValuesJson)!, x.Reference)).ToList();
             if (report.Source != "vendas")
                 lines.AddRange(await PatientCareReport.ReadAsync(db, clinic, report.Source, from, to, await Zone(clinic, ct), ct));
+            if (id == "novos-agendamentos" && lines.Count > 0)
+            {
+                var ids = lines.Select(x => Guid.TryParse(x.Text("paciente"), out var patient) ? patient : Guid.Empty).Where(x => x != Guid.Empty).Distinct().ToList();
+                var names = await db.Patients.AsNoTracking().Where(x => x.ClinicId == clinic && ids.Contains(x.Id))
+                    .Select(x => new { x.Id, x.Name, x.MedicalRecordNumber }).ToDictionaryAsync(x => x.Id, ct);
+                var result = Calculate(id, lines, from, to);
+                result.AddRange(lines.OrderByDescending(x => x.Date).ThenBy(x => x.Reference).Select(x => {
+                    var patient = x.Text("paciente");
+                    var label = Guid.TryParse(patient, out var patientId) && names.TryGetValue(patientId, out var found)
+                        ? $"{found.Name} · {found.MedicalRecordNumber}" : $"Referência importada: {patient}";
+                    return new ReportRow($"{label} · {x.Date:dd/MM/yyyy}", [new("Pacientes", 1), new("Reservas pagas", x.Number("valor"), "brl")]);
+                }));
+                return new(result);
+            }
             return new(lines.Count == 0 ? [] : Calculate(id, lines, from, to));
         }
         var zone = await Zone(clinic, ct);

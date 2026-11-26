@@ -47,9 +47,12 @@ public sealed class ReportsEndpointsTests
         foreach (var report in directory.Reports)
             (await admin.GetAsync($"/reports/{report.Id}{Period}")).EnsureSuccessStatusCode();
 
-        async Task<ReportRow> Row(string id) => (await admin.GetFromJsonAsync<ReportResult>($"/reports/{id}{Period}"))!.Rows.Single();
+        async Task<ReportRow> Row(string id) { var rows = (await admin.GetFromJsonAsync<ReportResult>($"/reports/{id}{Period}"))!.Rows; return id == "novos-agendamentos" ? rows.First() : rows.Single(); }
         (await Row("pontualidade")).Metrics.Select(m => m.Value).Should().Equal(15m, 10m);
         (await Row("novos-agendamentos")).Metrics.Select(m => m.Value).Should().Equal(1m, 120.50m);
+        var details = (await admin.GetFromJsonAsync<ReportResult>("/reports/novos-agendamentos" + Period))!.Rows;
+        details.Should().HaveCount(2);
+        details[1].Label.Should().Contain("p1").And.Contain("01/10/2026");
         (await Row("margem-modalidade")).Metrics.Select(m => m.Value).Should().Equal(300m, 75m, 225m, 75m);
         (await Row("margem-injetavel")).Metrics.Last().Value.Should().BeNull();
         (await Row("receita-futura")).Metrics.Single().Value.Should().Be(150m);
@@ -69,6 +72,22 @@ public sealed class ReportsEndpointsTests
         (await Row("novos-agendamentos")).Metrics.Select(m => m.Value).Should().Equal(1m, 70m);
         var page = await admin.GetFromJsonAsync<SourcePage>("/reports/sources/reservas" + Period);
         page!.Csv.Should().Contain("70").And.NotContain("1000");
+    }
+
+    [Fact]
+    public async Task New_appointments_show_the_linked_patient_name()
+    {
+        await using var factory = new ApiTestFactory();
+        using var admin = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        var patientId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        string name = "";
+        await factory.WithDbContextAsync(async db => name = (await db.Patients.SingleAsync(x => x.Id == patientId)).Name);
+        var csv = $"referencia;data;paciente;valor\nsinal;2026-10-01;{patientId};60";
+        (await admin.PostAsJsonAsync("/reports/sources/reservas/import", new ReportCsv(csv))).EnsureSuccessStatusCode();
+        var report = (await admin.GetFromJsonAsync<ReportResult>("/reports/novos-agendamentos" + Period))!;
+        report.Rows.Should().HaveCount(2);
+        report.Rows[1].Label.Should().Contain(name).And.Contain("01/10/2026");
+        report.Rows[1].Metrics.Last().Value.Should().Be(60);
     }
 
     [Fact]
