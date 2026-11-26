@@ -45,7 +45,9 @@ public class PatientCareEndpointsTests
         (await Save(paid.Id, visit)).StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await client.GetFromJsonAsync<CareWorkspace>(path))!.Records.Single().Links["consulta"].Should().Be(visit);
         var report = await client.GetFromJsonAsync<ReportResult>("/reports/novos-agendamentos?from=2026-11-06&to=2026-11-06");
-        report!.Rows.Single().Metrics.Select(m => m.Value).Should().Equal(1m, 60m);
+        report!.Rows.First().Metrics.Select(m => m.Value).Should().Equal(1m, 60m);
+        report.Rows.Should().HaveCount(2);
+        report.Rows[1].Label.Should().NotStartWith("Referência importada:");
         await factory.WithDbContextAsync(async db => {
             var original = await db.Receivables.SingleAsync(x => x.Id == bill.Id);
             original.AppointmentId.Should().BeNull();
@@ -91,7 +93,7 @@ public class PatientCareEndpointsTests
         async Task<decimal?[]> Metrics(string report, string end = "2026-10-31")
         {
             var result = await client.GetFromJsonAsync<ReportResult>($"/reports/{report}?from=2026-10-01&to={end}");
-            return result!.Rows.SelectMany(x => x.Metrics.Select(m => m.Value)).ToArray();
+            return (report == "novos-agendamentos" ? result!.Rows.Take(1) : result!.Rows).SelectMany(x => x.Metrics.Select(m => m.Value)).ToArray();
         }
         await Save("reservas", [], new() { ["pagamento"] = payment });
         await Save("espera", []);
