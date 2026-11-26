@@ -46,7 +46,7 @@ public sealed record TenantSettingsResponse(
 
 public sealed record PatientQuery(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null, string? Email = null, string? HealthInsurance = null);
 public sealed record AppointmentQuery(int Page = 1, int PageSize = 20, DateOnly? Date = null, DateOnly? DateFrom = null, DateOnly? DateTo = null, Guid? DoctorId = null, string? Status = null);
-public sealed record FinancialQuery(int Page = 1, int PageSize = 20, string? Status = null, DateOnly? DateFrom = null, DateOnly? DateTo = null);
+public sealed record FinancialQuery(int Page = 1, int PageSize = 20, string? Status = null, DateOnly? DateFrom = null, DateOnly? DateTo = null, string? PatientName = null);
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int Total);
 
 public sealed record CreatePatientRequest(

@@ -9,6 +9,23 @@ namespace HealthManager.Tests.Integration;
 public sealed class FinancialEndpointsTests
 {
     [Fact]
+    public async Task Receivables_FilterByPatientNameBeforePagination()
+    {
+        await using var factory = new ApiTestFactory();
+        using var client = await factory.CreateAuthenticatedClientAsync("admin@clinicaaurora.com", "ChangeMe123!");
+        string name = "";
+        await factory.WithDbContextAsync(async db =>
+        {
+            name = (await db.Patients.SingleAsync(x => x.Id == Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd"))).Name;
+        });
+        var result = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/financial/receivables?page=1&pageSize=1&patientName={Uri.EscapeDataString(name.ToUpperInvariant())}");
+        result.GetProperty("total").GetInt32().Should().BeGreaterThan(0);
+        result.GetProperty("items")[0].GetProperty("patientName").GetString().Should().Be(name);
+        var none = await client.GetFromJsonAsync<System.Text.Json.JsonElement>("/financial/receivables?patientName=nome-inexistente");
+        none.GetProperty("total").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
     public async Task ExpenseCategory_ShouldBeListedAndUsedWhenCreatingExpense()
     {
         await using var factory = new ApiTestFactory();

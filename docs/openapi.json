@@ -1612,6 +1612,11 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "patientName",
+            "in": "query",
+            "schema": { "type": "string" }
           }
         ],
         "responses": {

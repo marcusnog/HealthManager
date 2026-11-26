@@ -57,7 +57,7 @@ Financial:
   # FinanceSummaryView, FinanceSettlements — permissions carried as JWT 'permission' claims.
   # View policies accept view or manage permission; Manage policies require manage only.
   # Admin: all. Secretary: categories+receivables manage, payables view, summary view. Doctor: receivables/summary view.
-  GET /financial/receivables: "?page,pageSize,status,dateFrom,dateTo -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [FinanceReceivablesView]"
+  GET /financial/receivables: "?page,pageSize,status,dateFrom,dateTo,patientName -> PagedResult<ReceivableResponse> (includes linked appointment date, type, status and doctor) [FinanceReceivablesView]"
   GET /financial/payments: "?page,pageSize,receivableId,dateFrom,dateTo,destinationBank -> PagedResult<PaymentResponse> [FinanceReceivablesView]"
   POST /financial/payments: "{ receivableId, amount, paymentMethod, paidAt?, destinationBank?, fundsRecipient?, notes? } -> 201 PaymentResponse [FinanceReceivablesManage]"
   POST /financial/receivables/manual: "{ patientId?, description?, amount, dueDate?, paymentMethod, paidAt?, destinationBank?, fundsRecipient?, notes? } -> 201 ReceivableResponse (patient link, no appointment) [FinanceReceivablesManage]"

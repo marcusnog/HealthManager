@@ -1276,6 +1276,14 @@ public sealed class FinancialService(
             receivablesQuery = receivablesQuery.Where(x => x.DueDate <= to);
         }
 
+        if (!string.IsNullOrWhiteSpace(query.PatientName))
+        {
+            var patientName = query.PatientName.Trim().ToLowerInvariant();
+            receivablesQuery = receivablesQuery.Where(x =>
+                x.Patient != null ? x.Patient.Name.ToLower().Contains(patientName) :
+                x.Appointment != null && x.Appointment.Patient != null && x.Appointment.Patient.Name.ToLower().Contains(patientName));
+        }
+
         var total = await receivablesQuery.CountAsync(cancellationToken);
         var items = await receivablesQuery
             .OrderByDescending(x => x.CreatedAt)
