@@ -15,9 +15,12 @@ internal static class PatientCareReport
         {
             var start = ReportDates.Utc(from, TimeOnly.MinValue, zone);
             var deposits = await query.Where(x => x.Payment!.Status == PaymentStatus.Paid && x.Payment.PaidAt >= start && x.Payment.PaidAt < end)
-                .Select(x => new { x.Id, x.PatientId, x.Payment!.PaidAt, x.Payment.Amount }).ToListAsync(ct);
+                .Select(x => new { x.Id, x.PatientId, x.Payment!.PaidAt, x.Payment.Amount,
+                    DoctorName = db.Doctors.Where(d => d.ClinicId == clinic && d.Id ==
+                        ((Guid?)x.Appointment!.DoctorId ?? (Guid?)x.Payment.Receivable!.Appointment!.DoctorId ?? x.Payment.Receivable.ProfessionalId))
+                        .Select(d => d.Name).FirstOrDefault() }).ToListAsync(ct);
             return deposits.Select(x => new SourceLine(PatientCareService.Local(x.PaidAt, zone),
-                new() { ["paciente"] = x.PatientId.ToString(), ["valor"] = x.Amount.ToString(CultureInfo.InvariantCulture) }, x.Id.ToString())).ToList();
+                new() { ["paciente"] = x.PatientId.ToString(), ["medico"] = x.DoctorName ?? "", ["valor"] = x.Amount.ToString(CultureInfo.InvariantCulture) }, x.Id.ToString())).ToList();
         }
         query = query.Where(x => x.Date <= to);
         if (source is "horarios" or "indicacoes" or "etapas" or "interrupcoes" or "insumos") query = query.Where(x => x.Date >= from);

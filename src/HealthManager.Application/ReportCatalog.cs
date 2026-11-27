@@ -24,7 +24,7 @@ public sealed record ReportDirectory(ReportDefinition[] Reports, SourceDefinitio
 public sealed record ReportCsv(string Csv);
 public sealed record SourcePage(string Csv, bool HasMore);
 public sealed record ReportMetric(string Label, decimal? Value, string Unit = "numero");
-public sealed record ReportRow(string Label, IReadOnlyList<ReportMetric> Metrics);
+public sealed record ReportRow(string Label, IReadOnlyList<ReportMetric> Metrics, string? DoctorName = null);
 public sealed record ReportResult(IReadOnlyList<ReportRow> Rows);
 
 internal sealed record SourceLine(DateOnly Date, Dictionary<string, string> Fields, string Reference)

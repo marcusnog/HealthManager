@@ -4428,6 +4428,10 @@
           "metrics"
         ],
         "properties": {
+          "doctorName": {
+            "type": "string",
+            "nullable": true
+          },
           "label": {
             "type": "string"
           },

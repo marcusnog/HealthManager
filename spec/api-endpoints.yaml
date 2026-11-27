@@ -213,6 +213,6 @@ PatientCare:
 Reports:
   POST /reports/evidence/search: "Read-only ClinicAdmin keyword search. Tenant-scoped cursor batches of patient records or attachments. Returns keyword hits, inspected count, next cursor and unreadable file count. manualDocuments identifies each pending original by patient, document ID and filename, independently of keyword hits. Search words are sent in the body."
   GET /reports: "Catalogue deserialized from spec/reports.json, source layouts, clinic-local today [ClinicAdmin]"
-  GET /reports/{id}: "?from,to (inclusive ISO dates, <= 366 days) -> ReportResult with named numeric metrics per group, null if undefined; novos-agendamentos includes the total and individual payments with patient identity and date [ClinicAdmin]"
+  GET /reports/{id}: "?from,to (inclusive ISO dates, <= 366 days) -> ReportResult with named numeric metrics per group, null if undefined; novos-agendamentos includes the total and individual payments with patient identity, date and optional doctorName [ClinicAdmin]"
   GET /reports/sources/{source}: "?from,to,page -> source records in CSV format (100 per page) for review and correction [ClinicAdmin]"
   POST /reports/sources/{source}/import: "{ csv } -> count of validated records upserted atomically by clinic, source and reference [ClinicAdmin]"

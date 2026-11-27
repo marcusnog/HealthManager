@@ -50,6 +50,7 @@ public class PatientCareEndpointsTests
         report.Rows[1].Label.Should().NotStartWith("Referência importada:");
         await factory.WithDbContextAsync(async db => {
             var original = await db.Receivables.SingleAsync(x => x.Id == bill.Id);
+            report.Rows[1].DoctorName.Should().Be(await db.Appointments.Where(x => x.Id == visit).Select(x => x.Doctor!.Name).SingleAsync());
             original.AppointmentId.Should().BeNull();
             original.ReceivedAmount.Should().Be(60);
             original.OriginalAmount.Should().Be(60);

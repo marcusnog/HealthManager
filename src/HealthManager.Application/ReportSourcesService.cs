@@ -36,7 +36,9 @@ public sealed class ReportSourcesService(IApplicationDbContext db, ITenantProvid
         var batch = new Dictionary<string, SourceLine>();
         try
         {
-            if (!(parser.ReadFields() ?? []).SequenceEqual(definition.Header))
+            var header = parser.ReadFields() ?? [];
+            var legacyReservation = source == "reservas" && header.SequenceEqual(definition.Header[..^1]);
+            if (!legacyReservation && !header.SequenceEqual(definition.Header))
                 throw new InvalidOperationException("Confira o cabeçalho e a ordem das colunas do modelo.");
             while (!parser.EndOfData)
             {
@@ -44,11 +46,11 @@ public sealed class ReportSourcesService(IApplicationDbContext db, ITenantProvid
                 var line = parser.LineNumber;
                 var cells = parser.ReadFields()!;
                 string Error(string msg) => $"Linha {line}: {msg}.";
-                if (cells.Length != definition.Header.Length || cells[0].Length is 0 or > 120 || cells[0].Any(char.IsControl))
+                if (cells.Length != header.Length || cells[0].Length is 0 or > 120 || cells[0].Any(char.IsControl))
                     throw new InvalidOperationException(Error("referência ou número de colunas inválido"));
                 var date = ParseDate(cells[1]) ?? throw new InvalidOperationException(Error("data inválida, use AAAA-MM-DD"));
                 var values = new Dictionary<string, string>();
-                for (var i = 0; i < definition.Fields.Length; i++)
+                for (var i = 0; i < cells.Length - 2; i++)
                 {
                     var field = definition.Fields[i];
                     var value = cells[i + 2];

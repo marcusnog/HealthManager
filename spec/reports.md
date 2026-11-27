@@ -48,7 +48,7 @@ A classificação da venda como injetável ou protocolo pode ser indicada na con
 
 | Relatório | Finalidade | Cálculo e recorte |
 |---|---|---|
-| Novos agendamentos | Quantificar pacientes que contrataram uma reserva de data. | Pacientes distintos com pagamento de reserva positivo no período e soma dos valores pagos. O total é seguido pelos pagamentos com paciente e data; referências importadas sem cadastro são identificadas como tal. |
+| Novos agendamentos | Quantificar pacientes que contrataram uma reserva de data. | Pacientes distintos com pagamento de reserva positivo no período e soma dos valores pagos. O total é seguido pelos pagamentos com paciente, data e médico. Reservas sem médico informado exibem “Não informado”. As referências importadas sem cadastro são identificadas como tal. |
 | Taxa de ocupação | Comparar horários ocupados e disponíveis. | Minutos ocupados dentro da disponibilidade semanal vigente divididos pelos minutos disponíveis. Sobreposições do mesmo médico contam uma vez. Exclui cancelamentos. |
 | Taxa de no-show | Medir a frequência de faltas. | Faltas divididas pela soma de consultas concluídas e faltas, pela data agendada. |
 | Taxa de cancelamento | Medir a proporção de consultas canceladas. | Consultas atualmente canceladas divididas pelas consultas agendadas para o período. |

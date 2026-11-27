@@ -42,7 +42,7 @@ public sealed class ReportsService(IApplicationDbContext db, ITenantProvider ten
                     var patient = x.Text("paciente");
                     var label = Guid.TryParse(patient, out var patientId) && names.TryGetValue(patientId, out var found)
                         ? $"{found.Name} · {found.MedicalRecordNumber}" : $"Referência importada: {patient}";
-                    return new ReportRow($"{label} · {x.Date:dd/MM/yyyy}", [new("Pacientes", 1), new("Reservas pagas", x.Number("valor"), "brl")]);
+                    return new ReportRow($"{label} · {x.Date:dd/MM/yyyy}", [new("Pacientes", 1), new("Reservas pagas", x.Number("valor"), "brl")], x.Fields.GetValueOrDefault("medico"));
                 }));
                 return new(result);
             }

@@ -27,7 +27,7 @@ public sealed class ReportsEndpointsTests
         directory.Reports.GroupBy(x => x.Group).Select(g => g.Count()).Should().BeEquivalentTo([15, 13, 14]);
 
         var records = new Dictionary<string, string> {
-            ["reservas"] = "p1;120,50",
+            ["reservas"] = "p1;120,50;Dra. Ana",
             ["espera"] = "p1;",
             ["horarios"] = "08:00;08:05;08:15",
             ["indicacoes"] = "p1;c1;2026-10-15",
@@ -52,6 +52,7 @@ public sealed class ReportsEndpointsTests
         (await Row("novos-agendamentos")).Metrics.Select(m => m.Value).Should().Equal(1m, 120.50m);
         var details = (await admin.GetFromJsonAsync<ReportResult>("/reports/novos-agendamentos" + Period))!.Rows;
         details.Should().HaveCount(2);
+        details[1].DoctorName.Should().Be("Dra. Ana");
         details[1].Label.Should().Contain("p1").And.Contain("01/10/2026");
         (await Row("margem-modalidade")).Metrics.Select(m => m.Value).Should().Equal(300m, 75m, 225m, 75m);
         (await Row("margem-injetavel")).Metrics.Last().Value.Should().BeNull();
@@ -60,9 +61,9 @@ public sealed class ReportsEndpointsTests
         (await Row("insumos")).Metrics.Single().Value.Should().Be(1.25m);
 
         var header = string.Join(';', directory.Sources.Single(s => s.Id == "reservas").Header);
-        var correction = new ReportCsv(header + "\nref;2026-10-02;p1;70");
+        var correction = new ReportCsv(header + "\nref;2026-10-02;p1;70;");
         (await admin.PostAsJsonAsync("/reports/sources/reservas/import", correction)).EnsureSuccessStatusCode();
-        var invalid = new ReportCsv(correction.Csv + "\nref2;2026-10-02;p2;-5");
+        var invalid = new ReportCsv(correction.Csv + "\nref2;2026-10-02;p2;-5;");
         (await admin.PostAsJsonAsync("/reports/sources/reservas/import", invalid)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         await factory.WithDbContextAsync(async db => {
             db.ReportSourceRecords.Add(new() { Source = "reservas", Reference = "ref", ClinicId = Guid.NewGuid(),
